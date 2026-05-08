@@ -62,7 +62,8 @@ function _chartLine(ctx, pts, color, lw, l, t, pw, ph, xMax, yMax) {
 
 // ── Torque chart ──────────────────────────────────────────────────────────────
 function drawTorque(r) {
-  const c = _chartSetup('torqueCanvas');
+  const CID = 'torqueCanvas';
+  const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
 
@@ -84,35 +85,45 @@ function drawTorque(r) {
   const stMid = makeFF(ffMid);
   const stHi  = makeFF(ffHi);
 
-  const maxMD    = qpState.survey[qpState.survey.length - 1].md;
-  const maxTorq  = Math.max(
-    ...stHi.map(s => s.torque_ftlbs / 1000), 1);
+  const maxMD   = qpState.survey[qpState.survey.length - 1].md;
+  const xMax    = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), 1) * 1.1;
 
-  const g = _chartGrid(ctx, W, H, maxTorq * 1.1, maxMD, 'Torque (ft·lbs ×1000)', 'MD (ft)');
+  const g = _chartGrid(ctx, W, H, xMax, maxMD, 'Torque (ft·lbs ×1000)', 'MD (ft)');
 
   const toLine = sts => sts.map(s => ({ x: s.torque_ftlbs / 1000, y: s.md }));
-  _chartLine(ctx, toLine(stLo),  CHART_COLORS.lo,  1.5, g.l, g.t, g.pw, g.ph, maxTorq * 1.1, maxMD);
-  _chartLine(ctx, toLine(stMid), CHART_COLORS.mid, 2,   g.l, g.t, g.pw, g.ph, maxTorq * 1.1, maxMD);
-  _chartLine(ctx, toLine(stHi),  CHART_COLORS.hi,  1.5, g.l, g.t, g.pw, g.ph, maxTorq * 1.1, maxMD);
+  const liveCurves = [
+    { pts: toLine(stLo),  color: CHART_COLORS.lo,  label: 'FF ' + ffLo  },
+    { pts: toLine(stMid), color: CHART_COLORS.mid, label: 'FF ' + ffMid },
+    { pts: toLine(stHi),  color: CHART_COLORS.hi,  label: 'FF ' + ffHi  },
+  ];
+  CI.storeLive(CID, liveCurves);
+  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Torque (kft·lb)', yLabel: 'MD (ft)', depthDown: false });
+  CI.drawFrozen(ctx, CID);
+
+  _chartLine(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLine(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLine(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
 
   _legend(ctx, W, g.t, ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi],
     [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi]);
+  CI.drawAnnotations(ctx, CID);
 }
 
 // ── Buckling chart ────────────────────────────────────────────────────────────
 function drawBuckling(r) {
-  const c = _chartSetup('bucklingCanvas');
+  const CID = 'bucklingCanvas';
+  const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
 
   const bk = r.buckling;
   if (!bk?.stations?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  const maxMD   = Math.max(...bk.stations.map(s => s.md), 1);
-  const maxF    = Math.max(...bk.stations.map(s =>
-    Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0, -s.axialLoad_lbf || 0)), 1) / 1000;
+  const maxMD = Math.max(...bk.stations.map(s => s.md), 1);
+  const xMax  = Math.max(...bk.stations.map(s =>
+    Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0, -s.axialLoad_lbf || 0)), 1) / 1000 * 1.1;
 
-  const g = _chartGrid(ctx, W, H, maxF * 1.1, maxMD, 'Critical Load (klbs)', 'MD (ft)');
+  const g = _chartGrid(ctx, W, H, xMax, maxMD, 'Critical Load (klbs)', 'MD (ft)');
 
   const sinPts  = bk.stations.filter(s => s.fSin_lbf != null)
                              .map(s => ({ x: s.fSin_lbf / 1000, y: s.md }));
@@ -120,17 +131,28 @@ function drawBuckling(r) {
                              .map(s => ({ x: s.fHel_lbf / 1000, y: s.md }));
   const compPts = bk.stations.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
 
-  _chartLine(ctx, sinPts,  '#c0392b',  1.5, g.l, g.t, g.pw, g.ph, maxF * 1.1, maxMD);
-  _chartLine(ctx, helPts,  '#2a7fa8',  1.5, g.l, g.t, g.pw, g.ph, maxF * 1.1, maxMD);
-  _chartLine(ctx, compPts, '#1a7a4a',  2,   g.l, g.t, g.pw, g.ph, maxF * 1.1, maxMD);
+  const liveCurves = [
+    { pts: sinPts,  color: '#c0392b', label: 'Sinusoidal'      },
+    { pts: helPts,  color: '#2a7fa8', label: 'Helical'         },
+    { pts: compPts, color: '#1a7a4a', label: 'Compressive Load'},
+  ];
+  CI.storeLive(CID, liveCurves);
+  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Critical Load (klbs)', yLabel: 'MD (ft)', depthDown: false });
+  CI.drawFrozen(ctx, CID);
+
+  _chartLine(ctx, sinPts,  '#c0392b', 1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLine(ctx, helPts,  '#2a7fa8', 1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLine(ctx, compPts, '#1a7a4a', 2,   g.l, g.t, g.pw, g.ph, xMax, maxMD);
 
   _legend(ctx, W, g.t, ['Sinusoidal', 'Helical', 'Compressive Load'],
     ['#c0392b', '#2a7fa8', '#1a7a4a']);
+  CI.drawAnnotations(ctx, CID);
 }
 
 // ── Overpull chart ────────────────────────────────────────────────────────────
 function drawOverpull(r) {
-  const c = _chartSetup('overpullCanvas');
+  const CID = 'overpullCanvas';
+  const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
 
@@ -150,28 +172,39 @@ function drawOverpull(r) {
   const stHi  = makePooh(ffHi);
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
-  const maxHL = Math.max(...stHi.map(s => s.axialLoad_lbf / 1000), 1);
+  const xMax  = Math.max(...stHi.map(s => s.axialLoad_lbf / 1000), 1) * 1.1;
 
-  const g = _chartGrid(ctx, W, H, maxHL * 1.1, maxMD, 'Hook Load (klbs)', 'MD (ft)');
+  const g = _chartGrid(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
   const toLine = sts => sts.map(s => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
-  _chartLine(ctx, toLine(stLo),  CHART_COLORS.lo,  1.5, g.l, g.t, g.pw, g.ph, maxHL * 1.1, maxMD);
-  _chartLine(ctx, toLine(stMid), CHART_COLORS.mid, 2,   g.l, g.t, g.pw, g.ph, maxHL * 1.1, maxMD);
-  _chartLine(ctx, toLine(stHi),  CHART_COLORS.hi,  1.5, g.l, g.t, g.pw, g.ph, maxHL * 1.1, maxMD);
+  const liveCurves = [
+    { pts: toLine(stLo),  color: CHART_COLORS.lo,  label: 'FF ' + ffLo  },
+    { pts: toLine(stMid), color: CHART_COLORS.mid, label: 'FF ' + ffMid },
+    { pts: toLine(stHi),  color: CHART_COLORS.hi,  label: 'FF ' + ffHi  },
+  ];
+  CI.storeLive(CID, liveCurves);
+  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: false });
+  CI.drawFrozen(ctx, CID);
+
+  _chartLine(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLine(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLine(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
 
   _legend(ctx, W, g.t, ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi],
     [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi]);
+  CI.drawAnnotations(ctx, CID);
 }
 
 // ── Broomstick chart ──────────────────────────────────────────────────────────
 // Y-axis: depth increases DOWNWARD (surface at top, TD at bottom)
 function drawBroomstick(r) {
-  const c = _chartSetup('broomstickCanvas');
+  const CID = 'broomstickCanvas';
+  const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const ff  = +(document.getElementById('bsFF')?.value || 0.30);
-  const mw  = fluidGet().mudWeight;
+  const ff = +(document.getElementById('bsFF')?.value || 0.30);
+  const mw = fluidGet().mudWeight;
 
   const res = tdCompute(qpState.survey, bhaGet(), null, mw,
     { ffCased: ff, ffOpen: ff, wob_klbs: 15, overpullMargin_lbf: 100000 });
@@ -182,21 +215,27 @@ function drawBroomstick(r) {
   const rih   = res.modes.rih?.ffSensitivity?.mid?.stations   || [];
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
-  const allHL = [...rotOn, ...pooh, ...rih].map(s => Math.abs(s.axialLoad_lbf) / 1000);
-  const maxHL = Math.max(...allHL, 1);
+  const xMax  = Math.max(...[...rotOn, ...pooh, ...rih].map(s => Math.abs(s.axialLoad_lbf) / 1000), 1) * 1.1;
 
-  // Draw grid with inverted Y (depth down)
-  const g = _chartGridDepthDown(ctx, W, H, maxHL * 1.1, maxMD,
-    'Hook Load (klbs)', 'MD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
-  // toLine: x = hook load, y = md (depth increases down → y increases down in plot)
   const toLine = sts => sts.map(s => ({ x: Math.abs(s.axialLoad_lbf) / 1000, y: s.md }));
-  _chartLineDepthDown(ctx, toLine(rih),   '#2a7fa8', 1.5, g, maxHL * 1.1, maxMD);
-  _chartLineDepthDown(ctx, toLine(rotOn), '#1a7a4a', 2,   g, maxHL * 1.1, maxMD);
-  _chartLineDepthDown(ctx, toLine(pooh),  '#c0392b', 1.5, g, maxHL * 1.1, maxMD);
+  const liveCurves = [
+    { pts: toLine(rih),   color: '#2a7fa8', label: 'RIH'         },
+    { pts: toLine(rotOn), color: '#1a7a4a', label: 'Rot-On (WOB)'},
+    { pts: toLine(pooh),  color: '#c0392b', label: 'POOH'        },
+  ];
+  CI.storeLive(CID, liveCurves);
+  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
+  CI.drawFrozen(ctx, CID);
+
+  _chartLineDepthDown(ctx, liveCurves[0].pts, '#2a7fa8', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, '#1a7a4a', 2,   g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, '#c0392b', 1.5, g, xMax, maxMD);
 
   _legend(ctx, W, g.t, ['RIH', 'Rot-On (WOB)', 'POOH'],
     ['#2a7fa8', '#1a7a4a', '#c0392b']);
+  CI.drawAnnotations(ctx, CID);
 }
 
 function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel) {

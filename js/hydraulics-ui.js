@@ -3,16 +3,17 @@
 // drawHydPie   — pressure breakdown donut
 
 function drawHydSweep(h) {
-  const c = _chartSetup('hydSweepCanvas');
+  const CID = 'hydSweepCanvas';
+  const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
 
   if (!h?.sweep?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  const maxQ   = Math.max(...h.sweep.map(s => s.q), 1);
+  const xMax   = Math.max(...h.sweep.map(s => s.q), 1);
   const maxSPP = Math.max(...h.sweep.map(s => s.spp), h.sppLimit || 3500) * 1.1;
 
-  const g = _chartGrid(ctx, W, H, maxQ, maxSPP, 'Flow Rate (gpm)', 'SPP (psi)');
+  const g = _chartGrid(ctx, W, H, xMax, maxSPP, 'Flow Rate (gpm)', 'SPP (psi)');
 
   // SPP limit line
   const limitY = g.t + (1 - h.sppLimit / maxSPP) * g.ph;
@@ -24,12 +25,16 @@ function drawHydSweep(h) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
   ctx.fillText('SPP limit', g.l + 4, limitY - 2);
 
+  const sweepPts = h.sweep.map(s => ({ x: s.q, y: s.spp }));
+  CI.storeLive(CID, [{ pts: sweepPts, color: '#1a5f7a', label: 'SPP' }]);
+  CI.register(CID, { pad: g, xMax, yMax: maxSPP, xLabel: 'Flow Rate (gpm)', yLabel: 'SPP (psi)', depthDown: false });
+  CI.drawFrozen(ctx, CID);
+
   // SPP curve
-  _chartLine(ctx, h.sweep.map(s => ({ x: s.q, y: s.spp })),
-    '#1a5f7a', 2.5, g.l, g.t, g.pw, g.ph, maxQ, maxSPP);
+  _chartLine(ctx, sweepPts, '#1a5f7a', 2.5, g.l, g.t, g.pw, g.ph, xMax, maxSPP);
 
   // Operating point marker
-  const opX = g.l + (h.flowRate / maxQ) * g.pw;
+  const opX = g.l + (h.flowRate / xMax) * g.pw;
   const opY = g.t + (1 - h.pumpPressure / maxSPP) * g.ph;
   ctx.fillStyle = '#f0a500';
   ctx.beginPath(); ctx.arc(opX, opY, 5, 0, Math.PI * 2); ctx.fill();
@@ -37,10 +42,11 @@ function drawHydSweep(h) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
   ctx.fillText(`${h.flowRate} gpm / ${h.pumpPressure} psi`, opX + 8, opY - 2);
 
-  // ECD annotation
   ctx.fillStyle = '#1a2b38'; ctx.font = '11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   ctx.fillText(`ECD at bit: ${h.ecdAtBit} ppg   HSI: ${h.hsi?.toFixed(2) ?? '—'}`, g.l, g.t + 4);
+
+  CI.drawAnnotations(ctx, CID);
 }
 
 function drawHydPie(h) {

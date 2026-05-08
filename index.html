@@ -514,6 +514,7 @@
 </div>
 
 <!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
+<script src="js/chart-interaction.js"></script>
 <script src="js/survey-engine.js"></script>
 <script src="js/rheology-engine.js"></script>
 <script src="js/td-engine.js"></script>
@@ -531,5 +532,11 @@
 <script src="js/hydraulics-ui.js"></script>
 <script src="js/afe-chart.js"></script>
 <script src="js/compare-ui.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    ['torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
+     'hydSweepCanvas','afeCanvas'].forEach(id => CI.attach(id));
+  });
+</script>
 </body>
 </html>

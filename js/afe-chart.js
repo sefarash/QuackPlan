@@ -109,4 +109,12 @@ function drawAFE() {
   ctx.fillText(`Total: ${cumDays.toFixed(1)} days  |  ${totalCostFmt}`, l + 4, t + 4);
 
   _legend(ctx, W, t, ['Days', 'Cost'], ['#2a7fa8', '#1a7a4a']);
+
+  CI.register('afeCanvas', {
+    pad: { l, t, pw, ph },
+    xMax: maxDepth, yMax: maxDays,
+    xLabel: 'Depth (ft)', yLabel: 'Days',
+    depthDown: false,
+  });
+  CI.drawAnnotations(ctx, 'afeCanvas');
 }
