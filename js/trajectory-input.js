@@ -1,0 +1,262 @@
+// ===== TRAJECTORY INPUT =====
+// Option 1 (MD/Inc/Azi), Option 2 (mixed), Tortuosity tables
+// DLS display: °/100ft
+
+const _T1_DEFAULTS = { md: 0, inc: 0, azi: 0 };
+
+// ── Option 1 ─────────────────────────────────────────────────────────────────
+
+function traj1AddRow(vals) {
+  const body = document.getElementById('traj1Body');
+  const idx  = body.rows.length;
+  const v    = vals || { md: idx === 0 ? 0 : '', inc: '', azi: '' };
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="editable"><input type="number" value="${v.md}" step="1" onchange="traj1Recalc()"></td>
+    <td class="editable"><input type="number" value="${v.inc}" step="0.01" onchange="traj1Recalc()"></td>
+    <td class="editable"><input type="number" value="${v.azi}" step="0.1" onchange="traj1Recalc()"></td>
+    <td class="calc-cell" data-col="tvd">—</td>
+    <td class="calc-cell" data-col="tvdss">—</td>
+    <td class="calc-cell" data-col="dls">—</td>
+    <td class="row-act"><button onclick="traj1DeleteRow(this)">✕</button></td>`;
+  body.appendChild(tr);
+  traj1Recalc();
+}
+
+function traj1DeleteRow(btn) {
+  btn.closest('tr').remove();
+  traj1Recalc();
+}
+
+function traj1Recalc() {
+  const body     = document.getElementById('traj1Body');
+  const stations = _traj1ReadStations();
+  if (stations.length < 1) return;
+
+  const survey = computeSurvey(stations);
+  qpState.survey = survey;
+
+  survey.forEach((pt, i) => {
+    const row = body.rows[i];
+    if (!row) return;
+    const dls100 = (pt.dls * DLS_SCALE).toFixed(2);
+    _setCell(row, 'tvd',   pt.tvd.toFixed(1));
+    _setCell(row, 'tvdss', pt.tvd.toFixed(1));   // TVDss ≈ TVD (no KB offset input yet)
+    _setCell(row, 'dls',   dls100);
+  });
+
+  _traj1Save();
+  if (typeof drawSchematic === 'function') drawSchematic(survey);
+}
+
+function _traj1ReadStations() {
+  const rows = document.getElementById('traj1Body').rows;
+  const stations = [];
+  for (const row of rows) {
+    const inputs = row.querySelectorAll('input[type=number]');
+    const md  = +(inputs[0]?.value || 0);
+    const inc = +(inputs[1]?.value || 0);
+    const az  = +(inputs[2]?.value || 0);
+    if (inputs[0]?.value === '' && stations.length > 0) continue;
+    stations.push({ md, inc, az });
+  }
+  return stations;
+}
+
+function _setCell(row, col, val) {
+  const cell = row.querySelector(`[data-col="${col}"]`);
+  if (cell) cell.textContent = val;
+}
+
+function _traj1Save() {
+  if (!qpState.currentScenarioId) {
+    setStatus('Select a scenario to save data');
+    return;
+  }
+  const rows = document.getElementById('traj1Body').rows;
+  const data = [];
+  let prevMD = 0;
+  for (const row of rows) {
+    const inputs = row.querySelectorAll('input[type=number]');
+    const md  = inputs[0]?.value !== '' ? inputs[0]?.value : String(prevMD);
+    const inc = inputs[1]?.value || '0';
+    const azi = inputs[2]?.value || '0';
+    data.push({ md, inc, azi });
+    prevMD = +md;
+  }
+  dbSaveScenarioData(qpState.currentScenarioId, 'traj1', data);
+}
+
+function trajLoadRows(data) {
+  const body = document.getElementById('traj1Body');
+  body.innerHTML = '';
+  (data || []).forEach(v => traj1AddRow(v));
+}
+
+// ── Excel paste handler ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const t1 = document.getElementById('traj1Table');
+  if (!t1) return;
+
+  t1.addEventListener('paste', e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    const lines = text.trim().split(/\r?\n/);
+    const body  = document.getElementById('traj1Body');
+    body.innerHTML = '';   // replace on paste
+    lines.forEach(line => {
+      const cols = line.split(/\t/);
+      traj1AddRow({ md: cols[0] || 0, inc: cols[1] || 0, azi: cols[2] || 0 });
+    });
+  });
+
+  // Seed two empty rows so the user sees something
+  if (!document.getElementById('traj1Body').rows.length) {
+    traj1AddRow({ md: 0,    inc: 0, azi: 0 });
+    traj1AddRow({ md: 5000, inc: 0, azi: 0 });
+  }
+});
+
+// ── Option 2 ─────────────────────────────────────────────────────────────────
+
+function traj2AddRow() {
+  const body = document.getElementById('traj2Body');
+  const tr   = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="editable">
+      <select onchange="traj2Recalc()">
+        <option value="md_inc_azi">MD / Inc / Azi</option>
+        <option value="tvd_inc_azi">TVD / Inc / Azi</option>
+        <option value="md_dls_azi">MD / DLS / Azi</option>
+      </select>
+    </td>
+    <td class="editable"><input type="number" step="1" onchange="traj2Recalc()"></td>
+    <td class="editable"><input type="number" step="0.01" onchange="traj2Recalc()"></td>
+    <td class="editable"><input type="number" step="0.1" onchange="traj2Recalc()"></td>
+    <td class="calc-cell" data-col="tvd2">—</td>
+    <td class="calc-cell" data-col="dls2">—</td>
+    <td class="row-act"><button onclick="this.closest('tr').remove();traj2Recalc()">✕</button></td>`;
+  body.appendChild(tr);
+  traj2Recalc();
+}
+
+function traj2Recalc() {
+  const body = document.getElementById('traj2Body');
+  const rows = [];
+  for (const tr of body.rows) {
+    const sel    = tr.querySelector('select');
+    const inputs = tr.querySelectorAll('input[type=number]');
+    rows.push({
+      define: sel?.value || 'md_inc_azi',
+      md:  inputs[0]?.value, inc: inputs[1]?.value,
+      azi: inputs[2]?.value,
+      tvd: tr.querySelector('[data-col="tvd2"]')?.textContent,
+      dls: tr.querySelector('[data-col="dls2"]')?.textContent,
+    });
+  }
+
+  const stations = traj2BuildStations(rows);
+  if (stations.length < 2) return;
+
+  const survey = computeSurvey(stations);
+  qpState.survey = survey;
+
+  survey.forEach((pt, i) => {
+    const tr = body.rows[i];
+    if (!tr) return;
+    _setCell(tr, 'tvd2', pt.tvd.toFixed(1));
+    _setCell(tr, 'dls2', (pt.dls * DLS_SCALE).toFixed(2));
+  });
+
+  if (typeof drawSchematic === 'function') drawSchematic(survey);
+}
+
+// ── Tortuosity ────────────────────────────────────────────────────────────────
+
+function tortAddRow() {
+  const body = document.getElementById('tortBody');
+  const tr   = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="editable"><input type="number" step="100" value="0" onchange="tortRecalc()"></td>
+    <td class="editable"><input type="number" step="100" value="5000" onchange="tortRecalc()"></td>
+    <td class="editable"><input type="number" step="0.1" value="0.5" onchange="tortRecalc()"></td>
+    <td class="editable">
+      <select onchange="tortRecalc()">
+        <option value="random">Random</option>
+        <option value="sinusoidal">Sinusoidal</option>
+      </select>
+    </td>
+    <td class="row-act"><button onclick="this.closest('tr').remove();tortRecalc()">✕</button></td>`;
+  body.appendChild(tr);
+}
+
+function tortRecalc() {
+  const body      = document.getElementById('tortBody');
+  const intervals = [];
+  for (const tr of body.rows) {
+    const inputs = tr.querySelectorAll('input[type=number]');
+    const sel    = tr.querySelector('select');
+    intervals.push({
+      startMD: inputs[0]?.value, endMD: inputs[1]?.value,
+      tort: inputs[2]?.value, mode: sel?.value || 'random',
+    });
+  }
+  if (!qpState.survey.length) return;
+  const base    = qpState.survey.map(s => ({ md: s.md, inc: s.inc, az: s.az || s.azimuth || 0 }));
+  const applied = applyTortuosity(base, intervals);
+  const survey  = computeSurvey(applied);
+  if (typeof drawSchematic === 'function') drawSchematic(survey);
+}
+
+// ── Well Schematic table ──────────────────────────────────────────────────────
+function schematicAddRow() {
+  const body = document.getElementById('schematicBody');
+  const tr   = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="editable">
+      <select onchange="schematicSave()">
+        <option>Conductor</option>
+        <option>Surface Casing</option>
+        <option>Intermediate Casing</option>
+        <option>Production Casing</option>
+        <option>Liner</option>
+        <option>Open Hole</option>
+        <option>Tubing</option>
+      </select>
+    </td>
+    <td class="editable"><input type="number" step="0.125" value="13.375" onchange="schematicSave()"></td>
+    <td class="editable"><input type="number" step="1" value="0" onchange="schematicSave()"></td>
+    <td class="editable"><input type="number" step="1" value="5000" onchange="schematicSave()"></td>
+    <td class="row-act"><button onclick="this.closest('tr').remove();schematicSave()">✕</button></td>`;
+  body.appendChild(tr);
+  schematicSave();
+}
+
+function schematicLoadRows(data) {
+  const body = document.getElementById('schematicBody');
+  body.innerHTML = '';
+  (data || []).forEach(row => {
+    schematicAddRow();
+    const tr     = body.rows[body.rows.length - 1];
+    const sel    = tr.querySelector('select');
+    const inputs = tr.querySelectorAll('input[type=number]');
+    if (sel)      sel.value      = row.def  ?? 'Open Hole';
+    if (inputs[0]) inputs[0].value = row.size ?? 9.625;
+    if (inputs[1]) inputs[1].value = row.top  ?? 0;
+    if (inputs[2]) inputs[2].value = row.bot  ?? 5000;
+  });
+  if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
+}
+
+function schematicSave() {
+  if (!qpState.currentScenarioId) return;
+  const rows = [];
+  for (const tr of document.getElementById('schematicBody').rows) {
+    const sel    = tr.querySelector('select');
+    const inputs = tr.querySelectorAll('input[type=number]');
+    rows.push({ def: sel?.value, size: inputs[0]?.value, top: inputs[1]?.value, bot: inputs[2]?.value });
+  }
+  dbSaveScenarioData(qpState.currentScenarioId, 'schematic', rows);
+  if (typeof drawSchematic === 'function') drawSchematic(qpState.survey);
+}

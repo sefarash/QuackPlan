@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuackPlan — Well Planning</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════════ HEADER ═══════════════════════ -->
+<header class="qp-header">
+  <div class="qp-logo">
+    <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="15" cy="20" rx="11" ry="8" fill="#1a5f7a"/>
+      <ellipse cx="15" cy="19" rx="10" ry="7" fill="#2a7fa8"/>
+      <circle cx="15" cy="13" r="5" fill="#2a7fa8"/>
+      <circle cx="15" cy="13" r="4.2" fill="#3a9fc8"/>
+      <circle cx="17" cy="12" r="1" fill="#1a2b38"/>
+      <path d="M20 13 L24 12 L23 15 Z" fill="#f0c040"/>
+    </svg>
+    Quack<span>Plan</span>
+  </div>
+
+  <div class="header-sep"></div>
+
+  <nav class="input-tabs" id="inputTabs">
+    <button class="input-tab active" onclick="switchInputTab('trajectory',this)">Trajectory</button>
+    <button class="input-tab" onclick="switchInputTab('schematic',this)">Well Schematic</button>
+    <button class="input-tab" onclick="switchInputTab('bha',this)">Casing / BHA</button>
+    <button class="input-tab" onclick="switchInputTab('fluid',this)">Drilling Fluid</button>
+    <button class="input-tab" onclick="switchInputTab('activity',this)">Activity</button>
+    <button class="input-tab" onclick="switchInputTab('compare',this)">Compare</button>
+  </nav>
+
+  <div class="header-right">
+    <div class="hdr-scenario" id="hdrContext">
+      <strong id="hdrWellName">No well selected</strong>
+      &nbsp;|&nbsp;
+      <span id="hdrScenarioName">—</span>
+    </div>
+    <button class="hdr-btn" onclick="showNewProjectModal()">+ Project</button>
+    <button class="hdr-btn primary" onclick="qpCompute()">⚡ Compute</button>
+  </div>
+</header>
+
+<!-- ═══════════════════════ APP GRID ═══════════════════════ -->
+<div class="qp-app">
+
+  <!-- LEFT — Project Hierarchy -->
+  <div class="panel-hierarchy" id="hierarchyPanel">
+    <div class="hierarchy-header">
+      Project Hierarchy
+      <button class="hierarchy-add-btn" title="New project" onclick="showNewProjectModal()">+</button>
+    </div>
+    <div id="hierarchyTree">
+      <div class="tree-empty">No projects yet.<br>Click + to create one.</div>
+    </div>
+  </div>
+
+  <!-- CENTER — Input + Output panels -->
+  <div class="panel-center" id="centerPanel">
+
+    <!-- ── INPUT PANELS ── -->
+
+    <!-- Trajectory -->
+    <div id="panel-trajectory" class="input-panel active">
+      <div class="panel-title">
+        📐 Trajectory Input
+        <span class="text-dim" id="trajSurveySource"></span>
+      </div>
+
+      <div class="opt-tabs">
+        <button class="opt-tab active" onclick="switchTrajOption('opt1',this)">Option 1 — Define MD / Inc / Azi</button>
+        <button class="opt-tab" onclick="switchTrajOption('opt2',this)">Option 2 — Mixed Criteria</button>
+        <button class="opt-tab" onclick="switchTrajOption('tort',this)">Tortuosity</button>
+      </div>
+
+      <!-- Option 1 -->
+      <div id="trajOpt1" class="opt-panel active">
+        <table class="qp-table" id="traj1Table">
+          <thead>
+            <tr>
+              <th>MD (ft)</th>
+              <th>Inc (°)</th>
+              <th>Azi (°)</th>
+              <th>TVD (ft)</th>
+              <th>TVDss (ft)</th>
+              <th>DLS (°/100')</th>
+              <th class="row-act"></th>
+            </tr>
+          </thead>
+          <tbody id="traj1Body"></tbody>
+        </table>
+        <button class="add-row-btn" onclick="traj1AddRow()">+ Add station</button>
+        <span class="text-dim" style="margin-left:12px;">Tip: paste MD/Inc/Azi columns from Excel → the table auto-fills</span>
+      </div>
+
+      <!-- Option 2 -->
+      <div id="trajOpt2" class="opt-panel">
+        <table class="qp-table" id="traj2Table">
+          <thead>
+            <tr>
+              <th>Define</th>
+              <th>MD (ft)</th>
+              <th>Inc (°)</th>
+              <th>Azi (°)</th>
+              <th>TVD (ft)</th>
+              <th>DLS (°/100')</th>
+              <th class="row-act"></th>
+            </tr>
+          </thead>
+          <tbody id="traj2Body"></tbody>
+        </table>
+        <button class="add-row-btn" onclick="traj2AddRow()">+ Add criterion</button>
+      </div>
+
+      <!-- Tortuosity -->
+      <div id="trajTort" class="opt-panel">
+        <div class="section-label">Tortuosity Intervals</div>
+        <table class="qp-table" id="tortTable">
+          <thead>
+            <tr>
+              <th>Start MD (ft)</th>
+              <th>End MD (ft)</th>
+              <th>Tortuosity (°/100')</th>
+              <th>Mode</th>
+              <th class="row-act"></th>
+            </tr>
+          </thead>
+          <tbody id="tortBody"></tbody>
+        </table>
+        <button class="add-row-btn" onclick="tortAddRow()">+ Add interval</button>
+      </div>
+    </div>
+
+    <!-- Well Schematic Input -->
+    <div id="panel-schematic" class="input-panel">
+      <div class="panel-title">🏗 Well Schematic Definition</div>
+      <table class="qp-table" id="schematicTable">
+        <thead>
+          <tr>
+            <th>Definition</th>
+            <th>Size (in)</th>
+            <th>MD Top (ft)</th>
+            <th>MD Bottom (ft)</th>
+            <th class="row-act"></th>
+          </tr>
+        </thead>
+        <tbody id="schematicBody"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="schematicAddRow()">+ Add string / interval</button>
+    </div>
+
+    <!-- Casing / BHA -->
+    <div id="panel-bha" class="input-panel">
+      <div class="panel-title">🔧 Casing / BHA Definition</div>
+
+      <div class="section-label">BHA Components (bottom to top)</div>
+      <table class="qp-table" id="bhaTable">
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>OD (in)</th>
+            <th>ID (in)</th>
+            <th>Weight (lbs)</th>
+            <th>Length (ft)</th>
+            <th class="row-act"></th>
+          </tr>
+        </thead>
+        <tbody id="bhaBody"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="bhaAddRow()">+ Add component</button>
+
+      <div class="two-col mt12">
+        <div>
+          <div class="section-label mt8">Bit Nozzles</div>
+          <table class="qp-table" id="nozzleTable">
+            <thead>
+              <tr><th>Size (1/32")</th><th># Nozzles</th><th class="row-act"></th></tr>
+            </thead>
+            <tbody id="nozzleBody"></tbody>
+          </table>
+          <button class="add-row-btn" onclick="nozzleAddRow()">+ Add nozzle</button>
+          <div class="mt8 text-dim">TFA: <strong id="tfaDisplay">— in²</strong></div>
+        </div>
+        <div>
+          <div class="section-label mt8">MWD / Drive System Pressure Loss</div>
+          <table class="qp-table" id="mwdTable">
+            <thead>
+              <tr><th>Component</th><th>Pres Loss (psi)</th></tr>
+            </thead>
+            <tbody id="mwdBody">
+              <tr>
+                <td class="editable"><input value="MWD" onchange="mwdTableChange()"></td>
+                <td class="editable"><input type="number" value="400" onchange="mwdTableChange()"></td>
+              </tr>
+              <tr>
+                <td class="editable"><input value="Drive System" onchange="mwdTableChange()"></td>
+                <td class="editable"><input type="number" value="750" onchange="mwdTableChange()"></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="mt8 text-dim">Total MWD/DS loss: <strong id="mwdTotalDisplay">1150 psi</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drilling Fluid -->
+    <div id="panel-fluid" class="input-panel">
+      <div class="panel-title">💧 Drilling Fluid</div>
+
+      <div class="two-col">
+        <div>
+          <div class="section-label">Fluid Properties</div>
+          <div class="form-row">
+            <label>Mud Type</label>
+            <select id="mudType" onchange="fluidChanged()">
+              <option>WBM</option><option>OBM</option><option>SBM</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Rheology Model</label>
+            <select id="rheologyModel" onchange="fluidChanged()">
+              <option value="HB">Herschel-Bulkley</option>
+              <option value="BP">Bingham Plastic</option>
+              <option value="PL">Power Law</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Mud Weight</label>
+            <input type="number" id="mudWeight" value="10" step="0.1" onchange="fluidChanged()">
+            <span class="unit">ppg</span>
+          </div>
+          <div class="form-row">
+            <label>Plastic Viscosity (PV)</label>
+            <input type="number" id="pv" value="16" onchange="fluidChanged()">
+            <span class="unit">cP</span>
+          </div>
+          <div class="form-row">
+            <label>Yield Point (YP)</label>
+            <input type="number" id="yp" value="13" onchange="fluidChanged()">
+            <span class="unit">lb/100ft²</span>
+          </div>
+          <div class="form-row">
+            <label>Gel Strength (10s)</label>
+            <input type="number" id="gel10s" value="5" onchange="fluidChanged()">
+            <span class="unit">lb/100ft²</span>
+          </div>
+          <div class="form-row">
+            <label>Gel Strength (10m)</label>
+            <input type="number" id="gel10m" value="10" onchange="fluidChanged()">
+            <span class="unit">lb/100ft²</span>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">HB Parameters (if model = HB)</div>
+          <div class="form-row">
+            <label>τ₀ (yield stress)</label>
+            <input type="number" id="tauY" value="8" step="0.1" onchange="fluidChanged()">
+            <span class="unit">lb/100ft²</span>
+          </div>
+          <div class="form-row">
+            <label>n (flow index)</label>
+            <input type="number" id="nHB" value="0.7" step="0.01" onchange="fluidChanged()">
+          </div>
+          <div class="form-row">
+            <label>K (consistency)</label>
+            <input type="number" id="kHB" value="120" onchange="fluidChanged()">
+            <span class="unit">eq.cP</span>
+          </div>
+          <div class="section-label mt12">Pump Parameters</div>
+          <div class="form-row">
+            <label>Flow Rate</label>
+            <input type="number" id="flowRate" value="280" onchange="fluidChanged()">
+            <span class="unit">gpm</span>
+          </div>
+          <div class="form-row">
+            <label>Pump Efficiency</label>
+            <input type="number" id="pumpEff" value="90" onchange="fluidChanged()">
+            <span class="unit">%</span>
+          </div>
+          <div class="form-row">
+            <label>Rig SPP Limit</label>
+            <input type="number" id="rigSppLimit" value="3500" onchange="fluidChanged()">
+            <span class="unit">psi</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity -->
+    <div id="panel-activity" class="input-panel">
+      <div class="panel-title">📋 Activity Plan</div>
+
+      <div class="two-col">
+        <div>
+          <div class="section-label">Activity Plan</div>
+          <table class="qp-table" id="activityTable">
+            <thead>
+              <tr>
+                <th>Activity</th>
+                <th>Days</th>
+                <th>Depth (ft)</th>
+                <th>Cost ($)</th>
+                <th class="row-act"></th>
+              </tr>
+            </thead>
+            <tbody id="activityBody"></tbody>
+          </table>
+          <button class="add-row-btn" onclick="activityAddRow()">+ Add activity</button>
+          <div class="mt8 text-dim">Total: <strong id="actTotalDays">0 days</strong> &nbsp;|&nbsp; <strong id="actTotalCost">$0</strong></div>
+        </div>
+        <div>
+          <div class="section-label">Services</div>
+          <table class="qp-table" id="servicesTable">
+            <thead>
+              <tr><th>Service</th><th>Day Rate ($/day)</th><th>Lump Sum ($)</th><th class="row-act"></th></tr>
+            </thead>
+            <tbody id="servicesBody"></tbody>
+          </table>
+          <button class="add-row-btn" onclick="servicesAddRow()">+ Add service</button>
+
+          <div class="section-label mt12">Casing Costs</div>
+          <table class="qp-table" id="casingCostTable">
+            <thead>
+              <tr><th>Casing Size</th><th>$/ft</th><th>Length (ft)</th><th>Cement ($)</th><th>Total ($)</th></tr>
+            </thead>
+            <tbody id="casingCostBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compare -->
+    <div id="panel-compare" class="input-panel">
+      <div class="panel-title">📊 Scenario Comparison</div>
+
+      <div class="cmp-selectors">
+        <div class="cmp-slot">
+          <div class="section-label">Scenario A</div>
+          <select id="cmpSelA" class="cmp-select"><option value="">— select —</option></select>
+        </div>
+        <div class="cmp-slot">
+          <div class="section-label">Scenario B</div>
+          <select id="cmpSelB" class="cmp-select"><option value="">— select —</option></select>
+        </div>
+        <div class="cmp-slot">
+          <div class="section-label">Scenario C (optional)</div>
+          <select id="cmpSelC" class="cmp-select"><option value="">— none —</option></select>
+        </div>
+        <button class="hdr-btn primary" onclick="compareRun()" style="align-self:flex-end;margin-bottom:2px">⚡ Compare</button>
+      </div>
+
+      <div id="cmpResults" style="display:none">
+        <table class="qp-table" id="cmpTable">
+          <thead>
+            <tr>
+              <th style="width:230px">Metric</th>
+              <th id="cmpHeadA" style="text-align:center">A</th>
+              <th id="cmpHeadB" style="text-align:center">B</th>
+              <th id="cmpHeadC" style="text-align:center;display:none">C</th>
+            </tr>
+          </thead>
+          <tbody id="cmpBody"></tbody>
+        </table>
+      </div>
+
+      <div id="cmpChartWrap" style="display:none;margin-top:20px">
+        <div class="section-label" style="margin-bottom:6px">Trajectory Overlay — TVD vs MD</div>
+        <canvas id="cmpCanvas" style="width:100%;height:300px;display:block"></canvas>
+      </div>
+    </div>
+
+    <!-- ── OUTPUT PANELS ── -->
+
+    <!-- Torque -->
+    <div id="panel-torque" class="output-panel">
+      <div class="chart-controls">
+        <label>WOB <input type="number" id="torqWOB" value="15" style="width:60px"> klbs</label>
+        <label>FF Low <input type="number" id="torqFFlo" value="0.2" step="0.05" style="width:55px"></label>
+        <label>FF Mid <input type="number" id="torqFFmid" value="0.3" step="0.05" style="width:55px"></label>
+        <label>FF High <input type="number" id="torqFFhi" value="0.4" step="0.05" style="width:55px"></label>
+        <label><input type="checkbox" id="torqRotary" checked> Rotary</label>
+        <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+        <span class="legend-dot" style="background:#2a7fa8"></span>0.2FF
+        <span class="legend-dot" style="background:#f0a500"></span>0.3FF
+        <span class="legend-dot" style="background:#1a7a4a"></span>0.4FF
+      </div>
+      <div class="output-canvas-wrap">
+        <canvas id="torqueCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Buckling -->
+    <div id="panel-buckling" class="output-panel">
+      <div class="chart-controls">
+        <label>WOB <input type="number" id="buckWOB" value="15" style="width:60px"> klbs</label>
+        <label>FF Low <input type="number" id="buckFFlo" value="0.2" step="0.05" style="width:55px"></label>
+        <label>FF Mid <input type="number" id="buckFFmid" value="0.3" step="0.05" style="width:55px"></label>
+        <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+        <span class="legend-dot" style="background:#c0392b"></span>Sinusoidal
+        <span class="legend-dot" style="background:#2a7fa8"></span>Helical
+        <span class="legend-dot" style="background:#1a7a4a"></span>Lockup
+      </div>
+      <div class="output-canvas-wrap">
+        <canvas id="bucklingCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Overpull -->
+    <div id="panel-overpull" class="output-panel">
+      <div class="chart-controls">
+        <label>Block <input type="number" id="ovpBlock" value="35" style="width:60px"> kips</label>
+        <label>DP weight <input type="number" id="ovpDPwt" value="22.5" step="0.5" style="width:65px"> ppf</label>
+        <label>MW <input type="number" id="ovpMW" value="10" step="0.1" style="width:55px"> ppg</label>
+        <label>FF Low <input type="number" id="ovpFFlo" value="0.2" step="0.05" style="width:55px"></label>
+        <label>FF Mid <input type="number" id="ovpFFmid" value="0.3" step="0.05" style="width:55px"></label>
+        <label>FF High <input type="number" id="ovpFFhi" value="0.4" step="0.05" style="width:55px"></label>
+        <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+      </div>
+      <div class="output-canvas-wrap">
+        <canvas id="overpullCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Broomstick -->
+    <div id="panel-broomstick" class="output-panel">
+      <div class="chart-controls">
+        <label>FF <input type="number" id="bsFF" value="0.3" step="0.05" style="width:55px"></label>
+        <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+      </div>
+      <div class="output-canvas-wrap">
+        <canvas id="broomstickCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Hydraulics -->
+    <div id="panel-hydraulics" class="output-panel">
+      <div class="chart-controls">
+        <label>MW &nbsp;
+          <span id="hydMWlo">8</span>
+          <input type="range" id="hydMWslider" min="8" max="16" step="0.5" value="10"
+            oninput="document.getElementById('hydMWval').textContent=this.value;qpCompute()"
+            style="width:100px; vertical-align:middle">
+          <span id="hydMWval">10</span> ppg
+        </label>
+        <label>Flow rate &nbsp;
+          <span id="hydFlowLo">100</span>
+          <input type="range" id="hydFlowSlider" min="100" max="600" step="10" value="280"
+            oninput="document.getElementById('hydFlowVal').textContent=this.value;qpCompute()"
+            style="width:120px; vertical-align:middle">
+          <span id="hydFlowVal">280</span> gpm
+        </label>
+        <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+      </div>
+      <div class="output-canvas-wrap" style="display:flex;gap:8px">
+        <canvas id="hydSweepCanvas" style="flex:2;min-width:0"></canvas>
+        <canvas id="hydPieCanvas"   style="flex:1;min-width:0"></canvas>
+      </div>
+    </div>
+
+    <!-- Initial AFE -->
+    <div id="panel-afe" class="output-panel">
+      <div class="chart-controls">
+        <span class="text-dim">Days &amp; Cost vs. Depth — computed from Activity plan</span>
+        <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+      </div>
+      <div class="output-canvas-wrap">
+        <canvas id="afeCanvas"></canvas>
+      </div>
+    </div>
+
+  </div><!-- /panel-center -->
+
+  <!-- RIGHT — Well Schematic -->
+  <div class="panel-schematic">
+    <div class="schematic-header">Well Schematic</div>
+    <div class="schematic-canvas-wrap">
+      <canvas id="schematicCanvas"></canvas>
+    </div>
+  </div>
+
+</div><!-- /qp-app -->
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+<footer class="qp-footer">
+  <nav id="outputTabs">
+    <button class="output-tab" onclick="switchOutputTab('torque',this)">Torque</button>
+    <button class="output-tab" onclick="switchOutputTab('buckling',this)">Buckling</button>
+    <button class="output-tab" onclick="switchOutputTab('overpull',this)">Overpull</button>
+    <button class="output-tab" onclick="switchOutputTab('broomstick',this)">Broomstick</button>
+    <button class="output-tab" onclick="switchOutputTab('hydraulics',this)">Hydraulics</button>
+    <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
+  </nav>
+  <div class="footer-right" id="footerStatus">Ready</div>
+</footer>
+
+<!-- ═══════════════════════ MODALS ═══════════════════════ -->
+
+<!-- New/rename generic modal -->
+<div class="modal-backdrop" id="nameModal">
+  <div class="modal">
+    <div class="modal-title" id="nameModalTitle">New Project</div>
+    <div class="form-row">
+      <label id="nameModalLabel">Name</label>
+      <input type="text" id="nameModalInput" style="max-width:260px; flex:1">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeNameModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="nameModalConfirm()">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
+<script src="js/survey-engine.js"></script>
+<script src="js/rheology-engine.js"></script>
+<script src="js/td-engine.js"></script>
+<script src="js/state.js"></script>
+<script src="js/db-engine.js"></script>
+<script src="js/hierarchy-ui.js"></script>
+<script src="js/trajectory-solver.js"></script>
+<script src="js/trajectory-input.js"></script>
+<script src="js/well-schematic-draw.js"></script>
+<script src="js/bha-input.js"></script>
+<script src="js/fluid-input.js"></script>
+<script src="js/activity-input.js"></script>
+<script src="js/compute-engine.js"></script>
+<script src="js/td-charts.js"></script>
+<script src="js/hydraulics-ui.js"></script>
+<script src="js/afe-chart.js"></script>
+<script src="js/compare-ui.js"></script>
+</body>
+</html>
