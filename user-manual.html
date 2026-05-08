@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuackPlan — User Manual</title>
+<style>
+  :root {
+    --accent:   #1a5f7a;
+    --accent-lt:#2a7fa8;
+    --bg:       #f0f7fc;
+    --bg-panel: #daeef9;
+    --border:   #9ecce3;
+    --text:     #1a2b38;
+    --dim:      #5a7a8e;
+    --yellow:   #fdf7c3;
+    --danger:   #c0392b;
+    --success:  #1a7a4a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px; line-height: 1.65; color: var(--text);
+    background: var(--bg); padding: 0;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    position: fixed; top: 0; left: 0; width: 230px; height: 100vh;
+    background: var(--accent); color: #e8f5fc; overflow-y: auto;
+    padding: 28px 0 40px;
+  }
+  .sidebar-logo {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 20px 24px; border-bottom: 1px solid rgba(255,255,255,.15);
+    margin-bottom: 16px;
+  }
+  .sidebar-logo svg { width: 32px; height: 32px; flex-shrink: 0; }
+  .sidebar-logo span { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
+  .sidebar-logo span em { color: #f0c040; font-style: normal; }
+  .sidebar h3 {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase;
+    color: rgba(255,255,255,.45); padding: 16px 20px 6px;
+  }
+  .sidebar a {
+    display: block; padding: 7px 20px; color: rgba(255,255,255,.80);
+    text-decoration: none; font-size: 13px; border-left: 3px solid transparent;
+    transition: background .12s, color .12s;
+  }
+  .sidebar a:hover { background: rgba(255,255,255,.10); color: #fff; }
+  .sidebar a.active { background: rgba(255,255,255,.15); color: #fff; border-left-color: #f0c040; }
+  .sidebar a.sub { padding-left: 34px; font-size: 12px; }
+
+  /* ── Main content ── */
+  .main { margin-left: 230px; padding: 48px 64px 80px; max-width: 960px; }
+
+  h1 { font-size: 28px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+  h2 {
+    font-size: 20px; font-weight: 700; color: var(--accent);
+    margin: 52px 0 14px; padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 15px; font-weight: 600; color: var(--accent-lt); margin: 28px 0 8px; }
+  h4 { font-size: 13px; font-weight: 600; color: var(--text); margin: 18px 0 6px; }
+  p  { margin-bottom: 12px; }
+  ul, ol { margin: 8px 0 12px 20px; }
+  li { margin-bottom: 5px; }
+  a  { color: var(--accent-lt); }
+
+  .subtitle {
+    font-size: 15px; color: var(--dim); margin-bottom: 32px;
+    padding-bottom: 24px; border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Callout boxes ── */
+  .note, .warn, .tip {
+    border-radius: 6px; padding: 12px 16px; margin: 16px 0;
+    font-size: 13px; border-left: 4px solid;
+  }
+  .note { background: #e8f5fc; border-color: var(--accent-lt); }
+  .warn { background: #fff3cd; border-color: #b07800; }
+  .tip  { background: #e8f9ee; border-color: var(--success); }
+  .note strong, .warn strong, .tip strong { display: block; margin-bottom: 3px; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 13px; }
+  th {
+    background: var(--accent); color: #fff; text-align: left;
+    padding: 8px 12px; font-weight: 600;
+  }
+  td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+  tr:nth-child(even) td { background: var(--bg-panel); }
+
+  /* ── Key/badge ── */
+  kbd {
+    background: #fff; border: 1px solid #ccc; border-radius: 4px;
+    padding: 2px 6px; font-family: monospace; font-size: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+  }
+  .badge-input  { background: var(--yellow);  color: #7a5800; }
+  .badge-output { background: #dff0e8;         color: #1a5f3a; }
+  .badge-new    { background: #fde8e8;         color: var(--danger); }
+
+  /* ── Workflow steps ── */
+  .steps { counter-reset: step; list-style: none; margin: 0 0 16px; }
+  .steps li {
+    counter-increment: step; display: flex; gap: 14px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .steps li::before {
+    content: counter(step); flex-shrink: 0;
+    width: 26px; height: 26px; background: var(--accent-lt); color: #fff;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; margin-top: 1px;
+  }
+
+  /* ── Screenshot placeholder ── */
+  .fig {
+    background: var(--bg-panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 24px; text-align: center;
+    color: var(--dim); font-size: 12px; margin: 16px 0;
+  }
+
+  /* ── Section anchor offset (fixed header) ── */
+  section { scroll-margin-top: 24px; }
+
+  /* ── Input field pill ── */
+  .field {
+    display: inline-block; background: var(--yellow);
+    border: 1px solid #d4b800; border-radius: 4px;
+    padding: 1px 7px; font-size: 12px; font-weight: 600;
+    color: #6b4c00; white-space: nowrap;
+  }
+  .calc {
+    display: inline-block; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 7px; font-size: 12px; color: var(--dim);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <svg viewBox="0 0 32 32" fill="none">
+      <ellipse cx="15" cy="20" rx="11" ry="8" fill="rgba(255,255,255,.25)"/>
+      <ellipse cx="15" cy="19" rx="10" ry="7" fill="rgba(255,255,255,.35)"/>
+      <circle cx="15" cy="13" r="5" fill="rgba(255,255,255,.35)"/>
+      <circle cx="15" cy="13" r="4.2" fill="rgba(255,255,255,.5)"/>
+      <circle cx="17" cy="12" r="1" fill="#1a2b38"/>
+      <path d="M20 13 L24 12 L23 15 Z" fill="#f0c040"/>
+    </svg>
+    <span>Quack<em>Plan</em></span>
+  </div>
+
+  <h3>Getting Started</h3>
+  <a href="#overview">Overview</a>
+  <a href="#layout">App Layout</a>
+  <a href="#workflow">Typical Workflow</a>
+  <a href="#hierarchy">Project Hierarchy</a>
+
+  <h3>Input Tabs</h3>
+  <a href="#trajectory">Trajectory</a>
+  <a href="#traj-opt1" class="sub">Option 1 — Paste Survey</a>
+  <a href="#traj-opt2" class="sub">Option 2 — Mixed Criteria</a>
+  <a href="#tortuosity" class="sub">Tortuosity</a>
+  <a href="#schematic">Well Schematic</a>
+  <a href="#bha">Casing / BHA</a>
+  <a href="#fluid">Drilling Fluid</a>
+  <a href="#activity">Activity Plan</a>
+
+  <h3>Output Tabs</h3>
+  <a href="#traj-plot">Trajectory Plot</a>
+  <a href="#torque">Torque</a>
+  <a href="#buckling">Buckling</a>
+  <a href="#overpull">Overpull</a>
+  <a href="#broomstick">Broomstick</a>
+  <a href="#hydraulics">Hydraulics</a>
+  <a href="#afe">Initial AFE</a>
+
+  <h3>Tools</h3>
+  <a href="#chart-interaction">Chart Interaction</a>
+  <a href="#compare">Scenario Compare</a>
+  <a href="#reference">Field Reference</a>
+</nav>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<main class="main">
+
+<h1>QuackPlan User Manual</h1>
+<p class="subtitle">Well Planning Software &mdash; Reference Guide for Drilling Engineers</p>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="overview">
+<h2>Overview</h2>
+<p>QuackPlan is a browser-based well planning tool that covers trajectory design, well schematic definition, torque &amp; drag analysis, hydraulics, and AFE cost estimation. All data is stored locally in your browser — no server or internet connection is required during use.</p>
+
+<table>
+  <tr><th>Module</th><th>What it does</th></tr>
+  <tr><td>Trajectory</td><td>Define or build a wellbore path; apply tortuosity</td></tr>
+  <tr><td>Well Schematic</td><td>Define casing, liner, and open-hole intervals; generates live visual</td></tr>
+  <tr><td>Casing / BHA</td><td>Define drillstring components, bit nozzles, and MWD pressure losses</td></tr>
+  <tr><td>Drilling Fluid</td><td>Set mud properties and rheology model</td></tr>
+  <tr><td>Activity Plan</td><td>Build a day-by-day activity schedule with service costs</td></tr>
+  <tr><td>Trajectory Plot</td><td>Vertical section + plan view of the wellbore</td></tr>
+  <tr><td>Torque &amp; Drag</td><td>Torque, buckling, overpull, and broomstick charts with FF sensitivity</td></tr>
+  <tr><td>Hydraulics</td><td>SPP vs flow rate sweep, ECD, HSI, and pressure breakdown</td></tr>
+  <tr><td>Initial AFE</td><td>Cumulative days and cost vs depth chart</td></tr>
+  <tr><td>Compare</td><td>Side-by-side comparison of up to three scenarios</td></tr>
+</table>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="layout">
+<h2>App Layout</h2>
+<p>The interface is divided into four fixed zones:</p>
+<table>
+  <tr><th>Zone</th><th>Location</th><th>Purpose</th></tr>
+  <tr><td>Header</td><td>Top bar</td><td>Input tab navigation, active scenario label, Compute button</td></tr>
+  <tr><td>Hierarchy Panel</td><td>Left column</td><td>Project tree — Projects, Fields/Pads, Wells, Boreholes, Scenarios</td></tr>
+  <tr><td>Center Panel</td><td>Main area</td><td>Active input form or output chart</td></tr>
+  <tr><td>Well Schematic</td><td>Right column</td><td>Live visual schematic — updates as you edit</td></tr>
+  <tr><td>Footer</td><td>Bottom bar</td><td>Output tab navigation and status indicator</td></tr>
+</table>
+
+<div class="note">
+  <strong>Color convention in tables</strong>
+  <span class="field">Yellow cells</span> are user inputs. <span class="calc">Blue-grey cells</span> are calculated automatically and cannot be edited directly.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="workflow">
+<h2>Typical Workflow</h2>
+<ol class="steps">
+  <li><strong>Create a project.</strong> Click <strong>+ Project</strong> in the header or the hierarchy panel. Then add a Field/Pad, Well, Borehole, and Scenario by right-clicking each level in the tree.</li>
+  <li><strong>Select a scenario.</strong> Click a Scenario in the tree. Its name appears in the header context label. All inputs and outputs belong to the active scenario.</li>
+  <li><strong>Enter trajectory.</strong> Go to the <em>Trajectory</em> input tab. Use Option 1 to paste a survey or Option 2 to define build/hold criteria. Optionally add tortuosity.</li>
+  <li><strong>Define the well schematic.</strong> Switch to <em>Well Schematic</em> and add casing and liner strings. The visual schematic on the right updates live.</li>
+  <li><strong>Define the BHA.</strong> Switch to <em>Casing / BHA</em>. Enter drillstring components bottom-to-top (bit first). Set bit nozzles and MWD/drive system pressure losses.</li>
+  <li><strong>Set drilling fluid.</strong> Switch to <em>Drilling Fluid</em>. Choose a rheology model and enter mud properties.</li>
+  <li><strong>Build the activity plan.</strong> Switch to <em>Activity</em>. Add activities, service day rates, lump sums, and casing costs.</li>
+  <li><strong>Compute.</strong> Click <strong>⚡ Compute</strong>. The engine runs torque &amp; drag, buckling, hydraulics, and AFE calculations.</li>
+  <li><strong>Review outputs.</strong> Click any tab in the footer to view charts. Use the chart interaction tools to read values, freeze scenarios, and add annotations.</li>
+  <li><strong>Compare scenarios.</strong> Switch to the <em>Compare</em> input tab to run a side-by-side comparison of up to three scenarios.</li>
+</ol>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="hierarchy">
+<h2>Project Hierarchy</h2>
+<p>All data is organized in a five-level tree:</p>
+<pre style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:16px;font-size:13px;line-height:1.8;overflow-x:auto;">
+Project
+└── Field / Pad
+    └── Well
+        └── Borehole
+            └── Scenario  ← inputs and outputs live here
+</pre>
+
+<h4>Managing the tree</h4>
+<ul>
+  <li><strong>Add:</strong> Click <kbd>+</kbd> next to any node, or the <strong>+ Project</strong> button in the header.</li>
+  <li><strong>Rename:</strong> Right-click a node and choose <em>Rename</em>.</li>
+  <li><strong>Delete:</strong> Right-click a node and choose <em>Delete</em>. Deleting a parent removes all children.</li>
+  <li><strong>Select:</strong> Click any Scenario to make it active. The header shows the well and scenario name.</li>
+</ul>
+
+<div class="note">
+  <strong>Data persistence</strong>
+  All data is saved automatically to your browser's local storage. Clearing browser data will erase projects. Export important scenarios before clearing.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="trajectory">
+<h2>Trajectory <span class="badge badge-input">Input</span></h2>
+<p>The Trajectory tab has three sub-tabs: <strong>Option 1</strong>, <strong>Option 2</strong>, and <strong>Tortuosity</strong>. Both options produce the same internal survey (minimum curvature) — choose whichever matches your data source.</p>
+</section>
+
+<section id="traj-opt1">
+<h3>Option 1 — Paste Survey</h3>
+<p>Direct entry of measured depth, inclination, and azimuth. Designed for importing an existing survey or Landmark/Halliburton report.</p>
+
+<table>
+  <tr><th>Column</th><th>Units</th><th>Input or Calculated</th></tr>
+  <tr><td>MD</td><td>ft</td><td><span class="field">Input</span></td></tr>
+  <tr><td>Inc</td><td>°</td><td><span class="field">Input</span></td></tr>
+  <tr><td>Azi</td><td>°</td><td><span class="field">Input</span></td></tr>
+  <tr><td>TVD</td><td>ft</td><td><span class="calc">Calculated</span></td></tr>
+  <tr><td>TVDss</td><td>ft</td><td><span class="calc">Calculated</span></td></tr>
+  <tr><td>DLS</td><td>°/100'</td><td><span class="calc">Calculated</span></td></tr>
+</table>
+
+<div class="tip">
+  <strong>Paste from Excel</strong>
+  Copy three columns (MD, Inc, Azi) from any spreadsheet and paste directly into the table. QuackPlan auto-fills all rows. The first station should always be MD=0, Inc=0, Azi=0.
+</div>
+
+<p>Click <strong>+ Add station</strong> to append a row manually. Delete a row with the <kbd>×</kbd> button at the right.</p>
+</section>
+
+<section id="traj-opt2">
+<h3>Option 2 — Mixed Criteria</h3>
+<p>Build a trajectory by specifying what is <em>known</em> at each design point rather than entering a full survey. Each row has a <strong>Define</strong> selector that controls which columns are inputs and which are solved.</p>
+
+<table>
+  <tr><th>Define mode</th><th>Inputs (yellow)</th><th>Solved (blue)</th></tr>
+  <tr><td>MD / Inc / Azi</td><td>MD, Inc, Azi</td><td>TVD, DLS</td></tr>
+  <tr><td>Inc / Azi / TVD</td><td>Inc, Azi, TVD</td><td>MD, DLS</td></tr>
+  <tr><td>Inc / Azi / DLS</td><td>Inc, Azi, DLS</td><td>MD, TVD</td></tr>
+</table>
+
+<p>This is ideal for designing a well profile from target depth and inclination requirements, then solving for the required MD or DLS.</p>
+</section>
+
+<section id="tortuosity">
+<h3>Tortuosity</h3>
+<p>Both trajectory options support a tortuosity overlay that adds realistic micro-doglegs to simulate actual wellbore roughness. This affects torque &amp; drag results.</p>
+
+<table>
+  <tr><th>Field</th><th>Description</th></tr>
+  <tr><td>Start MD / End MD</td><td>Depth interval over which tortuosity is applied</td></tr>
+  <tr><td>Tortuosity (°/100')</td><td>Magnitude of added random dogleg. 0.5–1.5 is typical; above 3 is severe.</td></tr>
+  <tr><td>Mode</td><td>Random Inc Azi — independently randomizes inclination and azimuth perturbations</td></tr>
+</table>
+
+<div class="note">
+  <strong>When to use tortuosity</strong>
+  Always add tortuosity to planned trajectories before running torque &amp; drag. A smooth planned path underestimates real friction. Typical values: 0.5 °/100' for casing sections, 1.0–2.0 °/100' for rotary-steerable openhole sections.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="schematic">
+<h2>Well Schematic <span class="badge badge-input">Input</span></h2>
+<p>Define the casing and liner program. The visual schematic on the right side of the screen updates immediately as you add or modify rows.</p>
+
+<table>
+  <tr><th>Field</th><th>Description</th></tr>
+  <tr><td>Definition</td><td>String type: Surface Casing, Intermediate Casing, Production Casing, or Liner</td></tr>
+  <tr><td>Size (in)</td><td>Nominal OD in inches (e.g. 13.375, 9.625, 7)</td></tr>
+  <tr><td>MD Top (ft)</td><td>Top of string. Enter 0 or leave blank for surface strings. For liners, enter the liner top (hanger depth).</td></tr>
+  <tr><td>MD Bottom (ft)</td><td>Casing shoe / liner shoe measured depth</td></tr>
+</table>
+
+<p>Add rows in order from largest (shallowest) to smallest (deepest) string. The schematic draws shoe triangles, casing strings, and liner hangers automatically. Open hole below the last casing shoe is shown as a wavy line.</p>
+
+<div class="tip">
+  <strong>Schematic feeds hydraulics</strong>
+  The annular geometry defined here is used directly in the hydraulics calculation to compute section-by-section annular pressure losses and ECD.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="bha">
+<h2>Casing / BHA <span class="badge badge-input">Input</span></h2>
+<p>Define the bottomhole assembly and drillstring components from bit to surface. This data drives both torque &amp; drag and hydraulics calculations.</p>
+
+<h3>BHA Components Table</h3>
+<p>Enter components <strong>bottom to top</strong> — bit first, then DC, HWDP, DP in sequence.</p>
+
+<table>
+  <tr><th>Field</th><th>Description</th></tr>
+  <tr><td>Component</td><td>Free-text label (e.g. Bit, Drill Collar, HWDP, Drill Pipe, MWD/LWD)</td></tr>
+  <tr><td>OD (in)</td><td>Outside diameter in inches</td></tr>
+  <tr><td>ID (in)</td><td>Inside diameter in inches (used for pipe pressure drop)</td></tr>
+  <tr><td>Weight (lbs)</td><td>Total component weight in air</td></tr>
+  <tr><td>Length (ft)</td><td>Component length in feet</td></tr>
+</table>
+
+<h3>Bit Nozzles</h3>
+<p>Enter each nozzle size and quantity. QuackPlan calculates the Total Flow Area (TFA) automatically.</p>
+
+<table>
+  <tr><th>Field</th><th>Description</th></tr>
+  <tr><td>Size (1/32")</td><td>Nozzle diameter in 1/32" increments (e.g. 12 = 12/32" = 3/8")</td></tr>
+  <tr><td># Nozzles</td><td>Number of nozzles at this size</td></tr>
+  <tr><td>TFA (in²)</td><td>Calculated automatically — sum of all nozzle areas</td></tr>
+</table>
+
+<p>TFA drives the bit pressure drop calculation: <em>ΔP = ρ·V²/1120</em>, where V is nozzle velocity.</p>
+
+<h3>MWD / Drive System Pressure Loss</h3>
+<p>Enter fixed pressure drops for MWD tools and the drive system (motor or rotary steerable). These are added directly to the total standpipe pressure. Common values:</p>
+<ul>
+  <li>MWD tool: 300–600 psi depending on tool and flow rate</li>
+  <li>PDM drive: 400–900 psi at operating differential</li>
+  <li>RSS drive: 200–500 psi</li>
+</ul>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="fluid">
+<h2>Drilling Fluid <span class="badge badge-input">Input</span></h2>
+
+<h3>Fluid Properties</h3>
+<table>
+  <tr><th>Field</th><th>Units</th><th>Notes</th></tr>
+  <tr><td>Mud Type</td><td>—</td><td>WBM, OBM, or SBM — informational only, does not change calculation method</td></tr>
+  <tr><td>Rheology Model</td><td>—</td><td>Select Herschel-Bulkley (recommended), Bingham Plastic, or Power Law</td></tr>
+  <tr><td>Mud Weight</td><td>ppg</td><td>Used in T&amp;D (buoyancy), hydraulics (ECD, hydrostatic), and overpull calibration</td></tr>
+  <tr><td>Plastic Viscosity (PV)</td><td>cP</td><td>From FANN 600–300 rpm reading difference</td></tr>
+  <tr><td>Yield Point (YP)</td><td>lb/100ft²</td><td>From FANN 300 rpm reading minus PV</td></tr>
+  <tr><td>Gel Strength (10s / 10m)</td><td>lb/100ft²</td><td>For surge/swab estimates (not yet in output — informational)</td></tr>
+  <tr><td>Flow Rate</td><td>gpm</td><td>Default operating flow rate — also adjustable via slider on Hydraulics tab</td></tr>
+  <tr><td>Pump Efficiency</td><td>%</td><td>Used to calculate hydraulic horsepower</td></tr>
+  <tr><td>Rig SPP Limit</td><td>psi</td><td>Maximum allowable standpipe pressure — shown as red dashed line on Hydraulics chart</td></tr>
+</table>
+
+<h3>Rheology Models</h3>
+<table>
+  <tr><th>Model</th><th>Parameters</th><th>Best for</th></tr>
+  <tr><td>Herschel-Bulkley (recommended)</td><td>τ₀, n, K</td><td>Most accurate for OBM and polymer muds with a yield stress</td></tr>
+  <tr><td>Bingham Plastic</td><td>PV, YP</td><td>Simple field calculations; well-matched to FANN readings</td></tr>
+  <tr><td>Power Law</td><td>n, K</td><td>Shear-thinning fluids without significant yield stress</td></tr>
+</table>
+
+<h3>HB Parameters</h3>
+<p>When Herschel-Bulkley is selected, also enter:</p>
+<ul>
+  <li><strong>τ₀ (yield stress):</strong> typically 5–15 lb/100ft² for OBM</li>
+  <li><strong>n (flow index):</strong> 0.5–0.9 for typical drilling fluids</li>
+  <li><strong>K (consistency index):</strong> fit from rheometer data</li>
+</ul>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="activity">
+<h2>Activity Plan <span class="badge badge-input">Input</span></h2>
+<p>Defines the drilling program timeline and cost structure. The AFE output chart is built directly from this data.</p>
+
+<h3>Activity Table</h3>
+<table>
+  <tr><th>Field</th><th>Description</th></tr>
+  <tr><td>Activity</td><td>Description of the operation (e.g. "Drill 12¼" Section", "Run 9⅝" Casing")</td></tr>
+  <tr><td>Days</td><td>Planned duration in days</td></tr>
+  <tr><td>Depth (ft)</td><td>Final MD at end of this activity (for depth-tracking on the AFE chart)</td></tr>
+  <tr><td>Cost ($)</td><td>Fixed cost for this activity (materials, location, etc.). Day-rate services are added automatically.</td></tr>
+</table>
+
+<div class="tip">
+  <strong>Cost calculation</strong>
+  Each activity's total cost = fixed cost + (days × sum of all day rates). Day rates are defined in the Services table below.
+</div>
+
+<h3>Services Table</h3>
+<table>
+  <tr><th>Field</th><th>Description</th></tr>
+  <tr><td>Service</td><td>Service provider or cost category (e.g. Rig Rate, Supervision, Directional)</td></tr>
+  <tr><td>Day Rate ($/day)</td><td>Applied to every day in the Activity table</td></tr>
+  <tr><td>Lump Sum ($)</td><td>One-time cost added to the total (e.g. Logging, Coring, Bits)</td></tr>
+</table>
+
+<h3>Casing Costs</h3>
+<p>Enter unit cost, length, and cement cost for each casing string. Total casing cost per string is calculated automatically and included in the AFE.</p>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="traj-plot">
+<h2>Trajectory Plot <span class="badge badge-output">Output</span></h2>
+<p>Shows two views of the wellbore path side by side. Click <strong>Trajectory</strong> in the footer after running Compute (or click <strong>Redraw</strong> any time after entering trajectory data).</p>
+
+<h3>Vertical Section (left panel)</h3>
+<ul>
+  <li><strong>X axis:</strong> Horizontal departure from wellhead (ft) — always positive, direction of maximum departure</li>
+  <li><strong>Y axis:</strong> True Vertical Depth (ft), surface at top, TD at bottom</li>
+  <li>Casing shoe triangles are plotted at the TVD of each shoe, with the string size and TVD labeled</li>
+  <li>MD tick marks at regular intervals along the path</li>
+  <li>Blue dot = surface (wellhead), red dot = TD</li>
+</ul>
+
+<h3>Plan View (right panel)</h3>
+<ul>
+  <li><strong>X axis:</strong> Easting displacement from wellhead (ft)</li>
+  <li><strong>Y axis:</strong> Northing displacement from wellhead (ft), North up</li>
+  <li>North arrow in the top-right corner of the plot</li>
+  <li>Equal aspect ratio — the wellpath is not distorted</li>
+</ul>
+
+<div class="note">
+  <strong>Horizontal departure vs. vertical section</strong>
+  Horizontal departure is the straight-line distance from the wellhead to each point in the horizontal plane. For directional wells with azimuth changes, the vertical section (projected on a single reference azimuth) is a different value. QuackPlan currently plots departure. If your well has significant azimuth walk, the VS panel shows the true 2D path shape.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="torque">
+<h2>Torque <span class="badge badge-output">Output</span></h2>
+<p>Surface torque vs. measured depth for rotary drilling, computed using the Johancsik soft-string model.</p>
+
+<h3>Controls</h3>
+<table>
+  <tr><th>Control</th><th>Description</th></tr>
+  <tr><td>WOB (klbs)</td><td>Weight on bit. Higher WOB increases torque in the BHA and lower string.</td></tr>
+  <tr><td>FF Low / Mid / High</td><td>Three friction factor values plotted simultaneously. Typical range: 0.15–0.25 for WBM cased hole, 0.20–0.35 for OBM openhole.</td></tr>
+  <tr><td>Rotary checkbox</td><td>When checked, uses rotary mode (lower effective friction). Uncheck for sliding mode.</td></tr>
+</table>
+
+<h3>Interpreting the chart</h3>
+<ul>
+  <li>Higher torque at surface = more friction in the string</li>
+  <li>Steps in the torque profile correspond to changes in string geometry (pipe OD transitions, casing shoe depths)</li>
+  <li>If the mid FF curve approaches the rig's top drive torque limit, consider reducing WOB or using a lubricant</li>
+</ul>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="buckling">
+<h2>Buckling <span class="badge badge-output">Output</span></h2>
+<p>Shows the critical buckling loads and compressive axial load vs. depth, using Dawson-Paslay (sinusoidal) and Chen (helical) criteria.</p>
+
+<h3>Chart lines</h3>
+<table>
+  <tr><th>Line</th><th>Meaning</th></tr>
+  <tr><td style="color:#c0392b">Red — Sinusoidal</td><td>Critical load for sinusoidal buckling onset. Pipe buckles sinusoidally above this compressive load.</td></tr>
+  <tr><td style="color:#2a7fa8">Blue — Helical</td><td>Critical load for helical buckling. More severe — causes lockup and casing wear. Must be avoided during sliding.</td></tr>
+  <tr><td style="color:#1a7a4a">Green — Compressive Load</td><td>Actual axial compressive load in the string. Where this exceeds Sinusoidal, buckling is active.</td></tr>
+</table>
+
+<h3>Controls</h3>
+<ul>
+  <li><strong>WOB:</strong> Increases compressive load in the BHA</li>
+  <li><strong>FF Low / Mid:</strong> Two friction factor sensitivities</li>
+</ul>
+
+<div class="warn">
+  <strong>Helical buckling during sliding</strong>
+  If the compressive load exceeds the helical critical load in a long openhole section, the string will lock up and weight cannot be transferred to the bit. Redesign the BHA or reduce WOB if this occurs.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="overpull">
+<h2>Overpull <span class="badge badge-output">Output</span></h2>
+<p>Hook load vs. measured depth during pull-out-of-hole (POOH), showing three friction factor sensitivities.</p>
+
+<h3>Controls</h3>
+<table>
+  <tr><th>Control</th><th>Description</th></tr>
+  <tr><td>Block (kips)</td><td>Traveling block and top drive weight. Calibration value — set from rig data.</td></tr>
+  <tr><td>DP weight (ppf)</td><td>Drillpipe linear weight in pounds per foot. Used to calculate air weight of the string.</td></tr>
+  <tr><td>MW (ppg)</td><td>Mud weight for buoyancy correction</td></tr>
+  <tr><td>FF Low / Mid / High</td><td>Friction factor sensitivity range</td></tr>
+</table>
+
+<h3>Interpreting the chart</h3>
+<ul>
+  <li>Hook load increases as you pull the string off bottom</li>
+  <li>The spread between FF curves represents the overpull margin uncertainty</li>
+  <li>If the high-FF curve approaches the rig's maximum hook load rating, the well geometry or mud weight needs review</li>
+  <li>Calibrate the model against actual pick-up/slack-off weights from the rig during drilling</li>
+</ul>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="broomstick">
+<h2>Broomstick <span class="badge badge-output">Output</span></h2>
+<p>A composite hook load chart showing all three drillstring operating modes simultaneously at a single friction factor, with depth increasing <em>downward</em>.</p>
+
+<table>
+  <tr><th>Line</th><th>Mode</th><th>Interpretation</th></tr>
+  <tr><td style="color:#2a7fa8">Blue — RIH</td><td>Running in hole</td><td>Lower hook load; gravity assists descent</td></tr>
+  <tr><td style="color:#1a7a4a">Green — Rot-On (WOB)</td><td>Rotary drilling at WOB</td><td>Middle hook load; used for set-down weight checks</td></tr>
+  <tr><td style="color:#c0392b">Red — POOH</td><td>Pulling out of hole</td><td>Highest hook load; friction opposes upward motion</td></tr>
+</table>
+
+<p>The spread between RIH and POOH lines is the total friction contribution. A wide spread in openhole sections indicates high wellbore friction — consider wipers or optimizing the trajectory.</p>
+
+<h4>FF control</h4>
+<p>Use a single friction factor for all three lines. Adjust to bracket the expected friction range for the mud system and formation type.</p>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="hydraulics">
+<h2>Hydraulics <span class="badge badge-output">Output</span></h2>
+<p>Two simultaneous views: an SPP vs. flow rate sweep (left) and a pressure breakdown donut chart (right).</p>
+
+<h3>SPP Sweep Chart</h3>
+<ul>
+  <li><strong>X axis:</strong> Flow rate (gpm)</li>
+  <li><strong>Y axis:</strong> Standpipe pressure (psi)</li>
+  <li>The red dashed line is the rig SPP limit (set in Drilling Fluid inputs)</li>
+  <li>The orange dot marks the current operating point (flow rate and calculated SPP)</li>
+  <li>ECD at bit and bit HSI are annotated in the chart header</li>
+</ul>
+
+<h3>Interactive Controls</h3>
+<table>
+  <tr><th>Control</th><th>Effect</th></tr>
+  <tr><td>MW slider</td><td>Adjusts mud weight from 8–16 ppg without re-entering fluid inputs. Recalculates SPP and ECD.</td></tr>
+  <tr><td>Flow Rate slider</td><td>Moves the operating point along the curve. Updates ECD and HSI in real time.</td></tr>
+</table>
+
+<h3>Pressure Breakdown Donut</h3>
+<p>Shows how total SPP is distributed across components:</p>
+<ul>
+  <li><strong>Annular:</strong> Pressure loss in all annular sections (largest contributor in deep wells)</li>
+  <li><strong>Pipe:</strong> Friction loss inside the drillstring</li>
+  <li><strong>Bit:</strong> Pressure drop across nozzles (controls HSI)</li>
+  <li><strong>MWD/DS:</strong> Fixed tool pressure losses entered in Casing/BHA</li>
+</ul>
+
+<h3>Key metrics</h3>
+<table>
+  <tr><th>Metric</th><th>Formula</th><th>Target</th></tr>
+  <tr><td>ECD at bit (ppg)</td><td>MW + AnnLoss / (0.052 × TVD)</td><td>Below fracture gradient</td></tr>
+  <tr><td>Bit HSI (hhp/in²)</td><td>Bit ΔP × Q / (1714 × bit area)</td><td>&gt; 1.0 hhp/in²</td></tr>
+  <tr><td>Nozzle velocity (ft/s)</td><td>Q / (3.117 × TFA)</td><td>250–400 ft/s typical</td></tr>
+</table>
+
+<div class="warn">
+  <strong>Warnings</strong>
+  QuackPlan flags three conditions automatically: SPP exceeding rig limit, ECD above 13.5 ppg (potential fracture), and HSI below 1.0 (poor hole cleaning). These appear at the bottom of the donut chart.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="afe">
+<h2>Initial AFE <span class="badge badge-output">Output</span></h2>
+<p>Cumulative days and cost plotted against depth — the standard "staircase" well cost chart used in AFE submissions.</p>
+<ul>
+  <li><strong>Blue line (left axis):</strong> Cumulative planned days vs. depth</li>
+  <li><strong>Green line (right axis):</strong> Cumulative planned cost vs. depth</li>
+  <li>Total days and total AFE cost are annotated in the top-left corner</li>
+</ul>
+<p>Horizontal steps in the depth axis represent non-drilling activities (rig move, casing, cement wait) where cost accumulates but depth does not advance. The slope of diagonal segments represents drilling rate per dollar.</p>
+
+<div class="tip">
+  <strong>AFE tip</strong>
+  Add lump sum costs (logging, coring, liner hanger) in the Services table rather than the Activity table. They are added to the final total but do not appear as individual steps on the staircase.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="chart-interaction">
+<h2>Chart Interaction</h2>
+<p>All output charts support three interactive features accessible via mouse. No toolbar buttons needed.</p>
+
+<h3>Crosshair &amp; Tooltip</h3>
+<p><strong>Hover</strong> the mouse over any chart. A dashed crosshair follows your cursor and a tooltip displays the exact values at that point:</p>
+<ul>
+  <li>Torque / Overpull / Buckling / Broomstick: depth (MD ft) and the primary axis value</li>
+  <li>Hydraulics: flow rate (gpm) and SPP (psi)</li>
+  <li>Trajectory VS: TVD (ft) and horizontal departure (ft)</li>
+  <li>Trajectory Plan: Northing (ft) and Easting (ft)</li>
+  <li>AFE: depth (ft) and cumulative days</li>
+</ul>
+
+<h3>Freeze Snapshot</h3>
+<p><strong>Right-click</strong> anywhere on a chart and choose <strong>❄ Freeze current curves</strong>. The current set of curves is pinned to the chart as a semi-transparent dashed reference. You can then:</p>
+<ul>
+  <li>Change inputs (mud weight, WOB, friction factor) and recompute</li>
+  <li>The frozen curves remain visible for comparison alongside the updated live curves</li>
+  <li>Multiple snapshots can be stacked — each is labeled "Snap 1", "Snap 2", etc.</li>
+  <li>Right-click → <strong>Clear N frozen snapshots</strong> to remove them</li>
+</ul>
+
+<div class="tip">
+  <strong>Freeze workflow example</strong>
+  Freeze the torque chart at FF=0.25 (expected clean hole). Change FF to 0.40 (stuck pipe scenario) and recompute. The live curves show the worst case while the frozen snap shows the baseline — immediately visible on the same chart.
+</div>
+
+<h3>Annotations</h3>
+<p><strong>Right-click</strong> at a specific point of interest and choose <strong>💬 Add annotation here</strong>. Type a label (e.g. "KOP", "Casing shoe", "Max WOB limit"). A red pin and labeled box appear at that data point. Annotations persist through recomputes and can be frozen along with curves.</p>
+<p>Right-click → <strong>Clear annotations</strong> removes all annotations from that chart.</p>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="compare">
+<h2>Scenario Compare <span class="badge badge-input">Input</span></h2>
+<p>Compare up to three saved scenarios side by side. Switch to the <em>Compare</em> input tab in the header.</p>
+
+<ol>
+  <li>Select Scenario A, B, and optionally C from the dropdown menus</li>
+  <li>Click <strong>⚡ Compare</strong></li>
+  <li>A metrics table shows key values (max torque, max hookload, pump pressure, ECD, total days, total cost) for each scenario</li>
+  <li>A trajectory overlay chart plots the TVD vs. MD path for each scenario in different colors</li>
+</ol>
+
+<div class="note">
+  <strong>Comparing across wells</strong>
+  You can compare scenarios from different wells or boreholes. Use this to evaluate alternative well profiles, mud types, or BHA designs against each other on a common basis.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════ -->
+<section id="reference">
+<h2>Field Reference</h2>
+
+<h3>Typical Friction Factors</h3>
+<table>
+  <tr><th>Condition</th><th>Sliding FF</th><th>Rotary FF</th></tr>
+  <tr><td>WBM, cased hole</td><td>0.20–0.25</td><td>0.15–0.20</td></tr>
+  <tr><td>OBM, cased hole</td><td>0.15–0.20</td><td>0.12–0.16</td></tr>
+  <tr><td>WBM, openhole (soft)</td><td>0.25–0.35</td><td>0.20–0.28</td></tr>
+  <tr><td>OBM, openhole (hard)</td><td>0.18–0.28</td><td>0.15–0.22</td></tr>
+  <tr><td>Stuck pipe / high tortuosity</td><td>0.35–0.50</td><td>0.30–0.40</td></tr>
+</table>
+
+<h3>Typical Flow Rate Ranges</h3>
+<table>
+  <tr><th>Section</th><th>Hole Size</th><th>Typical Flow Rate</th></tr>
+  <tr><td>Surface</td><td>17½"</td><td>600–900 gpm</td></tr>
+  <tr><td>Intermediate</td><td>12¼"</td><td>400–600 gpm</td></tr>
+  <tr><td>Production</td><td>8½"</td><td>250–400 gpm</td></tr>
+  <tr><td>Liner / slim hole</td><td>6⅛"</td><td>150–280 gpm</td></tr>
+</table>
+
+<h3>Buoyancy Factor</h3>
+<p>The T&amp;D engine uses BF = 1 − (MW / 65.5) for steel in ppg units. This is applied to pipe weight when computing axial loads and friction forces.</p>
+
+<h3>Minimum Curvature Method</h3>
+<p>QuackPlan uses minimum curvature throughout. The dogleg angle DL is calculated as:</p>
+<pre style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px;font-size:13px;">
+cos(DL) = cos(I₂ − I₁) − sin(I₁)·sin(I₂)·(1 − cos(A₂ − A₁))
+RF = 2/DL · tan(DL/2)   [ratio factor; RF = 1 when DL = 0]
+ΔN = ΔMD/2 · (sin(I₁)cos(A₁) + sin(I₂)cos(A₂)) · RF
+ΔE = ΔMD/2 · (sin(I₁)sin(A₁) + sin(I₂)sin(A₂)) · RF
+ΔTVD = ΔMD/2 · (cos(I₁) + cos(I₂)) · RF
+</pre>
+
+<h3>Keyboard Shortcuts</h3>
+<table>
+  <tr><th>Action</th><th>Shortcut</th></tr>
+  <tr><td>Compute</td><td>No keyboard shortcut — click ⚡ Compute</td></tr>
+  <tr><td>Dismiss context menu</td><td><kbd>Esc</kbd> or click elsewhere</td></tr>
+  <tr><td>Navigate input tabs</td><td>Click tab buttons in header</td></tr>
+  <tr><td>Navigate output tabs</td><td>Click tab buttons in footer</td></tr>
+</table>
+
+<h3>Troubleshooting</h3>
+<table>
+  <tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+  <tr><td>Charts show "Run Compute first"</td><td>Compute has not been run for this scenario</td><td>Click ⚡ Compute</td></tr>
+  <tr><td>Torque chart is flat / zero</td><td>Inclination is zero throughout (vertical well)</td><td>Expected — vertical strings have no lateral contact force</td></tr>
+  <tr><td>SPP warning appears</td><td>Calculated SPP exceeds rig limit</td><td>Reduce flow rate, increase TFA, or review mud weight</td></tr>
+  <tr><td>ECD warning appears</td><td>ECD exceeds 13.5 ppg threshold</td><td>Reduce mud weight, reduce flow rate, or check annular geometry</td></tr>
+  <tr><td>Trajectory plot shows no path</td><td>All inclinations are zero</td><td>Expected — plan view is a single point for a vertical well. VS shows a straight vertical line.</td></tr>
+  <tr><td>Frozen curves disappear after browser refresh</td><td>Freeze state is in-memory only</td><td>Freeze is session-only — refreeze after reopening the app</td></tr>
+</table>
+</section>
+
+<br><br>
+<p style="color:var(--dim);font-size:12px;border-top:1px solid var(--border);padding-top:16px;">
+  QuackPlan &mdash; Well Planning Software &nbsp;|&nbsp; For internal engineering use
+</p>
+
+</main>
+
+<script>
+  // Highlight active sidebar link on scroll
+  const links = document.querySelectorAll('.sidebar a');
+  const sections = document.querySelectorAll('section[id], h2[id]');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.sidebar a[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
