@@ -254,12 +254,13 @@ const CI = (() => {
   // ── Coordinate helpers ─────────────────────────────────────────────────────
 
   function _toData(cx, cy, meta) {
-    const { pad: { l, t, pw, ph }, xMax, yMax, xLabel, yLabel, depthDown } = meta;
-    const xVal = xMax * (cx - l) / pw;
-    const yVal = depthDown ? yMax * (cy - t) / ph : yMax * (1 - (cy - t) / ph);
+    const { pad: { l, t, pw, ph }, xMax, yMax, xLabel, yLabel, depthDown,
+            xOffset = 0, yOffset = 0 } = meta;
+    const xVal = xMax * (cx - l) / pw + xOffset;
+    const yVal = (depthDown ? yMax * (cy - t) / ph : yMax * (1 - (cy - t) / ph)) + yOffset;
     return {
       xVal, yVal,
-      label: `${yLabel}: ${yVal.toFixed(0)}\n${xLabel}: ${xVal.toFixed(2)}`,
+      label: `${yLabel}: ${yVal.toFixed(0)}\n${xLabel}: ${xVal.toFixed(0)}`,
     };
   }
 
@@ -272,6 +273,7 @@ const CI = (() => {
       torqueCanvas: 'torque', bucklingCanvas: 'buckling',
       overpullCanvas: 'overpull', broomstickCanvas: 'broomstick',
       hydSweepCanvas: 'hydraulics', afeCanvas: 'afe',
+      trajVsCanvas: 'trajplot', trajPlanCanvas: 'trajplot',
     };
     if (typeof redrawOutputPanel === 'function')
       redrawOutputPanel(map[id] || (typeof qpState !== 'undefined' && qpState.activeOutputTab));

@@ -374,6 +374,18 @@
 
     <!-- ── OUTPUT PANELS ── -->
 
+    <!-- Trajectory Plot -->
+    <div id="panel-trajplot" class="output-panel">
+      <div class="chart-controls">
+        <span class="text-dim">Vertical Section + Plan View — updates with trajectory input</span>
+        <button class="hdr-btn" onclick="drawTrajPlot()">Redraw</button>
+      </div>
+      <div class="output-canvas-wrap" style="display:flex;gap:8px">
+        <canvas id="trajVsCanvas"   style="flex:3;min-width:0"></canvas>
+        <canvas id="trajPlanCanvas" style="flex:2;min-width:0"></canvas>
+      </div>
+    </div>
+
     <!-- Torque -->
     <div id="panel-torque" class="output-panel">
       <div class="chart-controls">
@@ -486,6 +498,7 @@
 <!-- ═══════════════════════ FOOTER ═══════════════════════ -->
 <footer class="qp-footer">
   <nav id="outputTabs">
+    <button class="output-tab" onclick="switchOutputTab('trajplot',this)">Trajectory</button>
     <button class="output-tab" onclick="switchOutputTab('torque',this)">Torque</button>
     <button class="output-tab" onclick="switchOutputTab('buckling',this)">Buckling</button>
     <button class="output-tab" onclick="switchOutputTab('overpull',this)">Overpull</button>
@@ -531,10 +544,12 @@
 <script src="js/td-charts.js"></script>
 <script src="js/hydraulics-ui.js"></script>
 <script src="js/afe-chart.js"></script>
+<script src="js/trajectory-plot.js"></script>
 <script src="js/compare-ui.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    ['torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
+    ['trajVsCanvas','trajPlanCanvas',
+     'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
      'hydSweepCanvas','afeCanvas'].forEach(id => CI.attach(id));
   });
 </script>

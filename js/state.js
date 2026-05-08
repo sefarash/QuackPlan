@@ -66,12 +66,13 @@ function switchTrajOption(opt, el) {
 function redrawOutputPanel(name) {
   const r = qpState.tdResult;
   const h = qpState.hydResult;
-  if      (name === 'torque'     && r) drawTorque(r);
-  else if (name === 'buckling'   && r) drawBuckling(r);
-  else if (name === 'overpull'   && r) drawOverpull(r);
-  else if (name === 'broomstick' && r) drawBroomstick(r);
-  else if (name === 'hydraulics' && h) { drawHydSweep(h); drawHydPie(h); }
-  else if (name === 'afe')             drawAFE();
+  if      (name === 'trajplot')                  drawTrajPlot();
+  else if (name === 'torque'     && r)           drawTorque(r);
+  else if (name === 'buckling'   && r)           drawBuckling(r);
+  else if (name === 'overpull'   && r)           drawOverpull(r);
+  else if (name === 'broomstick' && r)           drawBroomstick(r);
+  else if (name === 'hydraulics' && h)           { drawHydSweep(h); drawHydPie(h); }
+  else if (name === 'afe')                       drawAFE();
 }
 
 // ── Header context label ─────────────────────────────────────────────────────
