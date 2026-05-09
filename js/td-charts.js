@@ -2,7 +2,7 @@
 // drawTorque, drawBuckling, drawOverpull, drawBroomstick
 
 const CHART_COLORS = { lo: '#2a7fa8', mid: '#f0a500', hi: '#c0392b' };
-const CHART_PAD = { t: 44, b: 34, l: 70, r: 20 };
+const CHART_PAD = { t: 62, b: 22, l: 70, r: 20 };
 
 function _chartSetup(canvasId) {
   const canvas = document.getElementById(canvasId);
@@ -29,8 +29,8 @@ function _chartGrid(ctx, W, H, xMax, yMax, xLabel, yLabel) {
     ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
     ctx.fillStyle = '#5a7a8e'; ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText((xMax * i / 5).toFixed(0), x, t + ph + 6);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText((xMax * i / 5).toFixed(0), x, t - 14);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillText((yMax * (5 - i) / 5).toFixed(0), l - 5, y);
   }
@@ -39,11 +39,11 @@ function _chartGrid(ctx, W, H, xMax, yMax, xLabel, yLabel) {
   ctx.strokeRect(l, t, pw, ph);
 
   ctx.save();
-  ctx.fillStyle = '#1a2b38'; ctx.font = '11px sans-serif';
+  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText(xLabel, l + pw / 2, t - 6);
+  ctx.fillText(xLabel, l + pw / 2, t - 30);
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
-  ctx.textBaseline = 'middle';
+  ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle';
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
@@ -249,11 +249,9 @@ function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel) {
     const y = t + ph * i / 5;
     ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
-    // X labels (hook load)
     ctx.fillStyle = '#5a7a8e'; ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText((xMax * i / 5).toFixed(0), x, t + ph + 6);
-    // Y labels: depth increases downward → label increases downward
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText((xMax * i / 5).toFixed(0), x, t - 14);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillText((yMax * i / 5).toFixed(0), l - 5, y);
   }
@@ -262,11 +260,11 @@ function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel) {
   ctx.strokeRect(l, t, pw, ph);
 
   ctx.save();
-  ctx.fillStyle = '#1a2b38'; ctx.font = '11px sans-serif';
+  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText(xLabel, l + pw / 2, t - 6);
+  ctx.fillText(xLabel, l + pw / 2, t - 30);
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
-  ctx.textBaseline = 'middle';
+  ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle';
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
