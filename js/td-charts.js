@@ -88,7 +88,7 @@ function drawTorque(r) {
   const maxMD   = qpState.survey[qpState.survey.length - 1].md;
   const xMax    = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), 1) * 1.1;
 
-  const g = _chartGrid(ctx, W, H, xMax, maxMD, 'Torque (ft·lbs ×1000)', 'MD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Torque (ft·lbs ×1000)', 'MD (ft)');
 
   const toLine = sts => sts.map(s => ({ x: s.torque_ftlbs / 1000, y: s.md }));
   const liveCurves = [
@@ -97,12 +97,12 @@ function drawTorque(r) {
     { pts: toLine(stHi),  color: CHART_COLORS.hi,  label: 'FF ' + ffHi  },
   ];
   CI.storeLive(CID, liveCurves);
-  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Torque (kft·lb)', yLabel: 'MD (ft)', depthDown: false });
+  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Torque (kft·lb)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
 
-  _chartLine(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
-  _chartLine(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g.l, g.t, g.pw, g.ph, xMax, maxMD);
-  _chartLine(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g, xMax, maxMD);
 
   _legend(ctx, W, g.t, ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi],
     [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi]);
@@ -123,7 +123,7 @@ function drawBuckling(r) {
   const xMax  = Math.max(...bk.stations.map(s =>
     Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0, -s.axialLoad_lbf || 0)), 1) / 1000 * 1.1;
 
-  const g = _chartGrid(ctx, W, H, xMax, maxMD, 'Critical Load (klbs)', 'MD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Critical Load (klbs)', 'MD (ft)');
 
   const sinPts  = bk.stations.filter(s => s.fSin_lbf != null)
                              .map(s => ({ x: s.fSin_lbf / 1000, y: s.md }));
@@ -137,12 +137,12 @@ function drawBuckling(r) {
     { pts: compPts, color: '#1a7a4a', label: 'Compressive Load'},
   ];
   CI.storeLive(CID, liveCurves);
-  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Critical Load (klbs)', yLabel: 'MD (ft)', depthDown: false });
+  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Critical Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
 
-  _chartLine(ctx, sinPts,  '#c0392b', 1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
-  _chartLine(ctx, helPts,  '#2a7fa8', 1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
-  _chartLine(ctx, compPts, '#1a7a4a', 2,   g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLineDepthDown(ctx, sinPts,  '#c0392b', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, helPts,  '#2a7fa8', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, compPts, '#1a7a4a', 2,   g, xMax, maxMD);
 
   _legend(ctx, W, g.t, ['Sinusoidal', 'Helical', 'Compressive Load'],
     ['#c0392b', '#2a7fa8', '#1a7a4a']);
@@ -174,7 +174,7 @@ function drawOverpull(r) {
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
   const xMax  = Math.max(...stHi.map(s => s.axialLoad_lbf / 1000), 1) * 1.1;
 
-  const g = _chartGrid(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
   const toLine = sts => sts.map(s => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
   const liveCurves = [
@@ -183,12 +183,12 @@ function drawOverpull(r) {
     { pts: toLine(stHi),  color: CHART_COLORS.hi,  label: 'FF ' + ffHi  },
   ];
   CI.storeLive(CID, liveCurves);
-  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: false });
+  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
 
-  _chartLine(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
-  _chartLine(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g.l, g.t, g.pw, g.ph, xMax, maxMD);
-  _chartLine(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g.l, g.t, g.pw, g.ph, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g, xMax, maxMD);
 
   _legend(ctx, W, g.t, ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi],
     [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi]);
