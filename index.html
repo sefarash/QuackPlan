@@ -454,7 +454,10 @@
 
     <!-- Hydraulics -->
     <div id="panel-hydraulics" class="output-panel">
-      <div class="chart-controls">
+      <div class="output-canvas-wrap">
+        <canvas id="hydSweepCanvas"></canvas>
+      </div>
+      <div class="chart-controls" style="margin-top:8px;margin-bottom:4px">
         <label>MW &nbsp;
           <span id="hydMWlo">8</span>
           <input type="range" id="hydMWslider" min="8" max="16" step="0.5" value="10"
@@ -471,9 +474,8 @@
         </label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
       </div>
-      <div class="output-canvas-wrap" style="display:flex;gap:8px">
-        <canvas id="hydSweepCanvas" style="flex:2;min-width:0"></canvas>
-        <canvas id="hydPieCanvas"   style="flex:1;min-width:0"></canvas>
+      <div class="output-canvas-wrap" style="flex:none;height:220px">
+        <canvas id="hydPieCanvas"></canvas>
       </div>
     </div>
 
