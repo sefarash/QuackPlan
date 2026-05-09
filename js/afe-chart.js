@@ -55,10 +55,10 @@ function drawAFE() {
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillText((maxDays * i / 5).toFixed(1), x, t - 5);
 
-    // Right axis — Cum. Cost, $0 at top, $maxCost at bottom
+    // Right axis — Cum. Cost, $0 at bottom, $maxCost at top
     ctx.fillStyle = '#1a7a4a';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    const costVal = maxCost * i / 5;
+    const costVal = maxCost * (1 - i / 5);
     ctx.fillText('$' + (costVal >= 1e6 ? (costVal / 1e6).toFixed(1) + 'M'
                                         : (costVal / 1000).toFixed(0) + 'K'),
       l + pw + 4, y);
@@ -92,11 +92,11 @@ function drawAFE() {
   });
   ctx.stroke();
 
-  // Cost curve: x=cost (mapped to same pixel range via right axis), y=depth
+  // Cost curve: x=cost (inverted — $0 at right, $maxCost at left), y=depth
   ctx.strokeStyle = '#1a7a4a'; ctx.lineWidth = 2;
   ctx.beginPath();
   pts.forEach((p, i) => {
-    const x = l + (p.cost  / maxCost)  * pw;
+    const x = l + (1 - p.cost / maxCost) * pw;
     const y = t + (p.depth / maxDepth) * ph;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
