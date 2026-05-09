@@ -1,5 +1,16 @@
 /* ===== QUACKPLAN — STYLES ===== */
 
+/* Hide spinner arrows on range-bound number inputs */
+#hydMWmin::-webkit-outer-spin-button,
+#hydMWmin::-webkit-inner-spin-button,
+#hydMWmax::-webkit-outer-spin-button,
+#hydMWmax::-webkit-inner-spin-button,
+#hydFlowMin::-webkit-outer-spin-button,
+#hydFlowMin::-webkit-inner-spin-button,
+#hydFlowMax::-webkit-outer-spin-button,
+#hydFlowMax::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+#hydMWmin, #hydMWmax, #hydFlowMin, #hydFlowMax { -moz-appearance: textfield; }
+
 :root {
   --bg:          #f0f7fc;
   --bg-panel:    #daeef9;
