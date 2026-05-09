@@ -204,43 +204,61 @@ function drawBroomstick(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const ff = +(document.getElementById('bsFF')?.value || 0.30);
+  const ff     = +(document.getElementById('bsFF')?.value    || 0.30);
+  const wobLo  = +(document.getElementById('bsWOBlo')?.value  || 5);
+  const wobMid = +(document.getElementById('bsWOBmid')?.value || 15);
+  const wobHi  = +(document.getElementById('bsWOBhi')?.value  || 25);
   const mw = fluidGet().mudWeight;
 
-  const res = tdCompute(qpState.survey, bhaGet(), null, mw,
-    { ffCased: ff, ffOpen: ff, wob_klbs: 15, overpullMargin_lbf: 100000 });
-  if (!res) { _noData(ctx, W, H, 'Run Compute first'); return; }
+  const run = wob => tdCompute(qpState.survey, bhaGet(), null, mw,
+    { ffCased: ff, ffOpen: ff, wob_klbs: wob, overpullMargin_lbf: 100000 });
 
-  const rotOn  = res.modes.rotOn?.ffSensitivity?.mid?.stations  || [];
-  const rotOff = res.modes.rotOff?.ffSensitivity?.mid?.stations || [];
-  const pooh   = res.modes.pooh?.ffSensitivity?.mid?.stations   || [];
-  const rih    = res.modes.rih?.ffSensitivity?.mid?.stations    || [];
+  const resLo  = run(wobLo);
+  const resMid = run(wobMid);
+  const resHi  = run(wobHi);
+  if (!resMid) { _noData(ctx, W, H, 'Run Compute first'); return; }
+
+  const rotOnLo  = resLo?.modes.rotOn?.ffSensitivity?.mid?.stations  || [];
+  const rotOnMid = resMid.modes.rotOn?.ffSensitivity?.mid?.stations  || [];
+  const rotOnHi  = resHi?.modes.rotOn?.ffSensitivity?.mid?.stations  || [];
+  const rotOff   = resMid.modes.rotOff?.ffSensitivity?.mid?.stations || [];
+  const pooh     = resMid.modes.pooh?.ffSensitivity?.mid?.stations   || [];
+  const rih      = resMid.modes.rih?.ffSensitivity?.mid?.stations    || [];
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
-  const xMax  = Math.max(...[...rotOn, ...rotOff, ...pooh, ...rih]
+  const xMax  = Math.max(...[...rotOnLo, ...rotOnMid, ...rotOnHi, ...rotOff, ...pooh, ...rih]
     .map(s => Math.abs(s.axialLoad_lbf) / 1000), 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
   const toLine = sts => sts.map(s => ({ x: Math.abs(s.axialLoad_lbf) / 1000, y: s.md }));
   const liveCurves = [
-    { pts: toLine(rih),    color: '#2a7fa8', label: 'RIH'            },
-    { pts: toLine(rotOn),  color: '#1a7a4a', label: 'Rot-On (WOB)'  },
-    { pts: toLine(rotOff), color: '#8e44ad', label: 'Rot Off-Bottom' },
-    { pts: toLine(pooh),   color: '#c0392b', label: 'POOH'           },
+    { pts: toLine(rih),      color: '#2a7fa8', label: 'RIH'                      },
+    { pts: toLine(rotOnLo),  color: '#6aaa6a', label: `WOB ${wobLo}k (Rot-On)`  },
+    { pts: toLine(rotOnMid), color: '#1a7a4a', label: `WOB ${wobMid}k (Rot-On)` },
+    { pts: toLine(rotOnHi),  color: '#0a4a2a', label: `WOB ${wobHi}k (Rot-On)`  },
+    { pts: toLine(rotOff),   color: '#8e44ad', label: 'Rot Off-Bottom'           },
+    { pts: toLine(pooh),     color: '#c0392b', label: 'POOH'                     },
   ];
   CI.storeLive(CID, liveCurves);
   CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
 
   _chartLineDepthDown(ctx, liveCurves[0].pts, '#2a7fa8', 1.5, g, xMax, maxMD);
-  _chartLineDepthDown(ctx, liveCurves[1].pts, '#1a7a4a', 2,   g, xMax, maxMD);
-  _chartLineDepthDown(ctx, liveCurves[2].pts, '#8e44ad', 1.5, g, xMax, maxMD);
-  _chartLineDepthDown(ctx, liveCurves[3].pts, '#c0392b', 1.5, g, xMax, maxMD);
+  // WOB sensitivity family — lo dashed, mid solid bold, hi dashed
+  ctx.setLineDash([6, 3]);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, '#6aaa6a', 1.5, g, xMax, maxMD);
+  ctx.setLineDash([]);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, '#1a7a4a', 2.5, g, xMax, maxMD);
+  ctx.setLineDash([6, 3]);
+  _chartLineDepthDown(ctx, liveCurves[3].pts, '#0a4a2a', 1.5, g, xMax, maxMD);
+  ctx.setLineDash([]);
+  _chartLineDepthDown(ctx, liveCurves[4].pts, '#8e44ad', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[5].pts, '#c0392b', 1.5, g, xMax, maxMD);
 
   _legend(ctx, W, g.t,
-    ['RIH', 'Rot-On (WOB)', 'Rot Off-Bottom', 'POOH'],
-    ['#2a7fa8', '#1a7a4a', '#8e44ad', '#c0392b']);
+    ['RIH', `WOB ${wobLo}k`, `WOB ${wobMid}k`, `WOB ${wobHi}k`, 'Rot Off-Bottom', 'POOH'],
+    ['#2a7fa8', '#6aaa6a', '#1a7a4a', '#0a4a2a', '#8e44ad', '#c0392b']);
   CI.drawAnnotations(ctx, CID);
 }
 
