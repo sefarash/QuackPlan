@@ -170,10 +170,12 @@ function drawOverpull(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
+  const blockWt = +(document.getElementById('ovpBlock')?.value || 35);   // klbs
   const ffLo  = +(document.getElementById('ovpFFlo')?.value  || 0.20);
   const ffMid = +(document.getElementById('ovpFFmid')?.value || 0.30);
   const ffHi  = +(document.getElementById('ovpFFhi')?.value  || 0.40);
   const mw    = +(document.getElementById('ovpMW')?.value    || fluidGet().mudWeight);
+  const BF    = 1 - mw / 65.5;
 
   const run = ff => tdCompute(qpState.survey, bhaGet(), null, mw,
     { ffCased: ff, ffOpen: ff, wob_klbs: 15, overpullMargin_lbf: 100000 });
@@ -193,19 +195,25 @@ function drawOverpull(r) {
   const poohHi  = get(resHi,  'pooh');
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
-  const toV   = s => s.axialLoad_lbf / 1000;
+  // Hookload = buoyed string tension + block weight
+  const toV   = s => s.axialLoad_lbf / 1000 + blockWt;
   const xMax  = Math.max(...poohHi.map(toV), ...rihLo.map(toV), 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
+
+  // BF annotation
+  ctx.fillStyle = '#5a7a8e'; ctx.font = '9px sans-serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} klbs`, g.l + g.pw - 4, g.t + 4);
 
   // ── Section labels ──────────────────────────────────────────────────────────
   ctx.font = 'bold 10px sans-serif'; ctx.textBaseline = 'top';
   ctx.fillStyle = 'rgba(42,127,168,0.75)';
   ctx.textAlign = 'left';
-  ctx.fillText('← SLACK-OFF', g.l + 6, g.t + 6);
+  ctx.fillText('← SLACK-OFF', g.l + 6, g.t + 18);
   ctx.fillStyle = 'rgba(192,57,43,0.75)';
   ctx.textAlign = 'right';
-  ctx.fillText('PICK-UP →', g.l + g.pw - 6, g.t + 6);
+  ctx.fillText('PICK-UP →', g.l + g.pw - 6, g.t + 18);
 
   const toLine = sts => sts.map(s => ({ x: toV(s), y: s.md }));
   const liveCurves = [
@@ -257,11 +265,13 @@ function drawBroomstick(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const ff     = +(document.getElementById('bsFF')?.value    || 0.30);
-  const wobLo  = +(document.getElementById('bsWOBlo')?.value  || 5);
-  const wobMid = +(document.getElementById('bsWOBmid')?.value || 15);
-  const wobHi  = +(document.getElementById('bsWOBhi')?.value  || 25);
-  const mw = fluidGet().mudWeight;
+  const blockWt = +(document.getElementById('bsBlock')?.value  || 35);   // klbs — block + hook + swivel
+  const ff      = +(document.getElementById('bsFF')?.value    || 0.30);
+  const wobLo   = +(document.getElementById('bsWOBlo')?.value  || 5);
+  const wobMid  = +(document.getElementById('bsWOBmid')?.value || 15);
+  const wobHi   = +(document.getElementById('bsWOBhi')?.value  || 25);
+  const mw      = fluidGet().mudWeight;
+  const BF      = 1 - mw / 65.5;   // buoyancy factor for annotation only
 
   const run = wob => tdCompute(qpState.survey, bhaGet(), null, mw,
     { ffCased: ff, ffOpen: ff, wob_klbs: wob, overpullMargin_lbf: 100000 });
@@ -279,12 +289,19 @@ function drawBroomstick(r) {
   const rih      = resMid.modes.rih?.ffSensitivity?.mid?.stations    || [];
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
+  // Hookload = buoyed string tension + block weight (what the weight indicator shows)
+  const toHL  = s => Math.max(0, s.axialLoad_lbf / 1000 + blockWt);
   const xMax  = Math.max(...[...rotOnLo, ...rotOnMid, ...rotOnHi, ...rotOff, ...pooh, ...rih]
-    .map(s => Math.abs(s.axialLoad_lbf) / 1000), 1) * 1.1;
+    .map(toHL), 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
-  const toLine = sts => sts.map(s => ({ x: Math.abs(s.axialLoad_lbf) / 1000, y: s.md }));
+  // BF annotation
+  ctx.fillStyle = '#5a7a8e'; ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} klbs`, g.l + 4, g.t + 4);
+
+  const toLine = sts => sts.map(s => ({ x: toHL(s), y: s.md }));
   const liveCurves = [
     { pts: toLine(rih),      color: '#2a7fa8', label: 'RIH'                      },
     { pts: toLine(rotOnLo),  color: '#6aaa6a', label: `WOB ${wobLo}k (Rot-On)`  },
