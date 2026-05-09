@@ -13,6 +13,7 @@ function traj1AddRow(vals) {
 
   const tr = document.createElement('tr');
   tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
     <td class="editable"><input type="number" value="${v.md}" step="1" onchange="traj1Recalc()"></td>
     <td class="editable"><input type="number" value="${v.inc}" step="0.01" onchange="traj1Recalc()"></td>
     <td class="editable"><input type="number" value="${v.azi}" step="0.1" onchange="traj1Recalc()"></td>
@@ -124,6 +125,7 @@ function traj2AddRow() {
   const body = document.getElementById('traj2Body');
   const tr   = document.createElement('tr');
   tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
     <td class="editable">
       <select onchange="traj2ModeChange(this)">
         <option value="md_inc_azi">MD / Inc / Azi</option>
@@ -219,6 +221,7 @@ function tortAddRow() {
   const body = document.getElementById('tortBody');
   const tr   = document.createElement('tr');
   tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
     <td class="editable"><input type="number" step="100" value="0" onchange="tortRecalc()"></td>
     <td class="editable"><input type="number" step="100" value="5000" onchange="tortRecalc()"></td>
     <td class="editable"><input type="number" step="0.1" value="0.5" onchange="tortRecalc()"></td>
@@ -255,6 +258,7 @@ function schematicAddRow() {
   const body = document.getElementById('schematicBody');
   const tr   = document.createElement('tr');
   tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
     <td class="editable">
       <select onchange="schematicSave()">
         <option>Conductor</option>

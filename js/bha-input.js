@@ -26,6 +26,7 @@ function bhaAddRow(preset) {
 
   const tr = document.createElement('tr');
   tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
     <td class="editable">
       <select onchange="bhaPresetFill(this)">
         ${Object.keys(BHA_PRESETS).map(k =>
@@ -124,6 +125,7 @@ function nozzleAddRow() {
   const body = document.getElementById('nozzleBody');
   const tr   = document.createElement('tr');
   tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
     <td class="editable"><input type="number" step="1" value="12" onchange="nozzleRecalc()"></td>
     <td class="editable"><input type="number" step="1" value="3"  onchange="nozzleRecalc()"></td>
     <td class="row-act"><button onclick="this.closest('tr').remove();nozzleRecalc()">✕</button></td>`;

@@ -4,6 +4,7 @@ function activityAddRow() {
   const body = document.getElementById('activityBody');
   const tr   = document.createElement('tr');
   tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
     <td class="editable"><input type="text"   value="Drilling" onchange="activityRecalc()"></td>
     <td class="editable"><input type="number" step="0.5" value="3" onchange="activityRecalc()"></td>
     <td class="editable"><input type="number" step="100" value="0" onchange="activityRecalc()"></td>
@@ -37,6 +38,7 @@ function servicesAddRow() {
   const body = document.getElementById('servicesBody');
   const tr   = document.createElement('tr');
   tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
     <td class="editable"><input type="text"   value="Rig" onchange="activityRecalc()"></td>
     <td class="editable"><input type="number" step="500" value="25000" onchange="activityRecalc()"></td>
     <td class="editable"><input type="number" step="1000" value="0" onchange="activityRecalc()"></td>

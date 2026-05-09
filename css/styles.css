@@ -395,6 +395,20 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   background: #f8f8f8 !important;
 }
 
+.qp-table th.drag-col { width: 18px; padding: 0; }
+.qp-table .drag-handle {
+  width: 18px;
+  text-align: center;
+  color: #b0c8d8;
+  font-size: 13px;
+  cursor: grab;
+  user-select: none;
+  padding: 0 2px;
+}
+.qp-table .drag-handle:hover { color: #5a7a8e; }
+tr.row-dragging { opacity: 0.35; }
+tr.row-drag-over td { background: #daf0fb !important; }
+
 .row-del-btn {
   width: 20px; height: 20px;
   border: none;

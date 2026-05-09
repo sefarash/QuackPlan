@@ -81,6 +81,7 @@
         <table class="qp-table" id="traj1Table">
           <thead>
             <tr>
+              <th class="drag-col"></th>
               <th>MD (ft)</th>
               <th>Inc (°)</th>
               <th>Azi (°)</th>
@@ -101,6 +102,7 @@
         <table class="qp-table" id="traj2Table">
           <thead>
             <tr>
+              <th class="drag-col"></th>
               <th>Define</th>
               <th>MD (ft)</th>
               <th>Inc (°)</th>
@@ -121,6 +123,7 @@
         <table class="qp-table" id="tortTable">
           <thead>
             <tr>
+              <th class="drag-col"></th>
               <th>Start MD (ft)</th>
               <th>End MD (ft)</th>
               <th>Tortuosity (°/100')</th>
@@ -140,6 +143,7 @@
       <table class="qp-table" id="schematicTable">
         <thead>
           <tr>
+            <th class="drag-col"></th>
             <th>Definition</th>
             <th>Size (in)</th>
             <th>MD Top (ft)</th>
@@ -160,6 +164,7 @@
       <table class="qp-table" id="bhaTable">
         <thead>
           <tr>
+            <th class="drag-col"></th>
             <th>Component</th>
             <th>OD (in)</th>
             <th>ID (in)</th>
@@ -182,7 +187,7 @@
           <div class="section-label mt8">Bit Nozzles</div>
           <table class="qp-table" id="nozzleTable">
             <thead>
-              <tr><th>Size (1/32")</th><th># Nozzles</th><th class="row-act"></th></tr>
+              <tr><th class="drag-col"></th><th>Size (1/32")</th><th># Nozzles</th><th class="row-act"></th></tr>
             </thead>
             <tbody id="nozzleBody"></tbody>
           </table>
@@ -193,14 +198,16 @@
           <div class="section-label mt8">MWD / Drive System Pressure Loss</div>
           <table class="qp-table" id="mwdTable">
             <thead>
-              <tr><th>Component</th><th>Pres Loss (psi)</th></tr>
+              <tr><th class="drag-col"></th><th>Component</th><th>Pres Loss (psi)</th></tr>
             </thead>
             <tbody id="mwdBody">
               <tr>
+                <td class="drag-handle">⠿</td>
                 <td class="editable"><input value="MWD" onchange="mwdTableChange()"></td>
                 <td class="editable"><input type="number" value="400" onchange="mwdTableChange()"></td>
               </tr>
               <tr>
+                <td class="drag-handle">⠿</td>
                 <td class="editable"><input value="Drive System" onchange="mwdTableChange()"></td>
                 <td class="editable"><input type="number" value="750" onchange="mwdTableChange()"></td>
               </tr>
@@ -304,6 +311,7 @@
           <table class="qp-table" id="activityTable">
             <thead>
               <tr>
+                <th class="drag-col"></th>
                 <th>Activity</th>
                 <th>Days</th>
                 <th>Depth (ft)</th>
@@ -320,7 +328,7 @@
           <div class="section-label">Services</div>
           <table class="qp-table" id="servicesTable">
             <thead>
-              <tr><th>Service</th><th>Day Rate ($/day)</th><th>Lump Sum ($)</th><th class="row-act"></th></tr>
+              <tr><th class="drag-col"></th><th>Service</th><th>Day Rate ($/day)</th><th>Lump Sum ($)</th><th class="row-act"></th></tr>
             </thead>
             <tbody id="servicesBody"></tbody>
           </table>
@@ -564,11 +572,22 @@
 <script src="js/afe-chart.js"></script>
 <script src="js/trajectory-plot.js"></script>
 <script src="js/compare-ui.js"></script>
+<script src="js/row-drag.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
      'hydSweepCanvas','afeCanvas'].forEach(id => CI.attach(id));
+
+    makeRowsDraggable('traj1Body',      traj1Recalc);
+    makeRowsDraggable('traj2Body',      traj2Recalc);
+    makeRowsDraggable('tortBody',       tortRecalc);
+    makeRowsDraggable('schematicBody',  schematicSave);
+    makeRowsDraggable('bhaBody',        bhaSave);
+    makeRowsDraggable('nozzleBody',     nozzleRecalc);
+    makeRowsDraggable('mwdBody',        mwdTableChange);
+    makeRowsDraggable('activityBody',   activityRecalc);
+    makeRowsDraggable('servicesBody',   activityRecalc);
   });
 </script>
 </body>
