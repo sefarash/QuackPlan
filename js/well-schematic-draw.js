@@ -124,13 +124,6 @@ function drawSchematic(survey) {
       ctx.lineTo(cx + halfW + sh, yBot);
       ctx.closePath(); ctx.fill();
 
-      // Horizontal bar at shoe depth (casing collar line)
-      ctx.strokeStyle = color;
-      ctx.lineWidth   = 1;
-      ctx.beginPath();
-      ctx.moveTo(cx - halfW - sh, yBot);
-      ctx.lineTo(cx + halfW + sh, yBot);
-      ctx.stroke();
     }
 
     // Label on right side of right wall
