@@ -99,13 +99,13 @@ function drawSchematic(survey) {
     ctx.fillStyle = FILL[row.def] || 'rgba(100,150,200,0.08)';
     ctx.fillRect(cx - halfW, yTop, halfW * 2, yBot - yTop);
 
-    // Walls
-    ctx.strokeStyle = color;
-    ctx.lineWidth   = isOH ? 1.5 : 2;
-    ctx.setLineDash(isOH ? [5, 3] : []);
-    ctx.beginPath(); ctx.moveTo(cx - halfW, yTop); ctx.lineTo(cx - halfW, yBot); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx + halfW, yTop); ctx.lineTo(cx + halfW, yBot); ctx.stroke();
-    ctx.setLineDash([]);
+    // Walls (skip open hole — its boundaries are implied by the innermost casing)
+    if (!isOH) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = 2;
+      ctx.beginPath(); ctx.moveTo(cx - halfW, yTop); ctx.lineTo(cx - halfW, yBot); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + halfW, yTop); ctx.lineTo(cx + halfW, yBot); ctx.stroke();
+    }
 
     // Shoe triangles — point outward (not for Open Hole)
     if (!isOH) {
@@ -144,15 +144,6 @@ function drawSchematic(survey) {
     ctx.fillText(`${size}" ${row.def}`, lx, ly);
   });
 
-  // ── Wellbore centre axis (dashed) ──────────────────────────────────────────
-  ctx.strokeStyle = 'rgba(26,95,122,0.25)';
-  ctx.lineWidth   = 1;
-  ctx.setLineDash([3, 5]);
-  ctx.beginPath();
-  ctx.moveTo(cx, PAD_T);
-  ctx.lineTo(cx, PAD_T + lastSurvey.md * scaleY);
-  ctx.stroke();
-  ctx.setLineDash([]);
 
   // ── RKB marker (triangle pointing up) ─────────────────────────────────────
   ctx.strokeStyle = '#1a5f7a';
