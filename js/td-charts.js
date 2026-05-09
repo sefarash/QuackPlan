@@ -150,7 +150,7 @@ function drawBuckling(r) {
   CI.drawAnnotations(ctx, CID);
 }
 
-// ── Overpull chart ────────────────────────────────────────────────────────────
+// ── Overpull chart — Slack-off (left) / Pick-up (right) split ─────────────────
 function drawOverpull(r) {
   const CID = 'overpullCanvas';
   const c = _chartSetup(CID);
@@ -162,37 +162,77 @@ function drawOverpull(r) {
   const ffHi  = +(document.getElementById('ovpFFhi')?.value  || 0.40);
   const mw    = +(document.getElementById('ovpMW')?.value    || fluidGet().mudWeight);
 
-  const makePooh = (ff) => {
-    const res = tdCompute(qpState.survey, bhaGet(), null, mw,
-      { ffCased: ff, ffOpen: ff, wob_klbs: 15, overpullMargin_lbf: 100000 });
-    return res?.modes?.pooh?.ffSensitivity?.mid?.stations || [];
-  };
+  const run = ff => tdCompute(qpState.survey, bhaGet(), null, mw,
+    { ffCased: ff, ffOpen: ff, wob_klbs: 15, overpullMargin_lbf: 100000 });
 
-  const stLo  = makePooh(ffLo);
-  const stMid = makePooh(ffMid);
-  const stHi  = makePooh(ffHi);
+  const resLo  = run(ffLo);
+  const resMid = run(ffMid);
+  const resHi  = run(ffHi);
+  if (!resMid) { _noData(ctx, W, H, 'Run Compute first'); return; }
+
+  const get = (res, mode) => res?.modes?.[mode]?.ffSensitivity?.mid?.stations || [];
+  const rihLo   = get(resLo,  'rih');
+  const rihMid  = get(resMid, 'rih');
+  const rihHi   = get(resHi,  'rih');
+  const freeWt  = get(resMid, 'rotOff');
+  const poohLo  = get(resLo,  'pooh');
+  const poohMid = get(resMid, 'pooh');
+  const poohHi  = get(resHi,  'pooh');
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
-  const xMax  = Math.max(...stHi.map(s => s.axialLoad_lbf / 1000), 1) * 1.1;
+  const toV   = s => s.axialLoad_lbf / 1000;
+  const xMax  = Math.max(...poohHi.map(toV), ...rihLo.map(toV), 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
-  const toLine = sts => sts.map(s => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
+  // ── Section labels ──────────────────────────────────────────────────────────
+  ctx.font = 'bold 10px sans-serif'; ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(42,127,168,0.75)';
+  ctx.textAlign = 'left';
+  ctx.fillText('← SLACK-OFF', g.l + 6, g.t + 6);
+  ctx.fillStyle = 'rgba(192,57,43,0.75)';
+  ctx.textAlign = 'right';
+  ctx.fillText('PICK-UP →', g.l + g.pw - 6, g.t + 6);
+
+  const toLine = sts => sts.map(s => ({ x: toV(s), y: s.md }));
   const liveCurves = [
-    { pts: toLine(stLo),  color: CHART_COLORS.lo,  label: 'FF ' + ffLo  },
-    { pts: toLine(stMid), color: CHART_COLORS.mid, label: 'FF ' + ffMid },
-    { pts: toLine(stHi),  color: CHART_COLORS.hi,  label: 'FF ' + ffHi  },
+    { pts: toLine(rihLo),   color: '#5a9fd4', label: `SLK FF ${ffLo}`  },
+    { pts: toLine(rihMid),  color: '#2a7fa8', label: `SLK FF ${ffMid}` },
+    { pts: toLine(rihHi),   color: '#1a5f88', label: `SLK FF ${ffHi}`  },
+    { pts: toLine(freeWt),  color: '#7f8c8d', label: 'Free Wt'         },
+    { pts: toLine(poohLo),  color: '#e07878', label: `PKP FF ${ffLo}`  },
+    { pts: toLine(poohMid), color: '#c0392b', label: `PKP FF ${ffMid}` },
+    { pts: toLine(poohHi),  color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
   ];
   CI.storeLive(CID, liveCurves);
   CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
 
-  _chartLineDepthDown(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g, xMax, maxMD);
-  _chartLineDepthDown(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g, xMax, maxMD);
-  _chartLineDepthDown(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g, xMax, maxMD);
+  // Slack-off (RIH): lo/hi dashed, mid solid
+  ctx.setLineDash([5, 3]);
+  _chartLineDepthDown(ctx, liveCurves[0].pts, '#5a9fd4', 1.5, g, xMax, maxMD);
+  ctx.setLineDash([]);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, '#2a7fa8', 2,   g, xMax, maxMD);
+  ctx.setLineDash([5, 3]);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, '#1a5f88', 1.5, g, xMax, maxMD);
 
-  _legend(ctx, W, g.t, ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi],
-    [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi]);
+  // Free weight: gray long-dash
+  ctx.setLineDash([8, 4]);
+  _chartLineDepthDown(ctx, liveCurves[3].pts, '#7f8c8d', 1.5, g, xMax, maxMD);
+
+  // Pick-up (POOH): lo/hi dashed, mid solid
+  ctx.setLineDash([5, 3]);
+  _chartLineDepthDown(ctx, liveCurves[4].pts, '#e07878', 1.5, g, xMax, maxMD);
+  ctx.setLineDash([]);
+  _chartLineDepthDown(ctx, liveCurves[5].pts, '#c0392b', 2,   g, xMax, maxMD);
+  ctx.setLineDash([5, 3]);
+  _chartLineDepthDown(ctx, liveCurves[6].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
+  ctx.setLineDash([]);
+
+  _legend(ctx, W, g.t,
+    [`SLK ${ffLo}`, `SLK ${ffMid}`, `SLK ${ffHi}`, 'Free Wt',
+     `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`],
+    ['#5a9fd4', '#2a7fa8', '#1a5f88', '#7f8c8d', '#e07878', '#c0392b', '#8b1a1a']);
   CI.drawAnnotations(ctx, CID);
 }
 
