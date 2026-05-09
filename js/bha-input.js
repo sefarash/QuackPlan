@@ -10,6 +10,7 @@ const BHA_PRESETS = {
   'HWDP':        { od: 5.0,   id: 3.0,   wt: 49.3 },
   'Drill Collar':{ od: 6.5,   id: 2.25,  wt: 2050 },
   'Drill Pipe':  { od: 5.0,   id: 4.276, wt: 0   },
+  'Casing':      { od: 9.625, id: 8.835, wt: 47  },
 };
 
 // ── BHA table ─────────────────────────────────────────────────────────────────
