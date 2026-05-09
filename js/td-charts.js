@@ -294,10 +294,39 @@ function drawBroomstick(r) {
   const poohHi = st(resHi,  'pooh');
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
-  const toHL  = s => Math.max(0, s.axialLoad_lbf / 1000 + blockWt);
-  const xMax  = Math.max(
-    ...[...rihLo, ...rihMid, ...rihHi, ...rotOff,
-        ...poohLo, ...poohMid, ...poohHi].map(toHL), 1) * 1.1;
+
+  // Broomstick hookload when bit is at depth D:
+  //   = blockWt + accumulated (weight ± friction) from surface down to D
+  //   = blockWt + surfaceLoad − axialLoad(D)
+  // where surfaceLoad = axialLoad at the surface station (min MD).
+  // Result: all curves start at blockWt at surface and fan out with depth.
+  const surfLoad_klbs = sts => {
+    if (!sts.length) return 0;
+    const surf = sts.reduce((mn, s) => s.md < mn.md ? s : mn, sts[0]);
+    return surf.axialLoad_lbf / 1000;
+  };
+  const toBS = (sl, s) => Math.max(0, blockWt + sl - s.axialLoad_lbf / 1000);
+  const toBSLine = (sl, sts) => sts.map(s => ({ x: toBS(sl, s), y: s.md }));
+
+  const slRihLo   = surfLoad_klbs(rihLo);
+  const slRihMid  = surfLoad_klbs(rihMid);
+  const slRihHi   = surfLoad_klbs(rihHi);
+  const slRotOff  = surfLoad_klbs(rotOff);
+  const slPoohLo  = surfLoad_klbs(poohLo);
+  const slPoohMid = surfLoad_klbs(poohMid);
+  const slPoohHi  = surfLoad_klbs(poohHi);
+
+  const liveCurves = [
+    { pts: toBSLine(slRihLo,   rihLo),  color: '#5a9fd4', label: `RIH FF ${ffLo}`  },
+    { pts: toBSLine(slRihMid,  rihMid), color: '#2a7fa8', label: `RIH FF ${ffMid}` },
+    { pts: toBSLine(slRihHi,   rihHi),  color: '#1a5f88', label: `RIH FF ${ffHi}`  },
+    { pts: toBSLine(slRotOff,  rotOff), color: '#8e44ad', label: 'Rot Off Btm'     },
+    { pts: toBSLine(slPoohLo,  poohLo), color: '#e07878', label: `PKP FF ${ffLo}`  },
+    { pts: toBSLine(slPoohMid, poohMid),color: '#c0392b', label: `PKP FF ${ffMid}` },
+    { pts: toBSLine(slPoohHi,  poohHi), color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
+  ];
+
+  const xMax = Math.max(...liveCurves.flatMap(c => c.pts.map(p => p.x)), 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hookload (kips)', 'MD (ft)');
 
@@ -306,16 +335,6 @@ function drawBroomstick(r) {
   ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} kips`,
     g.l + 4, g.t + 4);
 
-  const toLine = sts => sts.map(s => ({ x: toHL(s), y: s.md }));
-  const liveCurves = [
-    { pts: toLine(rihLo),  color: '#5a9fd4', label: `RIH FF ${ffLo}`  },
-    { pts: toLine(rihMid), color: '#2a7fa8', label: `RIH FF ${ffMid}` },
-    { pts: toLine(rihHi),  color: '#1a5f88', label: `RIH FF ${ffHi}`  },
-    { pts: toLine(rotOff), color: '#8e44ad', label: 'Rot Off Btm'     },
-    { pts: toLine(poohLo), color: '#e07878', label: `PKP FF ${ffLo}`  },
-    { pts: toLine(poohMid),color: '#c0392b', label: `PKP FF ${ffMid}` },
-    { pts: toLine(poohHi), color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
-  ];
   CI.storeLive(CID, liveCurves);
   CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hookload (kips)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
@@ -351,44 +370,41 @@ function drawBroomstick(r) {
   const pw = g.pw, ph = g.ph;
   const labelMidY = g.t + ph * 0.65;
 
-  // "Slack off" — fixed to left side of chart
   ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   ctx.fillText('Slack off', g.l + 6, labelMidY);
 
-  // "Pick up" — fixed to right side of chart
   ctx.textAlign = 'right';
   ctx.fillText('Pick up', g.l + pw - 6, labelMidY);
 
-  // "Rotation Off Bottom" — near the rotOff curve mid-depth
   const rotMidSt = rotOff[Math.floor(rotOff.length / 2)];
   if (rotMidSt) {
-    const xRot = g.l + (toHL(rotMidSt) / xMax) * pw;
+    const xRot = g.l + (toBS(slRotOff, rotMidSt) / xMax) * pw;
     ctx.fillStyle = '#8e44ad'; ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText('Rotation', xRot + 4, labelMidY + 20);
     ctx.fillText('Off Bottom', xRot + 4, labelMidY + 32);
   }
 
-  // ── Bottom FF axis labels — placed at surface hookload x-positions ────────
-  // Surface station = minimum MD in the stations array
-  const surfaceX = sts => {
-    const s = sts.reduce((best, c) => c.md < best.md ? c : best, sts[0]);
-    return g.l + (toHL(s) / xMax) * pw;
+  // ── Bottom FF labels at TD depth (where curves fan out most) ─────────────
+  const tdHL = (sl, sts) => {
+    if (!sts.length) return 0;
+    const td = sts.reduce((mx, s) => s.md > mx.md ? s : mx, sts[0]);
+    return toBS(sl, td);
   };
   const labelY = g.t + ph + 16;
   ctx.font = '9px sans-serif'; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
   [
-    [rihHi,   ffHi,  '#1a5f88'],
-    [rihMid,  ffMid, '#2a7fa8'],
-    [rihLo,   ffLo,  '#5a9fd4'],
-    [poohLo,  ffLo,  '#e07878'],
-    [poohMid, ffMid, '#c0392b'],
-    [poohHi,  ffHi,  '#8b1a1a'],
-  ].forEach(([sts, ff, color]) => {
+    [slRihHi,   rihHi,   ffHi,  '#1a5f88'],
+    [slRihMid,  rihMid,  ffMid, '#2a7fa8'],
+    [slRihLo,   rihLo,   ffLo,  '#5a9fd4'],
+    [slPoohLo,  poohLo,  ffLo,  '#e07878'],
+    [slPoohMid, poohMid, ffMid, '#c0392b'],
+    [slPoohHi,  poohHi,  ffHi,  '#8b1a1a'],
+  ].forEach(([sl, sts, ff, color]) => {
     if (!sts.length) return;
     ctx.fillStyle = color;
-    ctx.fillText(`${ff}FF`, surfaceX(sts), labelY);
+    ctx.fillText(`${ff}FF`, g.l + (tdHL(sl, sts) / xMax) * pw, labelY);
   });
 
   CI.drawAnnotations(ctx, CID);
