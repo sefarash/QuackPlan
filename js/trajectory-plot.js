@@ -22,7 +22,8 @@ function _drawVS(survey) {
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const pts = survey.map(s => ({
+  const dense = _densify(survey, 50);
+  const pts = dense.map(s => ({
     dep: Math.sqrt(s.north * s.north + s.east * s.east),
     tvd: s.tvd,
     md:  s.md,
@@ -180,7 +181,7 @@ function _drawPlan(survey) {
   // Wellpath
   ctx.strokeStyle = '#1a5f7a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
   ctx.beginPath();
-  survey.forEach((s, i) => {
+  _densify(survey, 50).forEach((s, i) => {
     i === 0 ? ctx.moveTo(toX(s.east), toY(s.north))
             : ctx.lineTo(toX(s.east), toY(s.north));
   });
@@ -245,6 +246,46 @@ function _interpSurvey(survey, md) {
     }
   }
   return { ...last };
+}
+
+// Sub-sample each survey segment into `step`-ft increments using min curvature arcs
+function _densify(survey, step) {
+  const DEG = Math.PI / 180;
+  if (survey.length < 2) return survey.slice();
+  const result = [{ ...survey[0] }];
+
+  for (let i = 0; i < survey.length - 1; i++) {
+    const s0 = survey[i];
+    const s1 = survey[i + 1];
+    const segDMD = s1.md - s0.md;
+    if (segDMD < 0.01) continue;
+
+    const nSub = Math.max(1, Math.ceil(segDMD / step));
+    for (let j = 1; j <= nSub; j++) {
+      if (j === nSub) { result.push({ ...s1 }); continue; }
+
+      const f      = j / nSub;
+      const subInc = s0.inc + f * (s1.inc - s0.inc);
+      const subAz  = (s0.az || 0) + f * ((s1.az || 0) - (s0.az || 0));
+      const dMD    = f * segDMD;
+
+      const i1 = s0.inc * DEG, i2 = subInc * DEG;
+      const a1 = (s0.az || 0) * DEG, a2 = subAz * DEG;
+      const cosDL = Math.cos(i2 - i1) - Math.sin(i1) * Math.sin(i2) * (1 - Math.cos(a2 - a1));
+      const DL = Math.acos(Math.max(-1, Math.min(1, cosDL)));
+      const RF = DL < 1e-10 ? 1 : (2 / DL) * Math.tan(DL / 2);
+
+      result.push({
+        md:    s0.md   + dMD,
+        inc:   subInc,
+        az:    subAz,
+        tvd:   s0.tvd   + (dMD / 2) * (Math.cos(i1) + Math.cos(i2)) * RF,
+        north: s0.north + (dMD / 2) * (Math.sin(i1) * Math.cos(a1) + Math.sin(i2) * Math.cos(a2)) * RF,
+        east:  s0.east  + (dMD / 2) * (Math.sin(i1) * Math.sin(a1) + Math.sin(i2) * Math.sin(a2)) * RF,
+      });
+    }
+  }
+  return result;
 }
 
 function _niceInterval(maxVal, targetCount) {
