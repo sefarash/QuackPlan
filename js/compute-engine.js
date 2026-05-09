@@ -123,10 +123,11 @@ function _computeHyd(survey, fluid, bha) {
   const flowMin    = +(document.getElementById('hydFlowMin')?.value || 100);
   const flowMax    = +(document.getElementById('hydFlowMax')?.value || 600);
   const sweepLo    = Math.max(1, flowMin - 50);
-  const sweepHi    = flowMax + 50;
+  const sweepHi    = flowMax + 50;   // chart x-axis upper limit (50 gpm of empty space)
   const nPts       = 14;
+  // Curve ends at flowMax; chart axis extends to sweepHi for visual margin
   const sweepRates = Array.from({ length: nPts }, (_, i) =>
-    Math.round(sweepLo + (sweepHi - sweepLo) * i / (nPts - 1)));
+    Math.round(sweepLo + (flowMax - sweepLo) * i / (nPts - 1)));
   if (!sweepRates.includes(activeFlow)) { sweepRates.push(activeFlow); sweepRates.sort((a, b) => a - b); }
   const sweep      = sweepRates.map(q => {
     const vP  = q / (2.448 * dpID * dpID);
@@ -152,7 +153,7 @@ function _computeHyd(survey, fluid, bha) {
   if (hsi < 1.0)               warnings.push('Bit HSI below 1.0 — poor hole cleaning');
 
   return {
-    sections, sweep,
+    sections, sweep, sweepXmax: sweepHi,
     totalAnnLoss: Math.round(cumAnn),
     pipeLoss:     Math.round(pipeLoss),
     bitDrop:      Math.round(bitDrop),

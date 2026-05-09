@@ -10,7 +10,7 @@ function drawHydSweep(h) {
 
   if (!h?.sweep?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  const xMax   = Math.max(...h.sweep.map(s => s.q), 1);
+  const xMax   = h.sweepXmax || Math.max(...h.sweep.map(s => s.q), 1);
   const maxSPP = Math.max(...h.sweep.map(s => s.spp), h.sppLimit || 3500) * 1.1;
 
   const g = _chartGrid(ctx, W, H, xMax, maxSPP, 'Flow Rate (gpm)', 'SPP (psi)');
