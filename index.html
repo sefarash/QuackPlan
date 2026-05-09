@@ -464,18 +464,24 @@
       </div>
       <div class="chart-controls" style="margin-top:8px;margin-bottom:4px">
         <label>MW &nbsp;
-          <span id="hydMWlo">8</span>
+          <input type="number" id="hydMWmin" value="8" step="0.5" style="width:38px;text-align:right"
+            oninput="document.getElementById('hydMWslider').min=this.value;qpCompute()">
           <input type="range" id="hydMWslider" min="8" max="16" step="0.5" value="10"
             oninput="document.getElementById('hydMWval').textContent=this.value;qpCompute()"
             style="width:100px; vertical-align:middle">
-          <span id="hydMWval">10</span> ppg
+          <input type="number" id="hydMWmax" value="16" step="0.5" style="width:38px"
+            oninput="document.getElementById('hydMWslider').max=this.value;qpCompute()">
+          &nbsp;<span id="hydMWval">10</span> ppg
         </label>
         <label>Flow rate &nbsp;
-          <span id="hydFlowLo">100</span>
+          <input type="number" id="hydFlowMin" value="100" step="10" style="width:48px;text-align:right"
+            oninput="document.getElementById('hydFlowSlider').min=this.value;qpCompute()">
           <input type="range" id="hydFlowSlider" min="100" max="600" step="10" value="280"
             oninput="document.getElementById('hydFlowVal').textContent=this.value;qpCompute()"
             style="width:120px; vertical-align:middle">
-          <span id="hydFlowVal">280</span> gpm
+          <input type="number" id="hydFlowMax" value="600" step="10" style="width:48px"
+            oninput="document.getElementById('hydFlowSlider').max=this.value;qpCompute()">
+          &nbsp;<span id="hydFlowVal">280</span> gpm
         </label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
       </div>

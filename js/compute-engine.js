@@ -119,8 +119,15 @@ function _computeHyd(survey, fluid, bha) {
   const pumpHP       = Math.round((pumpPressure * activeFlow) / (1714 * (pumpEff / 100)));
   const ecdAtBit     = +( activeMW + cumAnn / (0.052 * (bitTVD_ft || 1)) ).toFixed(2);
 
-  // Build sweep (SPP vs flow rate) for chart
-  const sweepRates = [100, 150, 200, 250, 280, 320, 380, 450, 550];
+  // Build sweep (SPP vs flow rate) for chart — range = (flowMin−50) to (flowMax+50)
+  const flowMin    = +(document.getElementById('hydFlowMin')?.value || 100);
+  const flowMax    = +(document.getElementById('hydFlowMax')?.value || 600);
+  const sweepLo    = Math.max(1, flowMin - 50);
+  const sweepHi    = flowMax + 50;
+  const nPts       = 14;
+  const sweepRates = Array.from({ length: nPts }, (_, i) =>
+    Math.round(sweepLo + (sweepHi - sweepLo) * i / (nPts - 1)));
+  if (!sweepRates.includes(activeFlow)) { sweepRates.push(activeFlow); sweepRates.sort((a, b) => a - b); }
   const sweep      = sweepRates.map(q => {
     const vP  = q / (2.448 * dpID * dpID);
     const reP = 928 * activeMW * vP * dpID / (pv || 1);
