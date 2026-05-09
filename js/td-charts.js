@@ -120,33 +120,46 @@ function drawBuckling(r) {
   const bk = r.buckling;
   if (!bk?.stations?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
+  // Sliding (rotOff) compressive loads for comparison
+  const rotOffSt = r.modes?.rotOff?.ffSensitivity?.mid?.stations || [];
+  const slidePts = rotOffSt.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
+
   const maxMD = Math.max(...bk.stations.map(s => s.md), 1);
-  const xMax  = Math.max(...bk.stations.map(s =>
-    Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0, -s.axialLoad_lbf || 0)), 1) / 1000 * 1.1;
+  const xMax  = Math.max(
+    ...bk.stations.map(s => Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0, -s.axialLoad_lbf || 0)),
+    ...rotOffSt.map(s => Math.max(-s.axialLoad_lbf, 0)),
+    1
+  ) / 1000 * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Critical Load (klbs)', 'MD (ft)');
 
-  const sinPts  = bk.stations.filter(s => s.fSin_lbf != null)
-                             .map(s => ({ x: s.fSin_lbf / 1000, y: s.md }));
-  const helPts  = bk.stations.filter(s => s.fHel_lbf != null)
-                             .map(s => ({ x: s.fHel_lbf / 1000, y: s.md }));
-  const compPts = bk.stations.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
+  const sinPts   = bk.stations.filter(s => s.fSin_lbf != null)
+                               .map(s => ({ x: s.fSin_lbf / 1000, y: s.md }));
+  const helPts   = bk.stations.filter(s => s.fHel_lbf != null)
+                               .map(s => ({ x: s.fHel_lbf / 1000, y: s.md }));
+  const rotPts   = bk.stations.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
 
   const liveCurves = [
-    { pts: sinPts,  color: '#c0392b', label: 'Sinusoidal'      },
-    { pts: helPts,  color: '#2a7fa8', label: 'Helical'         },
-    { pts: compPts, color: '#1a7a4a', label: 'Compressive Load'},
+    { pts: sinPts,   color: '#c0392b', label: 'Sinusoidal'       },
+    { pts: helPts,   color: '#2a7fa8', label: 'Helical'          },
+    { pts: rotPts,   color: '#1a7a4a', label: 'Comp — Rotating'  },
+    { pts: slidePts, color: '#e07a1a', label: 'Comp — Sliding'   },
   ];
   CI.storeLive(CID, liveCurves);
   CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Critical Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
 
-  _chartLineDepthDown(ctx, sinPts,  '#c0392b', 1.5, g, xMax, maxMD);
-  _chartLineDepthDown(ctx, helPts,  '#2a7fa8', 1.5, g, xMax, maxMD);
-  _chartLineDepthDown(ctx, compPts, '#1a7a4a', 2,   g, xMax, maxMD);
+  _chartLineDepthDown(ctx, sinPts,   '#c0392b', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, helPts,   '#2a7fa8', 1.5, g, xMax, maxMD);
+  // Sliding curve drawn dashed
+  ctx.setLineDash([6, 3]);
+  _chartLineDepthDown(ctx, slidePts, '#e07a1a', 2,   g, xMax, maxMD);
+  ctx.setLineDash([]);
+  _chartLineDepthDown(ctx, rotPts,   '#1a7a4a', 2,   g, xMax, maxMD);
 
-  _legend(ctx, W, g.t, ['Sinusoidal', 'Helical', 'Compressive Load'],
-    ['#c0392b', '#2a7fa8', '#1a7a4a']);
+  _legend(ctx, W, g.t,
+    ['Sinusoidal', 'Helical', 'Comp — Rotating', 'Comp — Sliding (dashed)'],
+    ['#c0392b', '#2a7fa8', '#1a7a4a', '#e07a1a']);
   CI.drawAnnotations(ctx, CID);
 }
 
