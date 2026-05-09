@@ -2,7 +2,7 @@
 // drawTorque, drawBuckling, drawOverpull, drawBroomstick
 
 const CHART_COLORS = { lo: '#2a7fa8', mid: '#f0a500', hi: '#c0392b' };
-const CHART_PAD = { t: 30, b: 50, l: 70, r: 20 };
+const CHART_PAD = { t: 44, b: 34, l: 70, r: 20 };
 
 function _chartSetup(canvasId) {
   const canvas = document.getElementById(canvasId);
@@ -40,9 +40,10 @@ function _chartGrid(ctx, W, H, xMax, yMax, xLabel, yLabel) {
 
   ctx.save();
   ctx.fillStyle = '#1a2b38'; ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(xLabel, l + pw / 2, H - 8);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText(xLabel, l + pw / 2, t - 6);
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = 'middle';
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
@@ -262,9 +263,10 @@ function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel) {
 
   ctx.save();
   ctx.fillStyle = '#1a2b38'; ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(xLabel, l + pw / 2, H - 8);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText(xLabel, l + pw / 2, t - 6);
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = 'middle';
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
