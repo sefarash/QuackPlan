@@ -269,64 +269,71 @@ function drawBroomstick(r) {
   const ffLo    = +(document.getElementById('bsFFlo')?.value   || 0.20);
   const ffMid   = +(document.getElementById('bsFFmid')?.value  || 0.30);
   const ffHi    = +(document.getElementById('bsFFhi')?.value   || 0.40);
-  const wob     = +(document.getElementById('bsWOB')?.value    || 25);
-  const mdMarks = [
-    +(document.getElementById('bsMD1')?.value || 0),
-    +(document.getElementById('bsMD2')?.value || 0),
-    +(document.getElementById('bsMD3')?.value || 0),
-  ].filter(m => m > 0);
-  const mw  = fluidGet().mudWeight;
-  const BF  = 1 - mw / 65.5;
+  const mwLo    = +(document.getElementById('bsMWlo')?.value   || 9.0);
+  const mwMid   = +(document.getElementById('bsMWmid')?.value  || 10.0);
+  const mwHi    = +(document.getElementById('bsMWhi')?.value   || 12.0);
+  const BF      = 1 - mwMid / 65.5;
 
-  // 3 runs: FF lo/mid/hi at single WOB
-  const run = ff => tdCompute(qpState.survey, bhaGet(), null, mw,
-    { ffCased: ff, ffOpen: ff, wob_klbs: wob, overpullMargin_lbf: 100000 });
+  // 5 runs: 3 FF levels at mid MW (RIH/POOH FF sensitivity)
+  //       + lo/hi MW at mid FF (free-weight / rotOff MW sensitivity)
+  const run = (ff, mw) => tdCompute(qpState.survey, bhaGet(), null, mw,
+    { ffCased: ff, ffOpen: ff, wob_klbs: 25, overpullMargin_lbf: 100000 });
 
-  const resFFlo  = run(ffLo);
-  const resFFmid = run(ffMid);
-  const resFFhi  = run(ffHi);
+  const resFFlo  = run(ffLo,  mwMid);
+  const resFFmid = run(ffMid, mwMid);
+  const resFFhi  = run(ffHi,  mwMid);
+  const resMWlo  = run(ffMid, mwLo);
+  const resMWhi  = run(ffMid, mwHi);
   if (!resFFmid) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
   const st = (res, mode) => res?.modes?.[mode]?.ffSensitivity?.mid?.stations || [];
 
-  const rihLo   = st(resFFlo,  'rih');
-  const rihMid  = st(resFFmid, 'rih');
-  const rihHi   = st(resFFhi,  'rih');
-  const rotOff  = st(resFFmid, 'rotOff');
-  const rotOn   = st(resFFmid, 'rotOn');
-  const poohLo  = st(resFFlo,  'pooh');
-  const poohMid = st(resFFmid, 'pooh');
-  const poohHi  = st(resFFhi,  'pooh');
+  // RIH / POOH: FF sensitivity at mid MW
+  const rihLo    = st(resFFlo,  'rih');
+  const rihMid   = st(resFFmid, 'rih');
+  const rihHi    = st(resFFhi,  'rih');
+  const poohLo   = st(resFFlo,  'pooh');
+  const poohMid  = st(resFFmid, 'pooh');
+  const poohHi   = st(resFFhi,  'pooh');
+  // Free weight / rotOff: MW sensitivity at mid FF
+  const rotOffLo  = st(resMWlo,  'rotOff');
+  const rotOffMid = st(resFFmid, 'rotOff');
+  const rotOffHi  = st(resMWhi,  'rotOff');
+  // Rot-On: single curve at mid FF + mid MW
+  const rotOn     = st(resFFmid, 'rotOn');
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
   const toHL  = s => Math.max(0, s.axialLoad_lbf / 1000 + blockWt);
   const xMax  = Math.max(
-    ...[...rihLo, ...rihMid, ...rihHi, ...rotOff, ...rotOn, ...poohLo, ...poohMid, ...poohHi]
-      .map(toHL), 1) * 1.1;
+    ...[...rihLo, ...rihMid, ...rihHi,
+        ...rotOffLo, ...rotOffMid, ...rotOffHi, ...rotOn,
+        ...poohLo, ...poohMid, ...poohHi].map(toHL), 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
   ctx.fillStyle = '#5a7a8e'; ctx.font = '9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} klbs  WOB=${wob} klbs`,
+  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mwMid.toFixed(1)} ppg  Block=${blockWt} klbs`,
     g.l + 4, g.t + 4);
 
   const toLine = sts => sts.map(s => ({ x: toHL(s), y: s.md }));
   const liveCurves = [
-    { pts: toLine(rihLo),  color: '#5a9fd4', label: `RIH FF ${ffLo}`  },
-    { pts: toLine(rihMid), color: '#2a7fa8', label: `RIH FF ${ffMid}` },
-    { pts: toLine(rihHi),  color: '#1a5f88', label: `RIH FF ${ffHi}`  },
-    { pts: toLine(rotOff), color: '#8e44ad', label: 'Free Wt'         },
-    { pts: toLine(rotOn),  color: '#1a7a4a', label: `Rot-On WOB ${wob}k` },
-    { pts: toLine(poohLo), color: '#e07878', label: `PKP FF ${ffLo}`  },
-    { pts: toLine(poohMid),color: '#c0392b', label: `PKP FF ${ffMid}` },
-    { pts: toLine(poohHi), color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
+    { pts: toLine(rihLo),     color: '#5a9fd4', label: `RIH FF ${ffLo}`       },
+    { pts: toLine(rihMid),    color: '#2a7fa8', label: `RIH FF ${ffMid}`      },
+    { pts: toLine(rihHi),     color: '#1a5f88', label: `RIH FF ${ffHi}`       },
+    { pts: toLine(rotOffLo),  color: '#b07dd0', label: `Free MW ${mwLo}`      },
+    { pts: toLine(rotOffMid), color: '#8e44ad', label: `Free MW ${mwMid}`     },
+    { pts: toLine(rotOffHi),  color: '#5e1a8a', label: `Free MW ${mwHi}`      },
+    { pts: toLine(rotOn),     color: '#1a7a4a', label: 'Rot-On'               },
+    { pts: toLine(poohLo),    color: '#e07878', label: `PKP FF ${ffLo}`       },
+    { pts: toLine(poohMid),   color: '#c0392b', label: `PKP FF ${ffMid}`      },
+    { pts: toLine(poohHi),    color: '#8b1a1a', label: `PKP FF ${ffHi}`       },
   ];
   CI.storeLive(CID, liveCurves);
   CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
 
-  // RIH — lo/hi dashed, mid solid
+  // RIH — lo/hi dashed, mid solid (blue)
   ctx.setLineDash([5, 3]);
   _chartLineDepthDown(ctx, liveCurves[0].pts, '#5a9fd4', 1.5, g, xMax, maxMD);
   ctx.setLineDash([]);
@@ -334,58 +341,33 @@ function drawBroomstick(r) {
   ctx.setLineDash([5, 3]);
   _chartLineDepthDown(ctx, liveCurves[2].pts, '#1a5f88', 1.5, g, xMax, maxMD);
   ctx.setLineDash([]);
-  // Free weight + Rot-On
-  _chartLineDepthDown(ctx, liveCurves[3].pts, '#8e44ad', 1.5, g, xMax, maxMD);
-  _chartLineDepthDown(ctx, liveCurves[4].pts, '#1a7a4a', 2,   g, xMax, maxMD);
-  // POOH — lo/hi dashed, mid solid
-  ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[5].pts, '#e07878', 1.5, g, xMax, maxMD);
+  // Free weight MW — lo/hi dashed, mid solid (purple)
+  ctx.setLineDash([6, 3]);
+  _chartLineDepthDown(ctx, liveCurves[3].pts, '#b07dd0', 1.5, g, xMax, maxMD);
   ctx.setLineDash([]);
-  _chartLineDepthDown(ctx, liveCurves[6].pts, '#c0392b', 2,   g, xMax, maxMD);
-  ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[7].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[4].pts, '#8e44ad', 2,   g, xMax, maxMD);
+  ctx.setLineDash([6, 3]);
+  _chartLineDepthDown(ctx, liveCurves[5].pts, '#5e1a8a', 1.5, g, xMax, maxMD);
   ctx.setLineDash([]);
-
-  // ── MD reference lines ──────────────────────────────────────────────────────
-  // Interpolate hookload at a given MD from a stations array
-  const hlAt = (sts, md) => {
-    if (!sts.length) return null;
-    let best = sts[0];
-    for (const s of sts) { if (Math.abs(s.md - md) < Math.abs(best.md - md)) best = s; }
-    return toHL(best);
-  };
-
-  mdMarks.forEach((md, idx) => {
-    if (md > maxMD) return;
-    const y = g.t + (md / maxMD) * g.ph;
-    ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(g.l, y); ctx.lineTo(g.l + g.pw, y); ctx.stroke();
-    ctx.setLineDash([]);
-
-    // MD label (left)
-    ctx.fillStyle = '#7a5a2a'; ctx.font = 'bold 9px sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText(`MD ${Math.round(md).toLocaleString()} ft`, g.l + 3, y - 1);
-
-    // Hookload callouts (right)
-    const slk  = hlAt(rihMid,  md);
-    const free = hlAt(rotOff,  md);
-    const pkp  = hlAt(poohMid, md);
-    const parts = [];
-    if (slk  != null) parts.push(`SLK ${slk.toFixed(0)}`);
-    if (free != null) parts.push(`Free ${free.toFixed(0)}`);
-    if (pkp  != null) parts.push(`PKP ${pkp.toFixed(0)}`);
-    ctx.fillStyle = '#5a7a8e'; ctx.font = '9px sans-serif';
-    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-    ctx.fillText(parts.join('  /  ') + ' klbs', g.l + g.pw - 3, y - 1);
-  });
+  // Rot-On single
+  _chartLineDepthDown(ctx, liveCurves[6].pts, '#1a7a4a', 1.5, g, xMax, maxMD);
+  // POOH — lo/hi dashed, mid solid (red)
+  ctx.setLineDash([5, 3]);
+  _chartLineDepthDown(ctx, liveCurves[7].pts, '#e07878', 1.5, g, xMax, maxMD);
+  ctx.setLineDash([]);
+  _chartLineDepthDown(ctx, liveCurves[8].pts, '#c0392b', 2,   g, xMax, maxMD);
+  ctx.setLineDash([5, 3]);
+  _chartLineDepthDown(ctx, liveCurves[9].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
+  ctx.setLineDash([]);
 
   _legend(ctx, W, g.t,
     [`RIH ${ffLo}`, `RIH ${ffMid}`, `RIH ${ffHi}`,
-     'Free Wt', `Rot-On ${wob}k`,
+     `Free ${mwLo}`, `Free ${mwMid}`, `Free ${mwHi}`,
+     'Rot-On',
      `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`],
     ['#5a9fd4', '#2a7fa8', '#1a5f88',
-     '#8e44ad', '#1a7a4a',
+     '#b07dd0', '#8e44ad', '#5e1a8a',
+     '#1a7a4a',
      '#e07878', '#c0392b', '#8b1a1a']);
   CI.drawAnnotations(ctx, CID);
 }
