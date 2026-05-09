@@ -1,5 +1,5 @@
 // ===== AFE CHART =====
-// Days & Cost vs Depth — from activity plan
+// Depth on left-Y (depth-down), Cum. Days on top-X, Cum. Cost on right-Y
 
 function drawAFE() {
   const c = _chartSetup('afeCanvas');
@@ -25,102 +25,100 @@ function drawAFE() {
 
   const maxDepth = Math.max(...pts.map(p => p.depth), 1);
   const maxDays  = Math.max(...pts.map(p => p.days), 1);
-  const maxCost  = Math.max(...pts.map(p => p.cost), 1);
+  const maxCost  = Math.max(...pts.map(p => p.cost), cumCost, 1);
 
-  // Two-axis plot: days (left) and cost (right)
+  // Layout: Depth on left-Y (depth-down), Days on top-X, Cost on right-Y
   const { t, b, l, r } = CHART_PAD;
-  const rr   = 70;   // extra right margin for cost axis
-  const pw   = W - l - rr;
-  const ph   = H - t - b;
+  const rt = 70;   // extra right margin for cost axis
+  const pw = W - l - rt;
+  const ph = H - t - b;
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
 
-  // Grid
+  // Grid + axis labels
   ctx.strokeStyle = '#e8f0f5'; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
     const y = t + ph * i / 5;
+    const x = l + pw * i / 5;
+
     ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
-    // Days axis (left)
-    ctx.fillStyle = '#2a7fa8'; ctx.font = '10px sans-serif';
+    ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
+
+    // Left axis — Depth, 0 at top, maxDepth at bottom
+    ctx.fillStyle = '#5a7a8e'; ctx.font = '10px sans-serif';
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText((maxDays * (5 - i) / 5).toFixed(0), l - 5, y);
-    // Cost axis (right)
+    ctx.fillText((maxDepth * i / 5).toFixed(0), l - 5, y);
+
+    // Top axis — Cum. Days, 0 at left, maxDays at right
+    ctx.fillStyle = '#2a7fa8';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText((maxDays * i / 5).toFixed(1), x, t - 5);
+
+    // Right axis — Cum. Cost, $0 at top, $maxCost at bottom
     ctx.fillStyle = '#1a7a4a';
-    ctx.textAlign = 'left';
-    const costVal = maxCost * (5 - i) / 5;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const costVal = maxCost * i / 5;
     ctx.fillText('$' + (costVal >= 1e6 ? (costVal / 1e6).toFixed(1) + 'M'
                                         : (costVal / 1000).toFixed(0) + 'K'),
       l + pw + 4, y);
   }
 
-  // X axis (depth)
-  for (let i = 0; i <= 5; i++) {
-    const x = l + pw * i / 5;
-    ctx.strokeStyle = '#e8f0f5'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
-    ctx.fillStyle = '#5a7a8e'; ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText((maxDepth * i / 5).toFixed(0), x, t + ph + 6);
-  }
-
   ctx.strokeStyle = '#9ecce3'; ctx.lineWidth = 1.5;
   ctx.strokeRect(l, t, pw, ph);
 
-  // Axis labels
+  // Axis titles
   ctx.fillStyle = '#2a7fa8'; ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText('Cum. Days', l + pw / 2, t - 20);
+
+  ctx.fillStyle = '#5a7a8e';
   ctx.save(); ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
-  ctx.fillText('Cum. Days', 0, 0); ctx.restore();
+  ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillText('Depth (ft)', 0, 0); ctx.restore();
 
   ctx.fillStyle = '#1a7a4a';
   ctx.save(); ctx.translate(W - 10, t + ph / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   ctx.fillText('Cum. Cost ($)', 0, 0); ctx.restore();
 
-  ctx.fillStyle = '#5a7a8e'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.fillText('Depth (ft)', l + pw / 2, H - 14);
-
-  // Days line
+  // Days curve: x=days, y=depth (depth-down)
   ctx.strokeStyle = '#2a7fa8'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
   ctx.beginPath();
   pts.forEach((p, i) => {
-    const x = l + (p.depth / maxDepth) * pw;
-    const y = t + (1 - p.days / maxDays) * ph;
+    const x = l + (p.days  / maxDays)  * pw;
+    const y = t + (p.depth / maxDepth) * ph;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
 
-  // Cost line
+  // Cost curve: x=cost (mapped to same pixel range via right axis), y=depth
   ctx.strokeStyle = '#1a7a4a'; ctx.lineWidth = 2;
   ctx.beginPath();
   pts.forEach((p, i) => {
-    const x = l + (p.depth / maxDepth) * pw;
-    const y = t + (1 - p.cost  / maxCost)  * ph;
+    const x = l + (p.cost  / maxCost)  * pw;
+    const y = t + (p.depth / maxDepth) * ph;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
 
-  // ── Phase callout lines (casing shoe depths) ──────────────────────────────
+  // Phase callout lines — horizontal dashed lines at each casing shoe depth
   const schRows = _readSchematicRows().filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0);
   schRows.sort((a, b) => +(a.bot) - +(b.bot));
   schRows.forEach(row => {
     const d = +(row.bot);
     if (d <= 0 || d > maxDepth) return;
-    const x = l + (d / maxDepth) * pw;
+    const y = t + (d / maxDepth) * ph;
     ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
     ctx.setLineDash([]);
-    // Triangle shoe marker at top of line
+    // Triangle marker on left edge pointing right
     ctx.fillStyle = '#b8976a';
-    ctx.beginPath(); ctx.moveTo(x - 5, t); ctx.lineTo(x + 5, t); ctx.lineTo(x, t + 8); ctx.closePath(); ctx.fill();
-    // Label rotated above plot
-    ctx.save();
+    ctx.beginPath(); ctx.moveTo(l, y - 5); ctx.lineTo(l, y + 5); ctx.lineTo(l + 8, y); ctx.closePath(); ctx.fill();
+    // Label just above the dashed line
     ctx.fillStyle = '#7a5a2a'; ctx.font = '9px sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.translate(x + 3, t - 8);
-    ctx.rotate(-Math.PI / 4);
-    ctx.fillText(`${row.size}" ${row.def}`, 0, 0);
-    ctx.restore();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(`${row.size}" ${row.def}`, l + 12, y - 2);
   });
 
   // Total summary
@@ -135,9 +133,9 @@ function drawAFE() {
 
   CI.register('afeCanvas', {
     pad: { l, t, pw, ph },
-    xMax: maxDepth, yMax: maxDays,
-    xLabel: 'Depth (ft)', yLabel: 'Days',
-    depthDown: false,
+    xMax: maxDays, yMax: maxDepth,
+    xLabel: 'Cum. Days', yLabel: 'Depth (ft)',
+    depthDown: true,
   });
   CI.drawAnnotations(ctx, 'afeCanvas');
 }
