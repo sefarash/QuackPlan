@@ -27,7 +27,7 @@ function drawSchematic(survey) {
   }
 
   const schRows  = _readSchematicRows();
-  const maxDepth = Math.max(lastSurvey.tvd, ...schRows.map(r => +(r.bot || 0)), 1);
+  const maxDepth = Math.max(lastSurvey.md, ...schRows.map(r => +(r.bot || 0)), 1);
 
   // ── Layout ─────────────────────────────────────────────────────────────────
   const PAD_T = 54, PAD_B = 24, PAD_L = 46, PAD_R = 8;
@@ -150,7 +150,7 @@ function drawSchematic(survey) {
   ctx.setLineDash([3, 5]);
   ctx.beginPath();
   ctx.moveTo(cx, PAD_T);
-  ctx.lineTo(cx, PAD_T + lastSurvey.tvd * scaleY);
+  ctx.lineTo(cx, PAD_T + lastSurvey.md * scaleY);
   ctx.stroke();
   ctx.setLineDash([]);
 
@@ -173,7 +173,7 @@ function drawSchematic(survey) {
   ctx.fillText('RKB', cx + 12, PAD_T - 7);
 
   // ── TD marker ─────────────────────────────────────────────────────────────
-  const tdY = Math.min(PAD_T + lastSurvey.tvd * scaleY, H - PAD_B - 4);
+  const tdY = Math.min(PAD_T + lastSurvey.md * scaleY, H - PAD_B - 4);
   ctx.fillStyle = '#c0392b';
   ctx.beginPath(); ctx.arc(cx, tdY, 4, 0, Math.PI * 2); ctx.fill();
   ctx.font         = 'bold 9px sans-serif';
