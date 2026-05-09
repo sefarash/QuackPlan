@@ -100,6 +100,29 @@ function drawAFE() {
   });
   ctx.stroke();
 
+  // ── Phase callout lines (casing shoe depths) ──────────────────────────────
+  const schRows = _readSchematicRows().filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0);
+  schRows.sort((a, b) => +(a.bot) - +(b.bot));
+  schRows.forEach(row => {
+    const d = +(row.bot);
+    if (d <= 0 || d > maxDepth) return;
+    const x = l + (d / maxDepth) * pw;
+    ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
+    ctx.setLineDash([]);
+    // Triangle shoe marker at top of line
+    ctx.fillStyle = '#b8976a';
+    ctx.beginPath(); ctx.moveTo(x - 5, t); ctx.lineTo(x + 5, t); ctx.lineTo(x, t + 8); ctx.closePath(); ctx.fill();
+    // Label rotated above plot
+    ctx.save();
+    ctx.fillStyle = '#7a5a2a'; ctx.font = '9px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.translate(x + 3, t - 8);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillText(`${row.size}" ${row.def}`, 0, 0);
+    ctx.restore();
+  });
+
   // Total summary
   ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
