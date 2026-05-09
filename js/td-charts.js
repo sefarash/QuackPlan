@@ -267,7 +267,7 @@ function drawBroomstick(r) {
   const { ctx, W, H } = c;
 
   const blockWt = +(document.getElementById('bsBlock')?.value  || 35);
-  const dpWt  = +(document.getElementById('bsDPwt')?.value  || 19.5);
+  const dpWt  = +(document.getElementById('bsDPwt')?.value  || 22.5);
   const ffLo  = +(document.getElementById('bsFFlo')?.value  || 0.20);
   const ffMid = +(document.getElementById('bsFFmid')?.value || 0.30);
   const ffHi  = +(document.getElementById('bsFFhi')?.value  || 0.40);
@@ -344,11 +344,69 @@ function drawBroomstick(r) {
 
   _legend(ctx, W, g.t,
     [`RIH ${ffLo}`, `RIH ${ffMid}`, `RIH ${ffHi}`,
-     'Free Wt', 'Rot-On',
+     'Rot Off Btm', 'Rot-On',
      `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`],
     ['#5a9fd4', '#2a7fa8', '#1a5f88',
      '#8e44ad', '#1a7a4a',
      '#e07878', '#c0392b', '#8b1a1a']);
+
+  // ── Chart section labels: Slack off / Pick up / Rotation Off Bottom ───────
+  const pw = g.pw, ph = g.ph;
+  const midY = g.t + ph * 0.55;
+
+  // Approximate x-positions at mid-chart for labelling
+  const xOfPts = (sts) => {
+    const mid = Math.floor(sts.length / 2);
+    if (!sts[mid]) return null;
+    return g.l + (toHL(sts[mid]) / xMax) * pw;
+  };
+
+  // "Slack off" — over mid RIH curve
+  const xSlack = xOfPts(rihMid);
+  if (xSlack !== null) {
+    ctx.fillStyle = 'rgba(42,127,168,0.8)'; ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('Slack off', xSlack, midY);
+  }
+
+  // "Pick up" — over mid POOH curve
+  const xPickup = xOfPts(poohMid);
+  if (xPickup !== null) {
+    ctx.fillStyle = 'rgba(192,57,43,0.8)'; ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('Pick up', xPickup, midY);
+  }
+
+  // "Rotation Off Bottom" — near rotOff curve
+  const xRot = xOfPts(rotOff);
+  if (xRot !== null) {
+    ctx.fillStyle = '#8e44ad'; ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('Rotation', xRot + 4, midY + 16);
+    ctx.fillText('Off Bottom', xRot + 4, midY + 28);
+  }
+
+  // ── Bottom FF axis labels ─────────────────────────────────────────────────
+  // Slack-off side: hi→mid→lo labels at TD x-positions (higher FF = lower HL for RIH)
+  const labelY = g.t + ph + 16;
+  ctx.font = '9px sans-serif'; ctx.textBaseline = 'top';
+  const ffPairs = [
+    { sts: rihHi,  ff: ffHi,  color: '#1a5f88', align: 'center' },
+    { sts: rihMid, ff: ffMid, color: '#2a7fa8', align: 'center' },
+    { sts: rihLo,  ff: ffLo,  color: '#5a9fd4', align: 'center' },
+    { sts: poohLo, ff: ffLo,  color: '#e07878', align: 'center' },
+    { sts: poohMid,ff: ffMid, color: '#c0392b', align: 'center' },
+    { sts: poohHi, ff: ffHi,  color: '#8b1a1a', align: 'center' },
+  ];
+  ffPairs.forEach(({ sts, ff, color }) => {
+    const last = sts[sts.length - 1];
+    if (!last) return;
+    const lx = g.l + (toHL(last) / xMax) * pw;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${ff}FF`, lx, labelY);
+  });
+
   CI.drawAnnotations(ctx, CID);
 }
 
