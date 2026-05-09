@@ -171,6 +171,7 @@ function drawOverpull(r) {
   const { ctx, W, H } = c;
 
   const blockWt = +(document.getElementById('ovpBlock')?.value || 35);   // klbs
+  const dpWt  = +(document.getElementById('ovpDPwt')?.value  || 19.5);
   const ffLo  = +(document.getElementById('ovpFFlo')?.value  || 0.20);
   const ffMid = +(document.getElementById('ovpFFmid')?.value || 0.30);
   const ffHi  = +(document.getElementById('ovpFFhi')?.value  || 0.40);
@@ -178,7 +179,7 @@ function drawOverpull(r) {
   const BF    = 1 - mw / 65.5;
 
   const run = ff => tdCompute(qpState.survey, bhaGet(), null, mw,
-    { ffCased: ff, ffOpen: ff, wob_klbs: 15, overpullMargin_lbf: 100000 });
+    { ffCased: ff, ffOpen: ff, wob_klbs: 15, dpWt_ppf: dpWt, overpullMargin_lbf: 100000 });
 
   const resLo  = run(ffLo);
   const resMid = run(ffMid);
@@ -266,15 +267,16 @@ function drawBroomstick(r) {
   const { ctx, W, H } = c;
 
   const blockWt = +(document.getElementById('bsBlock')?.value  || 35);
+  const dpWt  = +(document.getElementById('bsDPwt')?.value  || 19.5);
   const ffLo  = +(document.getElementById('bsFFlo')?.value  || 0.20);
   const ffMid = +(document.getElementById('bsFFmid')?.value || 0.30);
   const ffHi  = +(document.getElementById('bsFFhi')?.value  || 0.40);
   const mw    = +(document.getElementById('bsMW')?.value    || fluidGet().mudWeight || 10.0);
   const BF    = 1 - mw / 65.5;
 
-  // 3 runs: FF lo/mid/hi at single MW
+  // 3 runs: FF lo/mid/hi at single MW and DP weight
   const run = ff => tdCompute(qpState.survey, bhaGet(), null, mw,
-    { ffCased: ff, ffOpen: ff, wob_klbs: 25, overpullMargin_lbf: 100000 });
+    { ffCased: ff, ffOpen: ff, wob_klbs: 25, dpWt_ppf: dpWt, overpullMargin_lbf: 100000 });
 
   const resLo  = run(ffLo);
   const resMid = run(ffMid);

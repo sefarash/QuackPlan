@@ -306,7 +306,7 @@ function tdCompute(survey, bha, casingDesign, mudWeight_ppg, inputs) {
 
   // --- Calibration inputs ---
   const blockWeight_lbf  = (+document.getElementById('tdBlockWeight')?.value || 50) * 1000;
-  const dpWtCalib_ppf    = +document.getElementById('tdDpWeight')?.value || 19.5;
+  const dpWtCalib_ppf    = +(inputs.dpWt_ppf) || +document.getElementById('tdDpWeight')?.value || 19.5;
 
   // MW: linked to hydraulics or override?
   const overrideEl       = document.getElementById('tdMwOverride');
