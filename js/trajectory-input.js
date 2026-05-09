@@ -125,34 +125,73 @@ function traj2AddRow() {
   const tr   = document.createElement('tr');
   tr.innerHTML = `
     <td class="editable">
-      <select onchange="traj2Recalc()">
+      <select onchange="traj2ModeChange(this)">
         <option value="md_inc_azi">MD / Inc / Azi</option>
-        <option value="tvd_inc_azi">TVD / Inc / Azi</option>
-        <option value="md_dls_azi">MD / DLS / Azi</option>
+        <option value="inc_azi_tvd">Inc / Azi / TVD</option>
+        <option value="inc_azi_dls">Inc / Azi / DLS</option>
       </select>
     </td>
-    <td class="editable"><input type="number" step="1" onchange="traj2Recalc()"></td>
-    <td class="editable"><input type="number" step="0.01" onchange="traj2Recalc()"></td>
-    <td class="editable"><input type="number" step="0.1" onchange="traj2Recalc()"></td>
-    <td class="calc-cell" data-col="tvd2">—</td>
-    <td class="calc-cell" data-col="dls2">—</td>
+    <td data-field="md"  class="editable"><input type="number" step="1"    onchange="traj2Recalc()"></td>
+    <td data-field="inc" class="editable"><input type="number" step="0.01" onchange="traj2Recalc()"></td>
+    <td data-field="azi" class="editable"><input type="number" step="0.1"  onchange="traj2Recalc()"></td>
+    <td data-field="tvd" class="calc-cell" data-col="tvd2">—</td>
+    <td data-field="dls" class="calc-cell" data-col="dls2">—</td>
     <td class="row-act"><button onclick="this.closest('tr').remove();traj2Recalc()">✕</button></td>`;
   body.appendChild(tr);
   traj2Recalc();
+}
+
+// Called when the Define dropdown changes — toggles which cells are editable
+function traj2ModeChange(sel) {
+  _traj2UpdateCells(sel.closest('tr'), sel.value);
+  traj2Recalc();
+}
+
+function _traj2UpdateCells(tr, mode) {
+  const editableFields = {
+    'md_inc_azi':  ['md', 'inc', 'azi'],
+    'inc_azi_tvd': ['inc', 'azi', 'tvd'],
+    'inc_azi_dls': ['inc', 'azi', 'dls'],
+  }[mode] || ['md', 'inc', 'azi'];
+
+  const steps = { md: '1', inc: '0.01', azi: '0.1', tvd: '1', dls: '0.01' };
+
+  ['md', 'inc', 'azi', 'tvd', 'dls'].forEach(field => {
+    const td = tr.querySelector(`[data-field="${field}"]`);
+    if (!td) return;
+    const isInput = editableFields.includes(field);
+
+    if (isInput && !td.querySelector('input')) {
+      td.className = 'editable';
+      td.removeAttribute('data-col');
+      td.innerHTML = `<input type="number" step="${steps[field]}" onchange="traj2Recalc()">`;
+    } else if (!isInput && td.querySelector('input')) {
+      td.className = 'calc-cell';
+      td.setAttribute('data-col', field === 'tvd' ? 'tvd2' : 'dls2');
+      td.textContent = '—';
+    }
+  });
+}
+
+function _traj2ReadField(tr, field) {
+  const td = tr.querySelector(`[data-field="${field}"]`);
+  if (!td) return '';
+  const input = td.querySelector('input');
+  return input ? input.value : td.textContent;
 }
 
 function traj2Recalc() {
   const body = document.getElementById('traj2Body');
   const rows = [];
   for (const tr of body.rows) {
-    const sel    = tr.querySelector('select');
-    const inputs = tr.querySelectorAll('input[type=number]');
+    const sel = tr.querySelector('select');
     rows.push({
       define: sel?.value || 'md_inc_azi',
-      md:  inputs[0]?.value, inc: inputs[1]?.value,
-      azi: inputs[2]?.value,
-      tvd: tr.querySelector('[data-col="tvd2"]')?.textContent,
-      dls: tr.querySelector('[data-col="dls2"]')?.textContent,
+      md:  _traj2ReadField(tr, 'md'),
+      inc: _traj2ReadField(tr, 'inc'),
+      azi: _traj2ReadField(tr, 'azi'),
+      tvd: _traj2ReadField(tr, 'tvd'),
+      dls: _traj2ReadField(tr, 'dls'),
     });
   }
 

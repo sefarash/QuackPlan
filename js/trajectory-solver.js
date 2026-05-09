@@ -6,7 +6,7 @@ const DLS_SCALE = 100 / 30;   // °/30ft → °/100ft for display
 
 // ── Option 2 solver ──────────────────────────────────────────────────────────
 // Each row: { define, md, inc, azi, tvd, dls }
-// define options: 'md_inc_azi' | 'tvd_inc_azi' | 'md_dls_azi'
+// define options: 'md_inc_azi' | 'inc_azi_tvd' | 'inc_azi_dls'
 function traj2BuildStations(rows) {
   if (!rows || rows.length === 0) return [];
 
@@ -20,7 +20,7 @@ function traj2BuildStations(rows) {
     const r    = rows[i];
     const prev = stations[stations.length - 1];
 
-    if (r.define === 'tvd_inc_azi') {
+    if (r.define === 'inc_azi_tvd') {
       // Solve for MD that produces the target TVD, given Inc/Azi
       const targetTVD = +(r.tvd || 0);
       const inc2 = +(r.inc || 0);
@@ -28,16 +28,14 @@ function traj2BuildStations(rows) {
       const md   = _solveForMD(prev, inc2, az2, targetTVD);
       stations.push({ md, inc: inc2, az: az2 });
 
-    } else if (r.define === 'md_dls_azi') {
-      // Solve for Inc2 from DLS, given MD2 and previous station
-      const md2  = +(r.md || 0);
-      const dls  = +(r.dls || 0);   // °/100ft (display)
-      const dMD  = md2 - prev.md;
+    } else if (r.define === 'inc_azi_dls') {
+      // Solve for MD from Inc2, Azi2, DLS using min curvature dogleg angle
+      const inc2 = +(r.inc || 0);
       const az2  = +(r.azi || 0);
-      // DLS = DL_degrees / dMD * 100  →  DL_degrees = DLS * dMD / 100
-      const dl   = dls * Math.abs(dMD) / 100;
-      const inc2 = Math.max(0, prev.inc + dl);   // simple: azimuth change = 0
-      stations.push({ md: md2, inc: inc2, az: az2 });
+      const dls  = +(r.dls || 0);   // °/100ft (display)
+      const dl   = _computeDL(prev.inc, prev.az || 0, inc2, az2);  // degrees
+      const dMD  = dls > 0 ? dl * 100 / dls : 0;
+      stations.push({ md: prev.md + dMD, inc: inc2, az: az2 });
 
     } else {
       // Default: md_inc_azi — use directly
@@ -46,6 +44,14 @@ function traj2BuildStations(rows) {
   }
 
   return stations;
+}
+
+// Compute dogleg angle in degrees between two survey stations
+function _computeDL(inc1, az1, inc2, az2) {
+  const DEG = Math.PI / 180;
+  const cosDL = Math.cos((inc2 - inc1) * DEG)
+              - Math.sin(inc1 * DEG) * Math.sin(inc2 * DEG) * (1 - Math.cos((az2 - az1) * DEG));
+  return Math.acos(Math.max(-1, Math.min(1, cosDL))) / DEG;
 }
 
 // Binary-search MD that gives targetTVD, given known Inc2/Az2
