@@ -167,7 +167,8 @@ function _traj2UpdateCells(tr, mode) {
       td.innerHTML = `<input type="number" step="${steps[field]}" onchange="traj2Recalc()">`;
     } else if (!isInput && td.querySelector('input')) {
       td.className = 'calc-cell';
-      td.setAttribute('data-col', field === 'tvd' ? 'tvd2' : 'dls2');
+      const colMap = { md: 'md2', tvd: 'tvd2', dls: 'dls2' };
+      td.setAttribute('data-col', colMap[field] || field + '2');
       td.textContent = '—';
     }
   });
@@ -204,6 +205,7 @@ function traj2Recalc() {
   survey.forEach((pt, i) => {
     const tr = body.rows[i];
     if (!tr) return;
+    _setCell(tr, 'md2',  pt.md.toFixed(1));
     _setCell(tr, 'tvd2', pt.tvd.toFixed(1));
     _setCell(tr, 'dls2', (pt.dls * DLS_SCALE).toFixed(2));
   });
