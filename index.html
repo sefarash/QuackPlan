@@ -499,6 +499,35 @@
       </div>
     </div>
 
+    <!-- Kick Tolerance -->
+    <div id="panel-kt" class="output-panel">
+      <div class="chart-controls">
+        <span class="text-dim">MW: <strong id="ktMWdisplay">—</strong> ppg (from Fluid tab)</span>
+        <button class="hdr-btn" onclick="drawKickTolerance()">Compute</button>
+      </div>
+      <div style="display:flex;flex:1;gap:10px;min-height:0">
+        <!-- Left: PPFG input table + chart -->
+        <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+          <div class="section-label" style="flex:none">PPFG Gradients</div>
+          <table class="qp-table" style="flex:none">
+            <thead>
+              <tr><th class="drag-col"></th><th>TVD (ft)</th><th>PP (ppg)</th><th>FG (ppg)</th><th class="row-act"></th></tr>
+            </thead>
+            <tbody id="ppfgBody"></tbody>
+          </table>
+          <button class="add-row-btn" style="flex:none" onclick="ppfgAddRow();ppfgSave()">+ Add point</button>
+          <div class="output-canvas-wrap" style="flex:1">
+            <canvas id="ktCanvas"></canvas>
+          </div>
+        </div>
+        <!-- Right: KT results -->
+        <div style="flex:1;min-width:0;overflow-y:auto;padding-right:4px">
+          <div class="section-label" style="margin-bottom:6px">Kick Tolerance per Section</div>
+          <div id="ktResultsDiv"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Initial AFE -->
     <div id="panel-afe" class="output-panel">
       <div class="chart-controls">
@@ -531,6 +560,7 @@
     <button class="output-tab" onclick="switchOutputTab('overpull',this)">Overpull</button>
     <button class="output-tab" onclick="switchOutputTab('broomstick',this)">Broomstick</button>
     <button class="output-tab" onclick="switchOutputTab('hydraulics',this)">Hydraulics</button>
+    <button class="output-tab" onclick="switchOutputTab('kt',this)">Kick Tolerance</button>
     <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
   </nav>
   <div class="footer-right" id="footerStatus">Ready</div>
@@ -573,12 +603,13 @@
 <script src="js/afe-chart.js"></script>
 <script src="js/trajectory-plot.js"></script>
 <script src="js/compare-ui.js"></script>
+<script src="js/kick-tolerance.js"></script>
 <script src="js/row-drag.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
-     'hydSweepCanvas','afeCanvas'].forEach(id => CI.attach(id));
+     'hydSweepCanvas','afeCanvas','ktCanvas'].forEach(id => CI.attach(id));
 
     makeRowsDraggable('traj1Body',      traj1Recalc);
     makeRowsDraggable('traj2Body',      traj2Recalc);
@@ -590,6 +621,7 @@
     makeRowsDraggable('activityBody',    activityRecalc);
     makeRowsDraggable('servicesBody',    activityRecalc);
     makeRowsDraggable('casingCostBody',  casingCostRecalc);
+    makeRowsDraggable('ppfgBody',        drawKickTolerance);
   });
 </script>
 </body>

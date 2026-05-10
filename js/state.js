@@ -73,6 +73,7 @@ function redrawOutputPanel(name) {
   else if (name === 'broomstick' && r)           drawBroomstick(r);
   else if (name === 'hydraulics' && h)           { drawHydSweep(h); drawHydPie(h); }
   else if (name === 'afe')                       drawAFE();
+  else if (name === 'kt')                        drawKickTolerance();
 }
 
 // ── Header context label ─────────────────────────────────────────────────────

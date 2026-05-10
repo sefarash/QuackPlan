@@ -130,6 +130,7 @@ function _loadScenario(id) {
     if (d.bha)       bhaLoadState(d.bha);
     if (d.nozzles)   nozzleLoadState(d.nozzles);
     if (d.activity)  activityLoadState(d.activity);
+    if (d.ppfg)      ppfgLoadState(d.ppfg);
 
     // Persist last-used scenario ID so reload restores it
     localStorage.setItem('qp_lastScenarioId', id);

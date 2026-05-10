@@ -336,6 +336,7 @@ const CI = (() => {
       overpullCanvas: 'overpull', broomstickCanvas: 'broomstick',
       hydSweepCanvas: 'hydraulics', afeCanvas: 'afe',
       trajVsCanvas: 'trajplot', trajPlanCanvas: 'trajplot',
+      ktCanvas: 'kt',
     };
     if (typeof redrawOutputPanel === 'function')
       redrawOutputPanel(map[id] || (typeof qpState !== 'undefined' && qpState.activeOutputTab));
