@@ -337,10 +337,11 @@
           <div class="section-label mt12">Casing Costs</div>
           <table class="qp-table" id="casingCostTable">
             <thead>
-              <tr><th>Casing Size</th><th>$/ft</th><th>Length (ft)</th><th>Cement ($)</th><th>Total ($)</th></tr>
+              <tr><th class="drag-col"></th><th>Casing Size</th><th>$/ft</th><th>Length (ft)</th><th>Cement ($)</th><th>Total ($)</th><th class="row-act"></th></tr>
             </thead>
             <tbody id="casingCostBody"></tbody>
           </table>
+          <button class="add-row-btn" onclick="casingCostAddRow()">+ Add casing</button>
         </div>
       </div>
     </div>
@@ -586,8 +587,9 @@
     makeRowsDraggable('bhaBody',        bhaSave);
     makeRowsDraggable('nozzleBody',     nozzleRecalc);
     makeRowsDraggable('mwdBody',        mwdTableChange);
-    makeRowsDraggable('activityBody',   activityRecalc);
-    makeRowsDraggable('servicesBody',   activityRecalc);
+    makeRowsDraggable('activityBody',    activityRecalc);
+    makeRowsDraggable('servicesBody',    activityRecalc);
+    makeRowsDraggable('casingCostBody',  casingCostRecalc);
   });
 </script>
 </body>

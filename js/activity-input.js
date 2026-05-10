@@ -22,9 +22,17 @@ function activityRecalc() {
     totalCost += +(inputs[3]?.value || 0);
   }
 
-  // Add service day-rate costs
   const dayRate = _servicesDayRate();
   totalCost += dayRate * totalDays;
+
+  // Add service lump sums
+  for (const tr of document.getElementById('servicesBody').rows) {
+    const inputs = tr.querySelectorAll('input[type=number]');
+    totalCost += +(inputs[1]?.value || 0);
+  }
+
+  // Add casing material costs
+  totalCost += _casingCostTotal();
 
   const dEl = document.getElementById('actTotalDays');
   const cEl = document.getElementById('actTotalCost');
@@ -56,6 +64,44 @@ function _servicesDayRate() {
   return rate;
 }
 
+// ── Casing Cost table ─────────────────────────────────────────────────────────
+
+function casingCostAddRow(vals) {
+  const body = document.getElementById('casingCostBody');
+  const tr   = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="drag-handle">⠿</td>
+    <td class="editable"><input type="text"   value="${vals?.size   ?? ''}"    placeholder='e.g. 9.625"' onchange="casingCostRecalc()"></td>
+    <td class="editable"><input type="number" step="0.5"  value="${vals?.rate   ?? 30}"   onchange="casingCostRecalc()"></td>
+    <td class="editable"><input type="number" step="100"  value="${vals?.length ?? 5000}" onchange="casingCostRecalc()"></td>
+    <td class="editable"><input type="number" step="1000" value="${vals?.cement ?? 0}"    onchange="casingCostRecalc()"></td>
+    <td class="calc-cell" data-col="castotal">—</td>
+    <td class="row-act"><button onclick="this.closest('tr').remove();casingCostRecalc()">✕</button></td>`;
+  body.appendChild(tr);
+  casingCostRecalc();
+}
+
+function casingCostRecalc() {
+  for (const tr of document.getElementById('casingCostBody').rows) {
+    const num   = tr.querySelectorAll('input[type=number]');
+    const rate   = +(num[0]?.value || 0);
+    const length = +(num[1]?.value || 0);
+    const cement = +(num[2]?.value || 0);
+    const cell = tr.querySelector('[data-col="castotal"]');
+    if (cell) cell.textContent = '$' + Math.round(rate * length + cement).toLocaleString();
+  }
+  activityRecalc();
+}
+
+function _casingCostTotal() {
+  let total = 0;
+  for (const tr of document.getElementById('casingCostBody').rows) {
+    const num = tr.querySelectorAll('input[type=number]');
+    total += +(num[0]?.value || 0) * +(num[1]?.value || 0) + +(num[2]?.value || 0);
+  }
+  return total;
+}
+
 function activityGet() {
   const activities = [];
   for (const tr of document.getElementById('activityBody').rows) {
@@ -78,7 +124,21 @@ function activityGet() {
     });
   }
 
-  return { activities, services };
+  const casingCosts = [];
+  for (const tr of document.getElementById('casingCostBody').rows) {
+    const txt = tr.querySelectorAll('input[type=text]');
+    const num = tr.querySelectorAll('input[type=number]');
+    const rate   = +(num[0]?.value || 0);
+    const length = +(num[1]?.value || 0);
+    const cement = +(num[2]?.value || 0);
+    casingCosts.push({
+      size: txt[0]?.value || '',
+      rate, length, cement,
+      total: rate * length + cement,
+    });
+  }
+
+  return { activities, services, casingCosts };
 }
 
 function activitySave() {
@@ -112,6 +172,13 @@ function activityLoadState(data) {
     if (inputs[2]) inputs[2].value = s.lumpSum ?? 0;
   });
 
+  const casBody = document.getElementById('casingCostBody');
+  casBody.innerHTML = '';
+  (data.casingCosts || []).forEach(c => {
+    casingCostAddRow(c);
+    // value is already set via vals param in casingCostAddRow
+  });
+
   activityRecalc();
 }
 
@@ -119,7 +186,6 @@ function activityLoadState(data) {
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('activityBody').rows.length) {
     activityAddRow();
-    // Give it a useful default
     const row = document.getElementById('activityBody').rows[0];
     const inputs = row.querySelectorAll('input');
     inputs[0].value = 'Spud to TD';

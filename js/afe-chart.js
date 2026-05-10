@@ -20,6 +20,14 @@ function drawAFE() {
     pts.push({ depth: a.depth || pts[pts.length - 1].depth, days: cumDays, cost: cumCost });
   });
 
+  // Inject casing costs as cost steps at each casing shoe depth (length = shoe MD)
+  (act.casingCosts || []).filter(c => c.total > 0 && c.length > 0).forEach(c => {
+    const shoeDepth = +(c.length);
+    const casCost   = +(c.total);
+    pts.forEach(p => { if (p.depth >= shoeDepth) p.cost += casCost; });
+    cumCost += casCost;
+  });
+
   const lumpSum = act.services.reduce((s, sv) => s + (sv.lumpSum || 0), 0);
   cumCost += lumpSum;
 
