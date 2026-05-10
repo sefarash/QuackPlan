@@ -44,7 +44,13 @@ function _renderNode(parent, node, depth) {
   const icon  = NODE_LABELS[node.type] || '•';
   const label = document.createElement('span');
   label.className = 'tree-label';
-  label.textContent = icon + ' ' + node.name;
+  let labelText = icon + ' ' + node.name;
+  if (node.type === 'well' && node.data) {
+    const { rkb, gl } = node.data;
+    if (rkb != null && gl != null)
+      labelText += ` — RKB ${rkb}ft / GL ${gl}ft MSL`;
+  }
+  label.textContent = labelText;
   label.onclick = () => _selectNode(node);
 
   const actions = document.createElement('span');
@@ -150,10 +156,58 @@ function showNewProjectModal() {
 
 function _promptAdd(parentNode) {
   const childType = NODE_TYPES[NODE_TYPES.indexOf(parentNode.type) + 1];
+  if (childType === 'well') { _openWellModal(parentNode.id); return; }
   _editNodeId = null;
   _openModal('New ' + _cap(childType), _cap(childType) + ' name', name => {
     dbAdd({ parentId: parentNode.id, name, type: childType }).then(hierarchyRefresh);
   });
+}
+
+// ── Well creation modal ───────────────────────────────────────────────────────
+
+let _wellModalParentId = null;
+
+function _openWellModal(parentId) {
+  _wellModalParentId = parentId;
+  const inputs = ['wellModalName', 'wellModalRKB', 'wellModalGL'];
+  inputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; el.style.outline = ''; }
+  });
+  document.getElementById('wellModal').classList.add('open');
+  setTimeout(() => document.getElementById('wellModalName').focus(), 50);
+}
+
+function closeWellModal() {
+  document.getElementById('wellModal').classList.remove('open');
+  _wellModalParentId = null;
+}
+
+function wellModalConfirm() {
+  const nameEl = document.getElementById('wellModalName');
+  const rkbEl  = document.getElementById('wellModalRKB');
+  const glEl   = document.getElementById('wellModalGL');
+
+  const name = nameEl.value.trim();
+  const rkb  = rkbEl.value.trim();
+  const gl   = glEl.value.trim();
+
+  // Validate — highlight missing fields and block
+  let firstInvalid = null;
+  [[nameEl, name === ''], [rkbEl, rkb === ''], [glEl, gl === '']].forEach(([el, bad]) => {
+    el.style.outline = bad ? '2px solid #c0392b' : '';
+    if (bad && !firstInvalid) firstInvalid = el;
+  });
+  if (firstInvalid) { firstInvalid.focus(); return; }
+
+  const parentId = _wellModalParentId;
+  closeWellModal();
+  dbAdd({
+    parentId,
+    name,
+    type: 'well',
+    data: { rkb: +rkb, gl: +gl },
+  }).then(hierarchyRefresh);
 }
 
 function _promptRename(node) {
@@ -201,6 +255,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('nameModalInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') nameModalConfirm();
     if (e.key === 'Escape') closeNameModal();
+  });
+
+  ['wellModalName', 'wellModalRKB', 'wellModalGL'].forEach(id => {
+    document.getElementById(id)?.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  wellModalConfirm();
+      if (e.key === 'Escape') closeWellModal();
+    });
   });
 
   hierarchyRefresh();

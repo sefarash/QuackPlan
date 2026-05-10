@@ -608,6 +608,32 @@
   </div>
 </div>
 
+<!-- Well creation modal -->
+<div class="modal-backdrop" id="wellModal">
+  <div class="modal">
+    <div class="modal-title">New Well</div>
+    <div class="form-row">
+      <label>Well Name</label>
+      <input type="text" id="wellModalName" style="max-width:240px;flex:1" placeholder="e.g. Well-A1">
+    </div>
+    <div class="form-row">
+      <label>RKB Elevation <span class="unit">ft above ground</span></label>
+      <input type="number" id="wellModalRKB" step="0.1" min="0" style="max-width:110px;flex:1" placeholder="e.g. 25">
+    </div>
+    <div class="form-row">
+      <label>Ground Level (GL) <span class="unit">ft above MSL</span></label>
+      <input type="number" id="wellModalGL" step="0.1" style="max-width:110px;flex:1" placeholder="e.g. 150">
+    </div>
+    <p style="font-size:11px;color:#9ecce3;margin:4px 0 12px 0">
+      RKB elevation above MSL = GL + RKB above ground
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeWellModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="wellModalConfirm()">Create Well</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
 <script src="js/chart-interaction.js"></script>
 <script src="js/survey-engine.js"></script>
