@@ -58,25 +58,36 @@ function bhaPresetFill(sel) {
   bhaSave();
 }
 
-// Recompute PPF, CumWt, CumLen for all rows (bottom = row 0)
+// Recompute PPF, CumWt, CumLen — accumulate from bottom row (bit) upward
 function _bhaRecalc() {
-  const rows = document.getElementById('bhaBody').rows;
-  let cumWt  = 0;
-  let cumLen = 0;
-  for (const tr of rows) {
+  const rows = [...document.getElementById('bhaBody').rows];
+
+  // Collect per-row values
+  const data = rows.map(tr => {
     const nums = tr.querySelectorAll('input[type=number]');
     const wt   = +(nums[2]?.value || 0);
     const len  = +(nums[3]?.value || 1);
-    cumWt  += wt;
-    cumLen += len;
-    const ppf = len > 0 ? wt / len : 0;
-    const ppfCell   = tr.querySelector('[data-col="ppf"]');
-    const cumWtCell = tr.querySelector('[data-col="cumwt"]');
-    const cumLenCell= tr.querySelector('[data-col="cumlen"]');
+    return { tr, wt, len, ppf: len > 0 ? wt / len : 0, cumWt: 0, cumLen: 0 };
+  });
+
+  // Accumulate from bottom (last row = bit) to top
+  let cumWt = 0, cumLen = 0;
+  for (let i = data.length - 1; i >= 0; i--) {
+    cumWt  += data[i].wt;
+    cumLen += data[i].len;
+    data[i].cumWt  = cumWt;
+    data[i].cumLen = cumLen;
+  }
+
+  // Write back to DOM
+  data.forEach(({ tr, ppf, cumWt, cumLen }) => {
+    const ppfCell    = tr.querySelector('[data-col="ppf"]');
+    const cumWtCell  = tr.querySelector('[data-col="cumwt"]');
+    const cumLenCell = tr.querySelector('[data-col="cumlen"]');
     if (ppfCell)    ppfCell.textContent    = ppf.toFixed(2);
     if (cumWtCell)  cumWtCell.textContent  = Math.round(cumWt).toLocaleString();
     if (cumLenCell) cumLenCell.textContent = Math.round(cumLen).toLocaleString();
-  }
+  });
 }
 
 function bhaLoadState(data) {
