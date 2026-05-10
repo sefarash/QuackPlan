@@ -56,13 +56,17 @@ const CI = (() => {
         });
         ctx.stroke();
       });
-      // Label tag at top-left of plot area
-      ctx.globalAlpha = 0.65;
+      // Label tag — colored swatch + label text
+      ctx.globalAlpha = 0.80;
       ctx.setLineDash([]);
+      const tagColor = snap.curves[0]?.color || '#1a5f7a';
+      const ty = t + 4 + si * 14;
+      ctx.fillStyle = tagColor;
+      ctx.fillRect(l + 4, ty + 1, 8, 8);
       ctx.font = '9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillStyle = '#1a5f7a';
-      ctx.fillText(`❄ ${snap.label}`, l + 4, t + 4 + si * 13);
+      ctx.fillStyle = '#1a2b38';
+      ctx.fillText(`❄ ${snap.label}`, l + 15, ty);
     });
     ctx.restore();
     ctx.setLineDash([]);
@@ -193,6 +197,10 @@ const CI = (() => {
         icon: '❄', text: 'Freeze current curves',
         fn: () => _doFreeze(id),
       },
+      ...s.frozen.map((snap, si) => ({
+        icon: '✎', text: `Edit "${snap.label}"`,
+        fn: () => _openSnapEdit(id, si),
+      })),
       s.frozen.length ? {
         icon: '🗑', text: `Clear ${s.frozen.length} frozen snapshot${s.frozen.length > 1 ? 's' : ''}`,
         fn: () => { _st(id).frozen = []; _redraw(id); },
@@ -249,6 +257,60 @@ const CI = (() => {
     if (!text?.trim()) return;
     _st(id).annotations.push({ ...coords, text: text.trim() });
     _redraw(id);
+  }
+
+  function _openSnapEdit(id, snapIdx) {
+    document.getElementById('qp_snap_modal')?.remove();
+
+    const snap = _st(id).frozen[snapIdx];
+    if (!snap) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'qp_snap_modal';
+    modal.style.cssText = [
+      'position:fixed', 'z-index:4000',
+      'top:50%', 'left:50%', 'transform:translate(-50%,-50%)',
+      'background:#fff', 'border:1px solid #9ecce3',
+      'border-radius:10px', 'box-shadow:0 8px 32px rgba(0,0,0,.28)',
+      'padding:20px 24px', 'min-width:280px', 'font:13px sans-serif', 'color:#1a2b38',
+    ].join(';');
+
+    const curveRows = snap.curves.map((c, ci) => `
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <input type="color" id="qp_sc_${ci}" value="${c.color}"
+          style="width:32px;height:26px;border:1px solid #ccd;border-radius:4px;cursor:pointer;padding:1px">
+        <span style="flex:1;color:#5a7a8e">${c.label || 'Curve ' + (ci + 1)}</span>
+      </div>`).join('');
+
+    modal.innerHTML = `
+      <div style="font:bold 13px sans-serif;margin-bottom:14px;color:#1a5f7a">✎ Edit Snapshot</div>
+      <label style="display:block;margin-bottom:4px;color:#5a7a8e;font-size:11px">LABEL</label>
+      <input id="qp_snap_lbl" type="text" value="${snap.label}"
+        style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #9ecce3;border-radius:5px;font:13px sans-serif">
+      <div style="margin-top:12px;margin-bottom:4px;color:#5a7a8e;font-size:11px">CURVE COLORS</div>
+      ${curveRows}
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button id="qp_snap_save"
+          style="flex:1;padding:7px;background:#1a5f7a;color:#fff;border:none;border-radius:5px;cursor:pointer;font:13px sans-serif">
+          Save
+        </button>
+        <button id="qp_snap_cancel"
+          style="flex:1;padding:7px;background:#e8f0f5;color:#1a2b38;border:none;border-radius:5px;cursor:pointer;font:13px sans-serif">
+          Cancel
+        </button>
+      </div>`;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('qp_snap_save').onclick = () => {
+      snap.label = document.getElementById('qp_snap_lbl').value.trim() || snap.label;
+      snap.curves.forEach((c, ci) => {
+        c.color = document.getElementById(`qp_sc_${ci}`)?.value || c.color;
+      });
+      modal.remove();
+      _redraw(id);
+    };
+    document.getElementById('qp_snap_cancel').onclick = () => modal.remove();
   }
 
   // ── Coordinate helpers ─────────────────────────────────────────────────────
