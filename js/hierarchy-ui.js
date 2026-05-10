@@ -95,20 +95,25 @@ function _renderNode(parent, node, depth) {
 function _selectNode(node) {
   if (node.type === 'scenario') {
     qpState.currentScenarioId = node.id;
-    // Walk up to find well name
-    dbGet(node.parentId).then(bh => {
-      if (!bh) return;
-      return dbGet(bh.parentId);
-    }).then(well => {
+    // Walk up borehole → well to get name and datums
+    dbGet(node.parentId).then(bh => bh ? dbGet(bh.parentId) : null).then(well => {
       setHeaderContext(well ? well.name : '?', node.name);
+      _applyWellDatums(well);
     });
-    // Load scenario data into UI
     _loadScenario(node.id);
   } else if (node.type === 'well') {
     qpState.currentWellId = node.id;
     setHeaderContext(node.name, '—');
+    _applyWellDatums(node);
   }
   hierarchyRefresh();
+}
+
+function _applyWellDatums(wellNode) {
+  const d = wellNode?.data || {};
+  qpState.wellDatums = (d.rkb != null && d.gl != null)
+    ? { rkb: +d.rkb, gl: +d.gl } : null;
+  if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
 }
 
 function _loadScenario(id) {
@@ -273,10 +278,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!node) return;
       qpState.currentScenarioId = lastId;
       _loadScenario(lastId);
-      // Restore header context
-      dbGet(node.parentId).then(bh => bh && dbGet(bh.parentId)).then(well => {
-        setHeaderContext(well?.name || '?', node.name);
-      });
+      // Restore header context and well datums
+      dbGet(node.parentId)
+        .then(bh => bh ? dbGet(bh.parentId) : null)
+        .then(well => {
+          setHeaderContext(well?.name || '?', node.name);
+          _applyWellDatums(well);
+        });
       hierarchyRefresh();
     });
   }

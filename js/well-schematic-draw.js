@@ -138,23 +138,8 @@ function drawSchematic(survey) {
   });
 
 
-  // ── RKB marker (triangle pointing up) ─────────────────────────────────────
-  ctx.strokeStyle = '#1a5f7a';
-  ctx.lineWidth   = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx - 9, PAD_T);
-  ctx.lineTo(cx + 9, PAD_T);
-  ctx.lineTo(cx,     PAD_T - 14);
-  ctx.closePath();
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(26,95,122,0.18)';
-  ctx.fill();
-
-  ctx.fillStyle    = '#1a2b38';
-  ctx.font         = 'bold 9px sans-serif';
-  ctx.textAlign    = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('RKB', cx + 12, PAD_T - 7);
+  // ── RKB / GL / MSL datum lines ────────────────────────────────────────────
+  _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth);
 
   // ── TD marker ─────────────────────────────────────────────────────────────
   const tdY = Math.min(PAD_T + lastSurvey.md * scaleY, H - PAD_B - 4);
@@ -172,6 +157,79 @@ function drawSchematic(survey) {
   ctx.textBaseline = 'top';
   ctx.fillText(`MD: ${Math.round(lastSurvey.md).toLocaleString()} ft`, 4, 4);
   ctx.fillText(`TVD: ${Math.round(lastSurvey.tvd).toLocaleString()} ft`, 4, 15);
+}
+
+function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
+  const datums = qpState.wellDatums;
+
+  // Horizontal lines run from left edge to just left of the wellbore centre
+  const X0   = 2;          // left start of datum lines
+  const X1   = cx - 4;     // right end (just left of pipe)
+  const LBL  = X0 + 1;     // label x
+  const BRKT = X0 + 14;    // x of the vertical bracket between labels
+
+  const yRKB = PAD_T;      // depth 0 = RKB
+
+  // ── Always draw RKB marker ────────────────────────────────────────────────
+  ctx.strokeStyle = '#1a5f7a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(X0, yRKB); ctx.lineTo(X1, yRKB); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#1a5f7a'; ctx.font = 'bold 9px sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+  ctx.fillText('RKB', LBL, yRKB - 1);
+
+  if (!datums) return;                     // no well selected — stop here
+
+  const rkb = datums.rkb;                  // ft above ground
+  const gl  = datums.gl;                   // ft above MSL
+
+  const yGL  = PAD_T + Math.min(rkb,          maxDepth) * scaleY;
+  const yMSL = PAD_T + Math.min(rkb + gl,     maxDepth) * scaleY;
+  const yBot = H - PAD_B;
+
+  // ── GL line ────────────────────────────────────────────────────────────────
+  if (yGL > yRKB + 4 && yGL < yBot) {
+    ctx.strokeStyle = '#2a7a2a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(X0, yGL); ctx.lineTo(X1, yGL); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#2a7a2a'; ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText('GL', LBL, yGL - 1);
+
+    // Bracket between RKB and GL with distance label
+    _drawBracket(ctx, BRKT, yRKB, yGL, `${rkb}'`, '#1a5f7a');
+  }
+
+  // ── MSL line ───────────────────────────────────────────────────────────────
+  if (yMSL > yGL + 4 && yMSL < yBot) {
+    ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(X0, yMSL); ctx.lineTo(X1, yMSL); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#0055aa'; ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText('MSL', LBL, yMSL - 1);
+
+    // Bracket between GL and MSL with distance label
+    if (yGL < yBot) _drawBracket(ctx, BRKT, yGL, yMSL, `${gl}'`, '#2a7a2a');
+  }
+}
+
+function _drawBracket(ctx, x, y1, y2, label, color) {
+  const MID = (y1 + y2) / 2;
+  const TS  = 4;   // tick half-size
+
+  ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([]);
+  // Vertical line
+  ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2); ctx.stroke();
+  // Top tick
+  ctx.beginPath(); ctx.moveTo(x - TS, y1); ctx.lineTo(x + TS, y1); ctx.stroke();
+  // Bottom tick
+  ctx.beginPath(); ctx.moveTo(x - TS, y2); ctx.lineTo(x + TS, y2); ctx.stroke();
+
+  // Distance label — draw to the right of the bracket
+  ctx.fillStyle = color; ctx.font = '8px sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + TS + 3, MID);
 }
 
 function _readSchematicRows() {
