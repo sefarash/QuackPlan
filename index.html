@@ -378,6 +378,8 @@
       <div class="chart-controls">
         <span class="text-dim">Vertical Section + Plan View — updates with trajectory input</span>
         <button class="hdr-btn" onclick="drawTrajPlot()">Redraw</button>
+        <button class="hdr-btn" onclick="exportSurvey()">⬇ Survey CSV</button>
+        <button class="hdr-btn" onclick="exportChartPNG('trajVsCanvas','survey_VS.png')">⬇ PNG</button>
       </div>
       <div class="output-canvas-wrap" style="display:flex;gap:8px">
         <canvas id="trajVsCanvas"   style="flex:3;min-width:0"></canvas>
@@ -394,6 +396,8 @@
         <label>FF High <input type="number" id="torqFFhi" value="0.4" step="0.05" style="width:55px"></label>
         <label><input type="checkbox" id="torqRotary" checked> Rotary</label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+        <button class="hdr-btn" onclick="exportTD()">⬇ T&amp;D CSV</button>
+        <button class="hdr-btn" onclick="exportChartPNG('torqueCanvas','torque.png')">⬇ PNG</button>
         <span class="legend-dot" style="background:#2a7fa8"></span>0.2FF
         <span class="legend-dot" style="background:#f0a500"></span>0.3FF
         <span class="legend-dot" style="background:#1a7a4a"></span>0.4FF
@@ -410,6 +414,8 @@
         <label>FF Low <input type="number" id="buckFFlo" value="0.2" step="0.05" style="width:55px"></label>
         <label>FF Mid <input type="number" id="buckFFmid" value="0.3" step="0.05" style="width:55px"></label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+        <button class="hdr-btn" onclick="exportTD()">⬇ T&amp;D CSV</button>
+        <button class="hdr-btn" onclick="exportChartPNG('bucklingCanvas','buckling.png')">⬇ PNG</button>
         <span class="legend-dot" style="background:#c0392b"></span>Sinusoidal
         <span class="legend-dot" style="background:#2a7fa8"></span>Helical
         <span class="legend-dot" style="background:#1a7a4a"></span>Lockup
@@ -429,6 +435,8 @@
         <label>FF Mid <input type="number" id="ovpFFmid" value="0.3" step="0.05" style="width:55px"></label>
         <label>FF High <input type="number" id="ovpFFhi" value="0.4" step="0.05" style="width:55px"></label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+        <button class="hdr-btn" onclick="exportTD()">⬇ T&amp;D CSV</button>
+        <button class="hdr-btn" onclick="exportChartPNG('overpullCanvas','overpull.png')">⬇ PNG</button>
       </div>
       <div class="output-canvas-wrap">
         <canvas id="overpullCanvas"></canvas>
@@ -445,6 +453,8 @@
         <label>FF Mid <input type="number" id="bsFFmid" value="0.3" step="0.05" style="width:50px"></label>
         <label>FF High <input type="number" id="bsFFhi"  value="0.4" step="0.05" style="width:50px"></label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+        <button class="hdr-btn" onclick="exportTD()">⬇ T&amp;D CSV</button>
+        <button class="hdr-btn" onclick="exportChartPNG('broomstickCanvas','broomstick.png')">⬇ PNG</button>
       </div>
       <div class="output-canvas-wrap">
         <canvas id="broomstickCanvas"></canvas>
@@ -478,6 +488,8 @@
           &nbsp;<span id="hydFlowVal">280</span> gpm
         </label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+        <button class="hdr-btn" onclick="exportHydraulics()">⬇ CSV</button>
+        <button class="hdr-btn" onclick="exportChartPNG('hydSweepCanvas','hydraulics.png')">⬇ PNG</button>
       </div>
       <div class="output-canvas-wrap" style="flex:none;height:220px">
         <canvas id="hydPieCanvas"></canvas>
@@ -498,6 +510,8 @@
             style="width:60px" onchange="drawCasingDesign()">
         </label>
         <button class="hdr-btn" onclick="drawCasingDesign()">Compute</button>
+        <button class="hdr-btn" onclick="exportChartPNG('cdBurstCanvas','burst.png')">⬇ Burst PNG</button>
+        <button class="hdr-btn" onclick="exportChartPNG('cdCollapseCanvas','collapse.png')">⬇ Collapse PNG</button>
       </div>
       <div style="display:flex;flex:1;gap:10px;min-height:0">
         <!-- Burst chart -->
@@ -520,6 +534,8 @@
       <div class="chart-controls">
         <span class="text-dim">MW: <strong id="ktMWdisplay">—</strong> ppg (from Fluid tab)</span>
         <button class="hdr-btn" onclick="drawKickTolerance()">Compute</button>
+        <button class="hdr-btn" onclick="exportKT()">⬇ KT CSV</button>
+        <button class="hdr-btn" onclick="exportChartPNG('ktCanvas','ppfg_kt.png')">⬇ PNG</button>
       </div>
       <div style="display:flex;flex:1;gap:10px;min-height:0">
         <!-- Left: PPFG chart -->
@@ -539,6 +555,8 @@
       <div class="chart-controls">
         <span class="text-dim">Days &amp; Cost vs. Depth — computed from Activity plan</span>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
+        <button class="hdr-btn" onclick="exportAFE()">⬇ AFE CSV</button>
+        <button class="hdr-btn" onclick="exportChartPNG('afeCanvas','afe.png')">⬇ PNG</button>
       </div>
       <div class="output-canvas-wrap">
         <canvas id="afeCanvas"></canvas>
@@ -609,6 +627,7 @@
 <script src="js/hydraulics-ui.js"></script>
 <script src="js/afe-chart.js"></script>
 <script src="js/trajectory-plot.js"></script>
+<script src="js/export.js"></script>
 <script src="js/casing-design.js"></script>
 <script src="js/kick-tolerance.js"></script>
 <script src="js/row-drag.js"></script>
