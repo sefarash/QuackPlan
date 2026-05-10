@@ -112,10 +112,9 @@ function _drawVS(survey) {
   ctx.beginPath(); ctx.arc(tdx, tdy, 5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(
-    `TD  ${Math.round(last.tvd)}'TVD / ${Math.round(last.md)}'MD`,
-    tdx + 7, tdy + 2
-  );
+  const tdIndent = ctx.measureText('TD  ').width;
+  ctx.fillText(`TD  ${Math.round(last.tvd).toLocaleString()}' TVD`, tdx + 7, tdy + 2);
+  ctx.fillText(`${Math.round(last.md).toLocaleString()}' MD`,       tdx + 7 + tdIndent, tdy + 13);
 
   CI.drawAnnotations(ctx, CID);
 }
