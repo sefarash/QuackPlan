@@ -62,11 +62,16 @@ function ppfgAddRow(vals) {
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td class="drag-handle">⠿</td>
-    <td class="editable"><input type="number" step="100" value="${vals?.tvd ?? ''}" placeholder="0" onchange="drawKickTolerance()"></td>
-    <td class="editable"><input type="number" step="0.1" value="${vals?.pp ?? ''}"  placeholder="8.6" onchange="drawKickTolerance()"></td>
-    <td class="editable"><input type="number" step="0.1" value="${vals?.fg ?? ''}"  placeholder="14.0" onchange="drawKickTolerance()"></td>
-    <td class="row-act"><button onclick="this.closest('tr').remove();drawKickTolerance()">✕</button></td>`;
+    <td class="editable"><input type="number" step="100" value="${vals?.tvd ?? ''}" placeholder="0"    onchange="ppfgRecalc()"></td>
+    <td class="editable"><input type="number" step="0.1"  value="${vals?.pp  ?? ''}" placeholder="8.6"  onchange="ppfgRecalc()"></td>
+    <td class="editable"><input type="number" step="0.1"  value="${vals?.fg  ?? ''}" placeholder="14.0" onchange="ppfgRecalc()"></td>
+    <td class="row-act"><button onclick="this.closest('tr').remove();ppfgRecalc()">✕</button></td>`;
   body.appendChild(tr);
+}
+
+function ppfgRecalc() {
+  ppfgSave();
+  if (qpState.activeOutputTab === 'kt') drawKickTolerance();
 }
 
 function _readPPFG() {
@@ -93,6 +98,30 @@ function ppfgLoadState(data) {
   if (!body) return;
   body.innerHTML = '';
   (data || []).forEach(r => ppfgAddRow(r));
+}
+
+function ppfgImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _ppfgPasteText(e.target.result);
+    ppfgRecalc();
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function _ppfgPasteText(text) {
+  const body = document.getElementById('ppfgBody');
+  if (!body) return;
+  body.innerHTML = '';
+  text.trim().split(/\r?\n/).forEach((line, i) => {
+    const cols = line.split(/\t|,/);
+    if (i === 0 && isNaN(parseFloat(cols[0]))) return; // skip header
+    if (cols.length < 2) return;
+    ppfgAddRow({ tvd: +(cols[0] || 0), pp: +(cols[1] || 0), fg: +(cols[2] || 0) });
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -231,8 +260,19 @@ function _renderKTTable(results, mw) {
     </p>`;
 }
 
-// ── Seed default PPFG points on first load ────────────────────────────────────
+// ── Paste handler + seed on first load ───────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // Excel / CSV paste into the table
+  const tbl = document.getElementById('ppfgTable');
+  if (tbl) {
+    tbl.addEventListener('paste', e => {
+      e.preventDefault();
+      _ppfgPasteText((e.clipboardData || window.clipboardData).getData('text'));
+      ppfgRecalc();
+    });
+  }
+
+  // Seed default points if nothing loaded
   if (!document.getElementById('ppfgBody')?.rows.length) {
     ppfgAddRow({ tvd: 0,     pp: 8.6,  fg: 14.0 });
     ppfgAddRow({ tvd: 5000,  pp: 9.5,  fg: 15.0 });

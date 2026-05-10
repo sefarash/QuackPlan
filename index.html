@@ -30,7 +30,7 @@
     <button class="input-tab" onclick="switchInputTab('bha',this)">Casing / BHA</button>
     <button class="input-tab" onclick="switchInputTab('fluid',this)">Drilling Fluid</button>
     <button class="input-tab" onclick="switchInputTab('activity',this)">Activity</button>
-    <button class="input-tab" onclick="switchInputTab('compare',this)">Compare</button>
+    <button class="input-tab" onclick="switchInputTab('ppfg',this)">PPFG</button>
   </nav>
 
   <div class="header-right">
@@ -346,44 +346,29 @@
       </div>
     </div>
 
-    <!-- Compare -->
-    <div id="panel-compare" class="input-panel">
-      <div class="panel-title">📊 Scenario Comparison</div>
-
-      <div class="cmp-selectors">
-        <div class="cmp-slot">
-          <div class="section-label">Scenario A</div>
-          <select id="cmpSelA" class="cmp-select"><option value="">— select —</option></select>
-        </div>
-        <div class="cmp-slot">
-          <div class="section-label">Scenario B</div>
-          <select id="cmpSelB" class="cmp-select"><option value="">— select —</option></select>
-        </div>
-        <div class="cmp-slot">
-          <div class="section-label">Scenario C (optional)</div>
-          <select id="cmpSelC" class="cmp-select"><option value="">— none —</option></select>
-        </div>
-        <button class="hdr-btn primary" onclick="compareRun()" style="align-self:flex-end;margin-bottom:2px">⚡ Compare</button>
+    <!-- PPFG Input -->
+    <div id="panel-ppfg" class="input-panel">
+      <div class="panel-title">📈 Pore Pressure / Fracture Gradient</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="add-row-btn" onclick="ppfgAddRow();ppfgRecalc()">+ Add point</button>
+        <label class="hdr-btn" style="cursor:pointer;margin:0">
+          Import CSV
+          <input type="file" accept=".csv,.txt" style="display:none" onchange="ppfgImportFile(this)">
+        </label>
+        <span class="text-dim" style="font-size:11px">Tip: copy TVD / PP / FG columns from Excel and paste into the table</span>
       </div>
-
-      <div id="cmpResults" style="display:none">
-        <table class="qp-table" id="cmpTable">
-          <thead>
-            <tr>
-              <th style="width:230px">Metric</th>
-              <th id="cmpHeadA" style="text-align:center">A</th>
-              <th id="cmpHeadB" style="text-align:center">B</th>
-              <th id="cmpHeadC" style="text-align:center;display:none">C</th>
-            </tr>
-          </thead>
-          <tbody id="cmpBody"></tbody>
-        </table>
-      </div>
-
-      <div id="cmpChartWrap" style="display:none;margin-top:20px">
-        <div class="section-label" style="margin-bottom:6px">Trajectory Overlay — TVD vs MD</div>
-        <canvas id="cmpCanvas" style="width:100%;height:300px;display:block"></canvas>
-      </div>
+      <table class="qp-table" id="ppfgTable">
+        <thead>
+          <tr>
+            <th class="drag-col"></th>
+            <th>TVD (ft)</th>
+            <th>Max Pore Pressure (ppg)</th>
+            <th>Min Frac Gradient (ppg)</th>
+            <th class="row-act"></th>
+          </tr>
+        </thead>
+        <tbody id="ppfgBody"></tbody>
+      </table>
     </div>
 
     <!-- ── OUTPUT PANELS ── -->
@@ -506,19 +491,9 @@
         <button class="hdr-btn" onclick="drawKickTolerance()">Compute</button>
       </div>
       <div style="display:flex;flex:1;gap:10px;min-height:0">
-        <!-- Left: PPFG input table + chart -->
-        <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
-          <div class="section-label" style="flex:none">PPFG Gradients</div>
-          <table class="qp-table" style="flex:none">
-            <thead>
-              <tr><th class="drag-col"></th><th>TVD (ft)</th><th>PP (ppg)</th><th>FG (ppg)</th><th class="row-act"></th></tr>
-            </thead>
-            <tbody id="ppfgBody"></tbody>
-          </table>
-          <button class="add-row-btn" style="flex:none" onclick="ppfgAddRow();ppfgSave()">+ Add point</button>
-          <div class="output-canvas-wrap" style="flex:1">
-            <canvas id="ktCanvas"></canvas>
-          </div>
+        <!-- Left: PPFG chart -->
+        <div class="output-canvas-wrap" style="flex:1">
+          <canvas id="ktCanvas"></canvas>
         </div>
         <!-- Right: KT results -->
         <div style="flex:1;min-width:0;overflow-y:auto;padding-right:4px">
@@ -602,7 +577,6 @@
 <script src="js/hydraulics-ui.js"></script>
 <script src="js/afe-chart.js"></script>
 <script src="js/trajectory-plot.js"></script>
-<script src="js/compare-ui.js"></script>
 <script src="js/kick-tolerance.js"></script>
 <script src="js/row-drag.js"></script>
 <script>
@@ -621,7 +595,7 @@
     makeRowsDraggable('activityBody',    activityRecalc);
     makeRowsDraggable('servicesBody',    activityRecalc);
     makeRowsDraggable('casingCostBody',  casingCostRecalc);
-    makeRowsDraggable('ppfgBody',        drawKickTolerance);
+    makeRowsDraggable('ppfgBody',        ppfgRecalc);
   });
 </script>
 </body>
