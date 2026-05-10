@@ -110,6 +110,26 @@ function drawAFE() {
   });
   ctx.stroke();
 
+  // Activity phase labels — dot + name at each activity endpoint on the Days curve
+  act.activities.forEach((a, i) => {
+    if (!a.name) return;
+    const pt = pts[i + 1];
+    if (!pt) return;
+    const x = l + (pt.days  / maxDays)  * pw;
+    const y = t + (pt.depth / maxDepth) * ph;
+
+    // Dot on the days curve
+    ctx.fillStyle = '#2a7fa8';
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+
+    // Label — flip side and above/below to reduce crowding
+    const nearRight = x > l + pw * 0.6;
+    ctx.fillStyle = '#1a3a50'; ctx.font = '9px sans-serif';
+    ctx.textAlign    = nearRight ? 'right' : 'left';
+    ctx.textBaseline = i % 2 === 0 ? 'bottom' : 'top';
+    ctx.fillText(a.name, nearRight ? x - 5 : x + 5, i % 2 === 0 ? y - 4 : y + 4);
+  });
+
   // Phase callout lines — horizontal dashed lines at each casing shoe depth
   const schRows = _readSchematicRows().filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0);
   schRows.sort((a, b) => +(a.bot) - +(b.bot));
