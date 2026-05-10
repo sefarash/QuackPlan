@@ -484,6 +484,37 @@
       </div>
     </div>
 
+    <!-- Casing Design -->
+    <div id="panel-cd" class="output-panel">
+      <div class="chart-controls">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px">
+          SF Burst
+          <input type="number" id="cdSFBurst" value="1.10" step="0.01" min="1.00" max="2.00"
+            style="width:60px" onchange="drawCasingDesign()">
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px">
+          SF Collapse
+          <input type="number" id="cdSFCollapse" value="1.00" step="0.01" min="1.00" max="2.00"
+            style="width:60px" onchange="drawCasingDesign()">
+        </label>
+        <button class="hdr-btn" onclick="drawCasingDesign()">Compute</button>
+      </div>
+      <div style="display:flex;flex:1;gap:10px;min-height:0">
+        <!-- Burst chart -->
+        <div class="output-canvas-wrap" style="flex:1">
+          <canvas id="cdBurstCanvas"></canvas>
+        </div>
+        <!-- Collapse chart -->
+        <div class="output-canvas-wrap" style="flex:1">
+          <canvas id="cdCollapseCanvas"></canvas>
+        </div>
+        <!-- Ratings table -->
+        <div style="flex:0 0 340px;min-width:0;overflow-y:auto;padding-right:4px">
+          <div id="cdRatingsDiv"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Kick Tolerance -->
     <div id="panel-kt" class="output-panel">
       <div class="chart-controls">
@@ -535,6 +566,7 @@
     <button class="output-tab" onclick="switchOutputTab('overpull',this)">Overpull</button>
     <button class="output-tab" onclick="switchOutputTab('broomstick',this)">Broomstick</button>
     <button class="output-tab" onclick="switchOutputTab('hydraulics',this)">Hydraulics</button>
+    <button class="output-tab" onclick="switchOutputTab('cd',this)">Casing Design</button>
     <button class="output-tab" onclick="switchOutputTab('kt',this)">Kick Tolerance</button>
     <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
   </nav>
@@ -577,13 +609,14 @@
 <script src="js/hydraulics-ui.js"></script>
 <script src="js/afe-chart.js"></script>
 <script src="js/trajectory-plot.js"></script>
+<script src="js/casing-design.js"></script>
 <script src="js/kick-tolerance.js"></script>
 <script src="js/row-drag.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
-     'hydSweepCanvas','afeCanvas','ktCanvas'].forEach(id => CI.attach(id));
+     'hydSweepCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','ktCanvas'].forEach(id => CI.attach(id));
 
     makeRowsDraggable('traj1Body',      traj1Recalc);
     makeRowsDraggable('traj2Body',      traj2Recalc);

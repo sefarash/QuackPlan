@@ -336,6 +336,7 @@ const CI = (() => {
       overpullCanvas: 'overpull', broomstickCanvas: 'broomstick',
       hydSweepCanvas: 'hydraulics', afeCanvas: 'afe',
       trajVsCanvas: 'trajplot', trajPlanCanvas: 'trajplot',
+      cdBurstCanvas: 'cd', cdCollapseCanvas: 'cd',
       ktCanvas: 'kt',
     };
     if (typeof redrawOutputPanel === 'function')
