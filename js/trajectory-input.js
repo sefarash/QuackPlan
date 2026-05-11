@@ -288,11 +288,13 @@ function schematicAddRow(preset) {
         <option>Tubing</option>
       </select>
     </td>
-    <td class="editable" style="min-width:120px">
-      <select class="sch-od" onchange="_schOdChanged(this)" style="width:100%;margin-bottom:2px">
+    <td class="editable" style="min-width:90px">
+      <select class="sch-od" onchange="_schOdChanged(this)" style="width:100%">
         <option value="">— OD —</option>
         ${_schOdOptions()}
       </select>
+    </td>
+    <td class="editable" style="min-width:140px">
       <select class="sch-grade" onchange="_schGradeChanged(this)" style="width:100%">
         <option value="">— Wt / Grade —</option>
         ${gradeOpts}
