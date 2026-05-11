@@ -71,7 +71,8 @@ function drawTorque(r) {
   const ffLo  = +(document.getElementById('torqFFlo')?.value  || 0.20);
   const ffMid = +(document.getElementById('torqFFmid')?.value || 0.30);
   const ffHi  = +(document.getElementById('torqFFhi')?.value  || 0.40);
-  const wob   = +(document.getElementById('torqWOB')?.value   || 15) * 1000;
+  const _wobRaw = document.getElementById('torqWOB')?.value;
+  const wob   = (_wobRaw === '' || _wobRaw == null ? 15 : +_wobRaw) * 1000;
 
   const modes  = r.modes?.rotOn?.ffSensitivity;
   if (!modes) { _noData(ctx, W, H, 'Run Compute first'); return; }
