@@ -131,6 +131,7 @@ function traj2AddRow() {
         <option value="md_inc_azi">MD / Inc / Azi</option>
         <option value="inc_azi_tvd">Inc / Azi / TVD</option>
         <option value="inc_azi_dls">Inc / Azi / DLS</option>
+        <option value="hold">Hold</option>
       </select>
     </td>
     <td data-field="md"  class="editable"><input type="number" step="1"    onchange="traj2Recalc()"></td>
@@ -154,6 +155,7 @@ function _traj2UpdateCells(tr, mode) {
     'md_inc_azi':  ['md', 'inc', 'azi'],
     'inc_azi_tvd': ['inc', 'azi', 'tvd'],
     'inc_azi_dls': ['inc', 'azi', 'dls'],
+    'hold':        ['md'],
   }[mode] || ['md', 'inc', 'azi'];
 
   const steps = { md: '1', inc: '0.01', azi: '0.1', tvd: '1', dls: '0.01' };
@@ -210,6 +212,8 @@ function traj2Recalc() {
     _setCell(tr, 'md2',  pt.md.toFixed(1));
     _setCell(tr, 'tvd2', pt.tvd.toFixed(1));
     _setCell(tr, 'dls2', (pt.dls * DLS_SCALE).toFixed(2));
+    _setCell(tr, 'inc2', pt.inc.toFixed(2));   // shown when inc is a calc-cell (Hold)
+    _setCell(tr, 'azi2', pt.az.toFixed(2));    // shown when azi is a calc-cell (Hold)
   });
 
   if (typeof drawSchematic === 'function') drawSchematic(survey);
@@ -223,6 +227,7 @@ function _traj2Save() {
     'md_inc_azi':  ['md', 'inc', 'azi'],
     'inc_azi_tvd': ['inc', 'azi', 'tvd'],
     'inc_azi_dls': ['inc', 'azi', 'dls'],
+    'hold':        ['md'],
   };
   const rows = [];
   for (const tr of body.rows) {
@@ -249,6 +254,7 @@ function traj2LoadRows(data) {
           <option value="md_inc_azi">MD / Inc / Azi</option>
           <option value="inc_azi_tvd">Inc / Azi / TVD</option>
           <option value="inc_azi_dls">Inc / Azi / DLS</option>
+          <option value="hold">Hold</option>
         </select>
       </td>
       <td data-field="md"  class="editable"><input type="number" step="1"    onchange="traj2Recalc()"></td>

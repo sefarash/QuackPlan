@@ -20,7 +20,11 @@ function traj2BuildStations(rows) {
     const r    = rows[i];
     const prev = stations[stations.length - 1];
 
-    if (r.define === 'inc_azi_tvd') {
+    if (r.define === 'hold') {
+      // Hold: keep previous inc and az, user supplies only MD
+      stations.push({ md: +(r.md || 0), inc: prev.inc, az: prev.az || 0 });
+
+    } else if (r.define === 'inc_azi_tvd') {
       // Solve for MD that produces the target TVD, given Inc/Azi
       const targetTVD = +(r.tvd || 0);
       const inc2 = +(r.inc || 0);
