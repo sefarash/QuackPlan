@@ -17,9 +17,16 @@ const BHA_GRADES = ['S-135', 'G-105', 'X-95', 'E-75'];
 
 // ── Catalogue cell HTML builders ───────────────────────────────────────────────
 
+function _hwdpSpecOptions(type) {
+  const arr = type === 'spiral' ? HWDP_SPIRAL : HWDP_CONV;
+  return arr.flatMap(e => e.connections.map(c =>
+    `<option value="${e.nom}|${c.conn}">${e.nom}" · ${c.conn} (${c.pf} lb/ft)</option>`
+  )).join('');
+}
+
 function _bhaCatCellHTML(compType) {
-  const W = 'style="width:100%;font-size:10px;padding:1px 2px;box-sizing:border-box"';
-  const wrap = 'style="display:flex;flex-direction:column;gap:2px;width:110px"';
+  const W    = 'style="width:100%;font-size:10px;padding:1px 2px;box-sizing:border-box"';
+  const wrap = 'style="display:flex;flex-direction:column;gap:2px;width:130px"';
 
   if (compType === 'Drill Pipe') {
     const odOpts = dpODs().map(od => `<option value="${od}">${od}"</option>`).join('');
@@ -33,28 +40,23 @@ function _bhaCatCellHTML(compType) {
     </div>`;
   }
   if (compType === 'Drill Collar') {
-    const odOpts = dcODs().map(od => `<option value="${od}">${od}"</option>`).join('');
+    const dcOpts = DC_CATALOGUE.map((r, i) =>
+      `<option value="${i}">${r[0]}" × ${r[1]}" · ${r[3]} lb/ft</option>`
+    ).join('');
     return `<div ${wrap}>
-      <select class="bha-cat-od" ${W} onchange="_bhaDCODChanged(this)">
-        <option value="">OD…</option>${odOpts}
-      </select>
-      <select class="bha-cat-id" ${W} onchange="_bhaDCIDChanged(this)">
-        <option value="">ID…</option>
+      <select class="bha-cat-dc" ${W} onchange="_bhaDCChanged(this)">
+        <option value="">Select DC…</option>${dcOpts}
       </select>
     </div>`;
   }
   if (compType === 'HWDP') {
-    const nomOpts = hwdpNoms('conv').map(n => `<option value="${n}">${n}"</option>`).join('');
     return `<div ${wrap}>
       <select class="bha-cat-type" ${W} onchange="_bhaHWDPTypeChanged(this)">
-        <option value="conv">Conv</option>
-        <option value="spiral">Spiral</option>
+        <option value="conv">Conv HWDP</option>
+        <option value="spiral">Spiral HWDP</option>
       </select>
-      <select class="bha-cat-od" ${W} onchange="_bhaHWDPODChanged(this)">
-        <option value="">Nom…</option>${nomOpts}
-      </select>
-      <select class="bha-cat-conn" ${W} onchange="_bhaHWDPConnChanged(this)">
-        <option value="">Conn…</option>
+      <select class="bha-cat-spec" ${W} onchange="_bhaHWDPSpecChanged(this)">
+        <option value="">Select spec…</option>${_hwdpSpecOptions('conv')}
       </select>
     </div>`;
   }
@@ -148,75 +150,36 @@ function _bhaDPConnChanged(sel) {
   bhaSave();
 }
 
-function _bhaDCODChanged(sel, doFill) {
+function _bhaDCChanged(sel) {
+  const idx = sel.value;
+  if (idx === '') return;
+  const r = DC_CATALOGUE[+idx];
+  if (!r) return;
   const tr    = sel.closest('tr');
-  const idSel = tr.querySelector('.bha-cat-id');
-  if (!idSel) return;
-  const od  = sel.value;
-  const ids = od ? dcIDsByOD(od) : [];
-  idSel.innerHTML = `<option value="">ID…</option>` +
-    ids.map(id => `<option value="${id}">${id}"</option>`).join('');
-  idSel.value = '';
-  if (doFill !== false && od) {
-    const nums = tr.querySelectorAll('input[type=number]');
-    nums[0].value = _bhaFracToDecimal(od);
-    bhaSave();
-  }
-}
-
-function _bhaDCIDChanged(sel) {
-  const tr   = sel.closest('tr');
-  const od   = tr.querySelector('.bha-cat-od')?.value;
-  const id   = sel.value;
-  if (!od || !id) return;
-  const spec = dcSpec(od, id);
-  if (!spec) return;
   const nums  = tr.querySelectorAll('input[type=number]');
   const cText = tr.querySelector('.bha-conn');
-  nums[0].value = spec.od_in;
-  nums[1].value = spec.id_in;
+  nums[0].value = _bhaFracToDecimal(r[0]);
+  nums[1].value = _bhaFracToDecimal(r[1]);
   const len = +(nums[3]?.value || 30);
-  nums[2].value = Math.round(spec.unitWt * len);
-  if (cText) cText.value = spec.conn;
+  nums[2].value = Math.round(r[3] * len);
+  if (cText) cText.value = r[4];
   bhaSave();
 }
 
 function _bhaHWDPTypeChanged(sel, doFill) {
   const tr      = sel.closest('tr');
-  const type    = sel.value;
-  const odSel   = tr.querySelector('.bha-cat-od');
-  const connSel = tr.querySelector('.bha-cat-conn');
-  if (!odSel) return;
-  const noms = hwdpNoms(type);
-  odSel.innerHTML = `<option value="">Nom…</option>` +
-    noms.map(n => `<option value="${n}">${n}"</option>`).join('');
-  odSel.value = '';
-  if (connSel) { connSel.innerHTML = `<option value="">Conn…</option>`; connSel.value = ''; }
+  const specSel = tr.querySelector('.bha-cat-spec');
+  if (!specSel) return;
+  specSel.innerHTML = `<option value="">Select spec…</option>` + _hwdpSpecOptions(sel.value);
+  specSel.value = '';
 }
 
-function _bhaHWDPODChanged(sel, doFill) {
-  const tr      = sel.closest('tr');
-  const type    = tr.querySelector('.bha-cat-type')?.value || 'conv';
-  const nom     = sel.value;
-  const connSel = tr.querySelector('.bha-cat-conn');
-  if (!connSel) return;
-  const conns = nom ? hwdpConnectionsByNom(type, nom) : [];
-  connSel.innerHTML = `<option value="">Conn…</option>` +
-    conns.map(c => `<option value="${c}">${c}</option>`).join('');
-  connSel.value = '';
-  if (doFill !== false && nom) {
-    const nums = tr.querySelectorAll('input[type=number]');
-    nums[0].value = _bhaFracToDecimal(nom);
-    bhaSave();
-  }
-}
-
-function _bhaHWDPConnChanged(sel) {
+function _bhaHWDPSpecChanged(sel) {
+  const val = sel.value;
+  if (!val) return;
+  const [nom, conn] = val.split('|');
   const tr   = sel.closest('tr');
   const type = tr.querySelector('.bha-cat-type')?.value || 'conv';
-  const nom  = tr.querySelector('.bha-cat-od')?.value;
-  const conn = sel.value;
-  if (!nom || !conn) return;
   const spec = hwdpSpec(type, nom, conn);
   if (!spec) return;
   const nums  = tr.querySelectorAll('input[type=number]');
@@ -285,25 +248,17 @@ function bhaLoadState(data) {
         _bhaDPODChanged(catODSel, false);
         if (catConnSel && row.catConn) catConnSel.value = row.catConn;
       }
-    } else if (comp === 'Drill Collar' && row.catOD) {
-      const catODSel = last.querySelector('.bha-cat-od');
-      const catIDSel = last.querySelector('.bha-cat-id');
-      if (catODSel) {
-        catODSel.value = row.catOD;
-        _bhaDCODChanged(catODSel, false);
-        if (catIDSel && row.catID) catIDSel.value = row.catID;
-      }
-    } else if (comp === 'HWDP' && row.catOD) {
+    } else if (comp === 'Drill Collar' && row.catDC) {
+      const dcSel = last.querySelector('.bha-cat-dc');
+      if (dcSel) dcSel.value = row.catDC;
+    } else if (comp === 'HWDP' && row.catSpec) {
       const catTypeSel = last.querySelector('.bha-cat-type');
-      const catODSel   = last.querySelector('.bha-cat-od');
-      const catConnSel = last.querySelector('.bha-cat-conn');
-      if (catTypeSel && row.catType) catTypeSel.value = row.catType;
-      if (catTypeSel) _bhaHWDPTypeChanged(catTypeSel, false);
-      if (catODSel) {
-        catODSel.value = row.catOD;
-        _bhaHWDPODChanged(catODSel, false);
-        if (catConnSel && row.catConn) catConnSel.value = row.catConn;
+      const catSpecSel = last.querySelector('.bha-cat-spec');
+      if (catTypeSel && row.catType) {
+        catTypeSel.value = row.catType;
+        _bhaHWDPTypeChanged(catTypeSel, false);
       }
+      if (catSpecSel) catSpecSel.value = row.catSpec;
     }
   });
   bhaSave();
@@ -326,7 +281,8 @@ function bhaSave() {
       catType: tr.querySelector('.bha-cat-type')?.value  || '',
       catOD:   tr.querySelector('.bha-cat-od')?.value    || '',
       catConn: tr.querySelector('.bha-cat-conn')?.value  || '',
-      catID:   tr.querySelector('.bha-cat-id')?.value    || '',
+      catDC:   tr.querySelector('.bha-cat-dc')?.value    || '',
+      catSpec: tr.querySelector('.bha-cat-spec')?.value  || '',
     });
   }
   dbSaveScenarioData(qpState.currentScenarioId, 'bha', rows);
