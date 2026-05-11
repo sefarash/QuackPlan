@@ -198,6 +198,32 @@ function _bhaFracToDecimal(s) {
 function dpODs() {
   return [...new Set(DP_CATALOGUE.map(r => r[0]))];
 }
+function dpGradesByOD(od) {
+  const seen = new Set();
+  return DP_CATALOGUE
+    .filter(r => r[0] === od)
+    .filter(r => { if (seen.has(r[2])) return false; seen.add(r[2]); return true; })
+    .map(r => r[2]);
+}
+function dpConnectionsByODGrade(od, grade) {
+  const seen = new Set();
+  return DP_CATALOGUE
+    .filter(r => r[0] === od && r[2] === grade)
+    .filter(r => { if (seen.has(r[1])) return false; seen.add(r[1]); return true; })
+    .map(r => r[1]);
+}
+function dpSpecFull(od, grade, conn) {
+  const r = DP_CATALOGUE.find(row => row[0] === od && row[2] === grade && row[1] === conn);
+  if (!r) return null;
+  return {
+    od_in:  _bhaFracToDecimal(r[0]),
+    tubeID: typeof r[6] === 'number' ? r[6] : 0,
+    adjWt:  typeof r[5] === 'number' ? r[5] : 0,
+    grade:  r[2],
+    conn:   r[1],
+  };
+}
+// Legacy — kept for any callers that still use 2-arg form
 function dpConnectionsByOD(od) {
   const seen = new Set();
   return DP_CATALOGUE
