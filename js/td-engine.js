@@ -320,7 +320,7 @@ function tdCompute(survey, bha, casingDesign, mudWeight_ppg, inputs) {
   const BF   = 1 - mw / _K.PPG;
   const ff_c = +(inputs.ffCased            || 0.20);
   const ff_o = +(inputs.ffOpen             || 0.30);
-  const WOB  = (+(inputs.wob_klbs          || 25)) * 1000;
+  const WOB  = (inputs.wob_klbs != null && inputs.wob_klbs !== '' ? +inputs.wob_klbs : 25) * 1000;
   const ovpReq = +(inputs.overpullMargin_lbf || 100000);
 
   const { elements, bitOD } = _buildElements(survey, bha, casingDesign, BF, dpWtCalib_ppf);
