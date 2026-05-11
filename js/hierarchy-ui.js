@@ -13,6 +13,14 @@ const NODE_LABELS = {
 let _modalCallback = null;   // fn(name) called on OK
 let _editNodeId    = null;   // non-null when renaming
 
+// Collapsed node IDs persisted in localStorage
+const _collapsed = new Set(
+  JSON.parse(localStorage.getItem('qp_collapsed') || '[]')
+);
+function _saveCollapsed() {
+  localStorage.setItem('qp_collapsed', JSON.stringify([..._collapsed]));
+}
+
 // ── Tree rendering ────────────────────────────────────────────────────────────
 
 function hierarchyRefresh() {
@@ -28,10 +36,8 @@ function hierarchyRefresh() {
 }
 
 function _renderNode(parent, node, depth) {
-  // item = container for this row + its children (block, not flex)
   const item = document.createElement('div');
 
-  // row = the clickable flex strip
   const row = document.createElement('div');
   row.className = 'tree-node';
   row.dataset.level = depth;
@@ -40,6 +46,12 @@ function _renderNode(parent, node, depth) {
   const isActive = node.id === qpState.currentScenarioId
                 || node.id === qpState.currentWellId;
   if (isActive) row.classList.add('active');
+
+  // Collapse toggle arrow — hidden until children are known
+  const toggle = document.createElement('span');
+  toggle.className = 'tree-toggle';
+  toggle.textContent = _collapsed.has(node.id) ? '▶' : '▼';
+  toggle.style.visibility = 'hidden';
 
   const icon  = NODE_LABELS[node.type] || '•';
   const label = document.createElement('span');
@@ -77,16 +89,37 @@ function _renderNode(parent, node, depth) {
   delBtn.onclick = e => { e.stopPropagation(); _confirmDelete(node); };
   actions.appendChild(delBtn);
 
+  row.appendChild(toggle);
   row.appendChild(label);
   row.appendChild(actions);
   item.appendChild(row);
   parent.appendChild(item);
 
-  // Children are appended to item (sibling to row), not inside the flex row
+  // Children wrapper — collapsible
+  const childWrap = document.createElement('div');
+  childWrap.className = 'tree-children';
+  if (_collapsed.has(node.id)) childWrap.style.display = 'none';
+  item.appendChild(childWrap);
+
+  toggle.onclick = e => {
+    e.stopPropagation();
+    if (_collapsed.has(node.id)) {
+      _collapsed.delete(node.id);
+      childWrap.style.display = '';
+      toggle.textContent = '▼';
+    } else {
+      _collapsed.add(node.id);
+      childWrap.style.display = 'none';
+      toggle.textContent = '▶';
+    }
+    _saveCollapsed();
+  };
+
   dbChildren(node.id).then(children => {
     if (!children.length) return;
+    toggle.style.visibility = 'visible';
     children.sort((a, b) => a.name.localeCompare(b.name));
-    children.forEach(c => _renderNode(item, c, depth + 1));
+    children.forEach(c => _renderNode(childWrap, c, depth + 1));
   });
 }
 

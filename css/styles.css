@@ -206,6 +206,17 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 }
 .tree-node .tree-actions button:hover { background: rgba(0,0,0,0.15); }
 
+.tree-toggle {
+  font-size: 8px;
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0.6;
+  user-select: none;
+}
+.tree-toggle:hover { opacity: 1; }
+
 .tree-node[data-level="0"] { font-weight: 700; font-size: 12px; }
 .tree-node[data-level="1"] { padding-left: 20px; font-weight: 600; }
 .tree-node[data-level="2"] { padding-left: 32px; }
