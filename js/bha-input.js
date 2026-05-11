@@ -15,7 +15,8 @@ const BHA_PRESETS = {
 
 const BHA_GRADES = ['S-135', 'G-105', 'X-95', 'E-75'];
 
-// ── Catalogue cell HTML builders ───────────────────────────────────────────────
+// ── Row HTML factory ──────────────────────────────────────────────────────────
+// Catalogue controls are embedded directly in Component / OD / Connection cells.
 
 function _hwdpSpecOptions(type) {
   const arr = type === 'spiral' ? HWDP_SPIRAL : HWDP_CONV;
@@ -24,92 +25,96 @@ function _hwdpSpecOptions(type) {
   )).join('');
 }
 
-function _bhaCatCellHTML(compType) {
-  const W    = 'style="width:100%;font-size:10px;padding:1px 2px;box-sizing:border-box"';
-  const wrap = 'style="display:flex;flex-direction:column;gap:2px;width:130px"';
+function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn) {
+  const p  = BHA_PRESETS[comp] || BHA_PRESETS['Drill Collar'];
+  const _od   = od   ?? p.od;
+  const _id   = id   ?? p.id;
+  const _wt   = wt   ?? p.wt;
+  const _len  = len  ?? 30;
+  const _gr   = grade ?? 'S-135';
+  const _conn = conn  ?? '';
 
-  if (compType === 'Drill Pipe') {
-    const odOpts = dpODs().map(od => `<option value="${od}">${od}"</option>`).join('');
-    return `<div ${wrap}>
-      <select class="bha-cat-od" ${W} onchange="_bhaDPODChanged(this)">
-        <option value="">OD…</option>${odOpts}
-      </select>
-      <select class="bha-cat-conn" ${W} onchange="_bhaDPConnChanged(this)">
-        <option value="">Conn…</option>
-      </select>
-    </div>`;
-  }
-  if (compType === 'Drill Collar') {
+  const gradeOpts = BHA_GRADES.map(g =>
+    `<option${g === _gr ? ' selected' : ''}>${g}</option>`).join('');
+  const typeOpts = Object.keys(BHA_PRESETS).map(k =>
+    `<option${k === comp ? ' selected' : ''}>${k}</option>`).join('');
+
+  const CS = 'style="display:block;width:100%;font-size:10px;padding:1px 2px;box-sizing:border-box;margin-bottom:3px"';
+
+  // ── Component cell extras (DC and HWDP catalogue pickers) ──
+  let compCat = '';
+  if (comp === 'Drill Collar') {
     const dcOpts = DC_CATALOGUE.map((r, i) =>
       `<option value="${i}">${r[0]}" × ${r[1]}" · ${r[3]} lb/ft</option>`
     ).join('');
-    return `<div ${wrap}>
-      <select class="bha-cat-dc" ${W} onchange="_bhaDCChanged(this)">
-        <option value="">Select DC…</option>${dcOpts}
-      </select>
-    </div>`;
-  }
-  if (compType === 'HWDP') {
-    return `<div ${wrap}>
-      <select class="bha-cat-type" ${W} onchange="_bhaHWDPTypeChanged(this)">
+    compCat = `<select class="bha-cat-dc" ${CS} onchange="_bhaDCChanged(this)">
+      <option value="">Catalogue…</option>${dcOpts}</select>`;
+  } else if (comp === 'HWDP') {
+    compCat = `<select class="bha-cat-type" ${CS} onchange="_bhaHWDPTypeChanged(this)">
         <option value="conv">Conv HWDP</option>
         <option value="spiral">Spiral HWDP</option>
       </select>
-      <select class="bha-cat-spec" ${W} onchange="_bhaHWDPSpecChanged(this)">
-        <option value="">Select spec…</option>${_hwdpSpecOptions('conv')}
-      </select>
-    </div>`;
+      <select class="bha-cat-spec" ${CS} onchange="_bhaHWDPSpecChanged(this)">
+        <option value="">Spec…</option>${_hwdpSpecOptions('conv')}</select>`;
   }
-  return '';
-}
 
-function _bhaRebuildCatCell(tr, compType) {
-  const td = tr.querySelector('.bha-cat-td');
-  if (td) td.innerHTML = _bhaCatCellHTML(compType);
+  // ── OD cell: catalogue OD picker for Drill Pipe ──
+  const odCat = comp === 'Drill Pipe'
+    ? `<select class="bha-cat-od" ${CS} onchange="_bhaDPODChanged(this)">
+        <option value="">OD…</option>
+        ${dpODs().map(o => `<option value="${o}">${o}"</option>`).join('')}
+      </select>`
+    : '';
+
+  // ── Connection cell: catalogue conn picker for Drill Pipe ──
+  const connCat = comp === 'Drill Pipe'
+    ? `<select class="bha-cat-conn" ${CS} onchange="_bhaDPConnChanged(this)">
+        <option value="">Conn…</option>
+      </select>`
+    : '';
+
+  const safeConn = String(_conn).replace(/"/g, '&quot;');
+
+  return `
+    <td class="drag-handle">⠿</td>
+    <td class="editable" style="vertical-align:top">
+      <select class="bha-type" onchange="bhaPresetFill(this)">${typeOpts}</select>
+      ${compCat}
+    </td>
+    <td class="editable" style="vertical-align:top">
+      ${odCat}
+      <input type="number" step="0.125" value="${_od}" onchange="bhaSave()">
+    </td>
+    <td class="editable"><input type="number" step="0.125" value="${_id}"  onchange="bhaSave()"></td>
+    <td class="editable"><input type="number" step="1"     value="${_wt}"  onchange="bhaSave()"></td>
+    <td class="editable"><input type="number" step="1"     value="${_len}" onchange="bhaSave()"></td>
+    <td class="calc-cell" data-col="ppf">—</td>
+    <td class="editable"><select class="bha-grade" onchange="bhaSave()">${gradeOpts}</select></td>
+    <td class="editable" style="vertical-align:top">
+      ${connCat}
+      <input class="bha-conn" type="text" value="${safeConn}" placeholder="e.g. NC50" onchange="bhaSave()">
+    </td>
+    <td class="calc-cell" data-col="cumwt">—</td>
+    <td class="calc-cell" data-col="cumlen">—</td>
+    <td class="row-act"><button onclick="this.closest('tr').remove();bhaSave()">✕</button></td>`;
 }
 
 // ── BHA table ─────────────────────────────────────────────────────────────────
 
 function bhaAddRow(preset) {
   const body = document.getElementById('bhaBody');
-  const p    = BHA_PRESETS[preset] || BHA_PRESETS['Drill Collar'];
   const comp = preset || 'Drill Collar';
-
-  const gradeOpts = BHA_GRADES.map(g => `<option>${g}</option>`).join('');
-
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td class="drag-handle">⠿</td>
-    <td class="editable">
-      <select class="bha-type" onchange="bhaPresetFill(this)">
-        ${Object.keys(BHA_PRESETS).map(k =>
-          `<option${k === comp ? ' selected' : ''}>${k}</option>`).join('')}
-      </select>
-    </td>
-    <td class="bha-cat-td">${_bhaCatCellHTML(comp)}</td>
-    <td class="editable"><input type="number" step="0.125" value="${p.od}"  onchange="bhaSave()"></td>
-    <td class="editable"><input type="number" step="0.125" value="${p.id}"  onchange="bhaSave()"></td>
-    <td class="editable"><input type="number" step="1"     value="${p.wt}"  onchange="bhaSave()"></td>
-    <td class="editable"><input type="number" step="1"     value="30"       onchange="bhaSave()"></td>
-    <td class="calc-cell" data-col="ppf">—</td>
-    <td class="editable"><select class="bha-grade" onchange="bhaSave()">${gradeOpts}</select></td>
-    <td class="editable"><input class="bha-conn" type="text" value="" placeholder="e.g. NC50" onchange="bhaSave()"></td>
-    <td class="calc-cell" data-col="cumwt">—</td>
-    <td class="calc-cell" data-col="cumlen">—</td>
-    <td class="row-act"><button onclick="this.closest('tr').remove();bhaSave()">✕</button></td>`;
+  const tr   = document.createElement('tr');
+  tr.innerHTML = _makeBhaRowHTML(comp);
   body.appendChild(tr);
   bhaSave();
 }
 
 function bhaPresetFill(sel) {
-  const p = BHA_PRESETS[sel.value];
-  if (!p) return;
-  const row    = sel.closest('tr');
-  const inputs = row.querySelectorAll('input[type=number]');
-  inputs[0].value = p.od;
-  inputs[1].value = p.id;
-  inputs[2].value = p.wt;
-  _bhaRebuildCatCell(row, sel.value);
+  const row  = sel.closest('tr');
+  const nums = row.querySelectorAll('input[type=number]');
+  const len  = nums[3]?.value;   // keep current length across type change
+  row.innerHTML = _makeBhaRowHTML(sel.value, null, null, null, len);
   bhaSave();
 }
 
@@ -125,8 +130,7 @@ function _bhaDPODChanged(sel, doFill) {
     conns.map(c => `<option value="${c}">${c}</option>`).join('');
   connSel.value = '';
   if (doFill !== false && od) {
-    const nums = tr.querySelectorAll('input[type=number]');
-    nums[0].value = _bhaFracToDecimal(od);
+    tr.querySelectorAll('input[type=number]')[0].value = _bhaFracToDecimal(od);
     bhaSave();
   }
 }
@@ -136,15 +140,14 @@ function _bhaDPConnChanged(sel) {
   const od   = tr.querySelector('.bha-cat-od')?.value;
   const conn = sel.value;
   if (!od || !conn) return;
-  const spec = dpSpec(od, conn);
+  const spec  = dpSpec(od, conn);
   if (!spec) return;
   const nums  = tr.querySelectorAll('input[type=number]');
   const grSel = tr.querySelector('.bha-grade');
   const cText = tr.querySelector('.bha-conn');
   nums[0].value = spec.od_in;
   nums[1].value = spec.tubeID;
-  const len = +(nums[3]?.value || 30);
-  nums[2].value = Math.round(spec.adjWt * len);
+  nums[2].value = Math.round(spec.adjWt * (+(nums[3]?.value || 30)));
   if (grSel) grSel.value = spec.grade;
   if (cText) cText.value = spec.conn;
   bhaSave();
@@ -160,8 +163,7 @@ function _bhaDCChanged(sel) {
   const cText = tr.querySelector('.bha-conn');
   nums[0].value = _bhaFracToDecimal(r[0]);
   nums[1].value = _bhaFracToDecimal(r[1]);
-  const len = +(nums[3]?.value || 30);
-  nums[2].value = Math.round(r[3] * len);
+  nums[2].value = Math.round(r[3] * (+(nums[3]?.value || 30)));
   if (cText) cText.value = r[4];
   bhaSave();
 }
@@ -170,7 +172,7 @@ function _bhaHWDPTypeChanged(sel, doFill) {
   const tr      = sel.closest('tr');
   const specSel = tr.querySelector('.bha-cat-spec');
   if (!specSel) return;
-  specSel.innerHTML = `<option value="">Select spec…</option>` + _hwdpSpecOptions(sel.value);
+  specSel.innerHTML = `<option value="">Spec…</option>` + _hwdpSpecOptions(sel.value);
   specSel.value = '';
 }
 
@@ -186,8 +188,7 @@ function _bhaHWDPSpecChanged(sel) {
   const cText = tr.querySelector('.bha-conn');
   nums[0].value = spec.od_in;
   nums[1].value = spec.id_in;
-  const len = +(nums[3]?.value || 30);
-  nums[2].value = Math.round(spec.pf * len);
+  nums[2].value = Math.round(spec.pf * (+(nums[3]?.value || 30)));
   if (cText) cText.value = spec.conn;
   bhaSave();
 }
@@ -226,34 +227,28 @@ function bhaLoadState(data) {
   const body = document.getElementById('bhaBody');
   body.innerHTML = '';
   (data || []).forEach(row => {
-    bhaAddRow(row.comp);
-    const last  = body.rows[body.rows.length - 1];
-    const nums  = last.querySelectorAll('input[type=number]');
-    if (nums[0]) nums[0].value = row.od    ?? nums[0].value;
-    if (nums[1]) nums[1].value = row.id    ?? nums[1].value;
-    if (nums[2]) nums[2].value = row.wt    ?? nums[2].value;
-    if (nums[3]) nums[3].value = row.len   ?? nums[3].value;
-    const grSel = last.querySelector('.bha-grade');
-    const cText = last.querySelector('.bha-conn');
-    if (grSel && row.grade) grSel.value = row.grade;
-    if (cText && row.conn !== undefined) cText.value = row.conn;
+    const tr = document.createElement('tr');
+    tr.innerHTML = _makeBhaRowHTML(
+      row.comp, row.od, row.id, row.wt, row.len, row.grade, row.conn
+    );
+    body.appendChild(tr);
 
-    // Restore catalogue selections without triggering auto-fill of numbers
+    // Restore catalogue selections (no auto-fill — numbers already set above)
     const comp = row.comp;
     if (comp === 'Drill Pipe' && row.catOD) {
-      const catODSel   = last.querySelector('.bha-cat-od');
-      const catConnSel = last.querySelector('.bha-cat-conn');
+      const catODSel = tr.querySelector('.bha-cat-od');
       if (catODSel) {
         catODSel.value = row.catOD;
         _bhaDPODChanged(catODSel, false);
+        const catConnSel = tr.querySelector('.bha-cat-conn');
         if (catConnSel && row.catConn) catConnSel.value = row.catConn;
       }
     } else if (comp === 'Drill Collar' && row.catDC) {
-      const dcSel = last.querySelector('.bha-cat-dc');
+      const dcSel = tr.querySelector('.bha-cat-dc');
       if (dcSel) dcSel.value = row.catDC;
     } else if (comp === 'HWDP' && row.catSpec) {
-      const catTypeSel = last.querySelector('.bha-cat-type');
-      const catSpecSel = last.querySelector('.bha-cat-spec');
+      const catTypeSel = tr.querySelector('.bha-cat-type');
+      const catSpecSel = tr.querySelector('.bha-cat-spec');
       if (catTypeSel && row.catType) {
         catTypeSel.value = row.catType;
         _bhaHWDPTypeChanged(catTypeSel, false);
@@ -278,11 +273,11 @@ function bhaSave() {
       len:     nums[3]?.value,
       grade:   tr.querySelector('.bha-grade')?.value,
       conn:    tr.querySelector('.bha-conn')?.value,
-      catType: tr.querySelector('.bha-cat-type')?.value  || '',
-      catOD:   tr.querySelector('.bha-cat-od')?.value    || '',
-      catConn: tr.querySelector('.bha-cat-conn')?.value  || '',
-      catDC:   tr.querySelector('.bha-cat-dc')?.value    || '',
-      catSpec: tr.querySelector('.bha-cat-spec')?.value  || '',
+      catType: tr.querySelector('.bha-cat-type')?.value || '',
+      catOD:   tr.querySelector('.bha-cat-od')?.value   || '',
+      catConn: tr.querySelector('.bha-cat-conn')?.value || '',
+      catDC:   tr.querySelector('.bha-cat-dc')?.value   || '',
+      catSpec: tr.querySelector('.bha-cat-spec')?.value || '',
     });
   }
   dbSaveScenarioData(qpState.currentScenarioId, 'bha', rows);
@@ -306,7 +301,7 @@ function nozzleRecalc() {
   let tfa = 0;
   for (const tr of document.getElementById('nozzleBody').rows) {
     const inputs = tr.querySelectorAll('input[type=number]');
-    const size  = +(inputs[0]?.value || 0);   // 1/32"
+    const size  = +(inputs[0]?.value || 0);
     const count = +(inputs[1]?.value || 0);
     const r_in  = size / 64;
     tfa += count * Math.PI * r_in * r_in;
