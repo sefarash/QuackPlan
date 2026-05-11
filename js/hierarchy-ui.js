@@ -123,6 +123,7 @@ function _loadScenario(id) {
 
     // Clear all tables first so stale rows don't persist
     document.getElementById('traj1Body').innerHTML      = '';
+    document.getElementById('traj2Body').innerHTML      = '';
     document.getElementById('schematicBody').innerHTML  = '';
     document.getElementById('bhaBody').innerHTML        = '';
     document.getElementById('nozzleBody').innerHTML     = '';
@@ -136,6 +137,7 @@ function _loadScenario(id) {
       traj1AddRow({ md: 0,    inc: 0, azi: 0 });
       traj1AddRow({ md: 5000, inc: 0, azi: 0 });
     }
+    if (d.traj2 && d.traj2.length) traj2LoadRows(d.traj2);
     if (d.schematic) schematicLoadRows(d.schematic);
     if (d.fluid)     fluidLoadState(d.fluid);
     if (d.bha)       bhaLoadState(d.bha);

@@ -213,6 +213,65 @@ function traj2Recalc() {
   });
 
   if (typeof drawSchematic === 'function') drawSchematic(survey);
+  _traj2Save();
+}
+
+function _traj2Save() {
+  if (!qpState.currentScenarioId) return;
+  const body = document.getElementById('traj2Body');
+  const editableByMode = {
+    'md_inc_azi':  ['md', 'inc', 'azi'],
+    'inc_azi_tvd': ['inc', 'azi', 'tvd'],
+    'inc_azi_dls': ['inc', 'azi', 'dls'],
+  };
+  const rows = [];
+  for (const tr of body.rows) {
+    const mode = tr.querySelector('select')?.value || 'md_inc_azi';
+    const row  = { define: mode };
+    (editableByMode[mode] || ['md', 'inc', 'azi']).forEach(f => {
+      const input = tr.querySelector(`[data-field="${f}"] input`);
+      row[f] = input?.value ?? '';
+    });
+    rows.push(row);
+  }
+  dbSaveScenarioData(qpState.currentScenarioId, 'traj2', rows);
+}
+
+function traj2LoadRows(data) {
+  const body = document.getElementById('traj2Body');
+  body.innerHTML = '';
+  (data || []).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="drag-handle">⠿</td>
+      <td class="editable">
+        <select onchange="traj2ModeChange(this)">
+          <option value="md_inc_azi">MD / Inc / Azi</option>
+          <option value="inc_azi_tvd">Inc / Azi / TVD</option>
+          <option value="inc_azi_dls">Inc / Azi / DLS</option>
+        </select>
+      </td>
+      <td data-field="md"  class="editable"><input type="number" step="1"    onchange="traj2Recalc()"></td>
+      <td data-field="inc" class="editable"><input type="number" step="0.01" onchange="traj2Recalc()"></td>
+      <td data-field="azi" class="editable"><input type="number" step="0.1"  onchange="traj2Recalc()"></td>
+      <td data-field="tvd" class="calc-cell" data-col="tvd2">—</td>
+      <td data-field="dls" class="calc-cell" data-col="dls2">—</td>
+      <td class="row-act"><button onclick="this.closest('tr').remove();traj2Recalc()">✕</button></td>`;
+    body.appendChild(tr);
+
+    const sel = tr.querySelector('select');
+    if (sel && row.define) {
+      sel.value = row.define;
+      _traj2UpdateCells(tr, row.define);
+    }
+    // Fill only the editable input fields for this mode
+    ['md', 'inc', 'azi', 'tvd', 'dls'].forEach(f => {
+      if (row[f] === undefined || row[f] === '') return;
+      const input = tr.querySelector(`[data-field="${f}"] input`);
+      if (input) input.value = row[f];
+    });
+  });
+  traj2Recalc();
 }
 
 // ── Tortuosity ────────────────────────────────────────────────────────────────
