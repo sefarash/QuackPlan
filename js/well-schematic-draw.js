@@ -239,11 +239,19 @@ function _readSchematicRows() {
   for (const tr of tbody.rows) {
     const sel    = tr.querySelector('select');
     const inputs = tr.querySelectorAll('input[type=number]');
+    const spec   = tr.dataset.casingSpec ? (() => { try { return JSON.parse(tr.dataset.casingSpec); } catch (_) { return null; } })() : null;
     rows.push({
-      def:  sel?.value   || 'Open Hole',
-      size: inputs[0]?.value || 9.625,
-      top:  inputs[1]?.value || 0,
-      bot:  inputs[2]?.value || 5000,
+      def:  sel?.value        || 'Open Hole',
+      size: inputs[0]?.value  || 9.625,
+      top:  inputs[1]?.value  || 0,
+      bot:  inputs[2]?.value  || 5000,
+      ...(spec ? {
+        nomWt_ppf: spec.nomWt_ppf,
+        grade:     spec.grade,
+        id_in:     spec.id_in,
+        collapse:  spec.collapse,
+        burst:     spec.burst,
+      } : {}),
     });
   }
   return rows;

@@ -254,9 +254,27 @@ function tortRecalc() {
 }
 
 // ── Well Schematic table ──────────────────────────────────────────────────────
-function schematicAddRow() {
+
+function _schOdOptions() {
+  return CATALOGUE_ODS.map(od =>
+    `<option value="${od}">${od}"</option>`
+  ).join('');
+}
+
+function _schGradeOptions(od) {
+  if (!od) return '<option value="">— pick OD first —</option>';
+  return catalogueByOD(od).map(r =>
+    `<option value="${r[1]}_${r[2]}">${r[1]} lb/ft — ${r[2]}</option>`
+  ).join('');
+}
+
+function schematicAddRow(preset) {
   const body = document.getElementById('schematicBody');
   const tr   = document.createElement('tr');
+
+  const defaultOD = preset?.od || '';
+  const gradeOpts = _schGradeOptions(defaultOD);
+
   tr.innerHTML = `
     <td class="drag-handle">⠿</td>
     <td class="editable">
@@ -270,26 +288,85 @@ function schematicAddRow() {
         <option>Tubing</option>
       </select>
     </td>
-    <td class="editable"><input type="number" step="0.125" value="13.375" onchange="schematicSave()"></td>
-    <td class="editable"><input type="number" step="1" value="0" onchange="schematicSave()"></td>
-    <td class="editable"><input type="number" step="1" value="5000" onchange="schematicSave()"></td>
+    <td class="editable" style="min-width:120px">
+      <select class="sch-od" onchange="_schOdChanged(this)" style="width:100%;margin-bottom:2px">
+        <option value="">— OD —</option>
+        ${_schOdOptions()}
+      </select>
+      <select class="sch-grade" onchange="_schGradeChanged(this)" style="width:100%">
+        <option value="">— Wt / Grade —</option>
+        ${gradeOpts}
+      </select>
+    </td>
+    <td class="editable" style="min-width:60px">
+      <input type="number" class="sch-size" step="0.125" value="${preset?.size ?? 13.375}"
+        style="width:58px" onchange="schematicSave()">
+    </td>
+    <td class="editable"><input type="number" step="1" value="${preset?.top ?? 0}" onchange="schematicSave()"></td>
+    <td class="editable"><input type="number" step="1" value="${preset?.bot ?? 5000}" onchange="schematicSave()"></td>
     <td class="row-act"><button onclick="this.closest('tr').remove();schematicSave()">✕</button></td>`;
   body.appendChild(tr);
   schematicSave();
+}
+
+function _schOdChanged(odSel) {
+  const tr       = odSel.closest('tr');
+  const gradeSel = tr.querySelector('.sch-grade');
+  const sizeIn   = tr.querySelector('.sch-size');
+  const od       = odSel.value;
+
+  // Repopulate grade dropdown
+  gradeSel.innerHTML = `<option value="">— Wt / Grade —</option>${_schGradeOptions(od)}`;
+  gradeSel.value = '';
+
+  // Auto-fill size from OD decimal
+  if (od) sizeIn.value = _odToDecimal(od);
+  _schStoreCatalogueSpec(tr, null);
+  schematicSave();
+}
+
+function _schGradeChanged(gradeSel) {
+  const tr  = gradeSel.closest('tr');
+  const od  = tr.querySelector('.sch-od').value;
+  const val = gradeSel.value;           // "nomWt_grade" e.g. "15_L-80"
+
+  if (!val || !od) { _schStoreCatalogueSpec(tr, null); schematicSave(); return; }
+
+  const [wStr, grade] = val.split('_');
+  const nomWt = parseFloat(wStr);
+  const spec  = catalogueByOD(od).find(r => r[1] === nomWt && r[2] === grade);
+  _schStoreCatalogueSpec(tr, spec ? catalogueSpec(spec) : null);
+  schematicSave();
+}
+
+function _schStoreCatalogueSpec(tr, spec) {
+  // Store as data attribute for use by casing design and export
+  tr.dataset.casingSpec = spec ? JSON.stringify(spec) : '';
 }
 
 function schematicLoadRows(data) {
   const body = document.getElementById('schematicBody');
   body.innerHTML = '';
   (data || []).forEach(row => {
-    schematicAddRow();
+    schematicAddRow({ size: row.size, top: row.top, bot: row.bot, od: row.od || '' });
     const tr     = body.rows[body.rows.length - 1];
-    const sel    = tr.querySelector('select');
-    const inputs = tr.querySelectorAll('input[type=number]');
-    if (sel)      sel.value      = row.def  ?? 'Open Hole';
-    if (inputs[0]) inputs[0].value = row.size ?? 9.625;
-    if (inputs[1]) inputs[1].value = row.top  ?? 0;
-    if (inputs[2]) inputs[2].value = row.bot  ?? 5000;
+    const selDef = tr.querySelector('select');
+    const odSel  = tr.querySelector('.sch-od');
+    const gradSel= tr.querySelector('.sch-grade');
+    const sizeIn = tr.querySelector('.sch-size');
+
+    if (selDef)  selDef.value  = row.def  ?? 'Open Hole';
+    if (sizeIn)  sizeIn.value  = row.size ?? 9.625;
+
+    // Restore catalogue selections
+    if (row.od && odSel) {
+      odSel.value = row.od;
+      gradSel.innerHTML = `<option value="">— Wt / Grade —</option>${_schGradeOptions(row.od)}`;
+      if (row.grade) gradSel.value = row.grade;
+    }
+    if (row.casingSpec) {
+      try { _schStoreCatalogueSpec(tr, JSON.parse(row.casingSpec)); } catch (_) {}
+    }
   });
   if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
 }
@@ -298,9 +375,21 @@ function schematicSave() {
   if (!qpState.currentScenarioId) return;
   const rows = [];
   for (const tr of document.getElementById('schematicBody').rows) {
-    const sel    = tr.querySelector('select');
-    const inputs = tr.querySelectorAll('input[type=number]');
-    rows.push({ def: sel?.value, size: inputs[0]?.value, top: inputs[1]?.value, bot: inputs[2]?.value });
+    const selDef  = tr.querySelector('select');
+    const odSel   = tr.querySelector('.sch-od');
+    const gradSel = tr.querySelector('.sch-grade');
+    const sizeIn  = tr.querySelector('.sch-size');
+    // inputs[type=number]: [0]=size, [1]=top, [2]=bot
+    const inputs  = tr.querySelectorAll('input[type=number]');
+    rows.push({
+      def:        selDef?.value,
+      size:       sizeIn?.value ?? inputs[0]?.value,
+      top:        inputs[1]?.value,
+      bot:        inputs[2]?.value,
+      od:         odSel?.value   || '',
+      grade:      gradSel?.value || '',
+      casingSpec: tr.dataset.casingSpec || '',
+    });
   }
   dbSaveScenarioData(qpState.currentScenarioId, 'schematic', rows);
   if (typeof drawSchematic === 'function') drawSchematic(qpState.survey);
