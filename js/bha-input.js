@@ -18,39 +18,45 @@ const BHA_GRADES = ['S-135', 'G-105', 'X-95', 'E-75'];
 // ── Catalogue cell HTML builders ───────────────────────────────────────────────
 
 function _bhaCatCellHTML(compType) {
-  const selSty = 'style="max-width:60px;font-size:10px;padding:1px 2px"';
-  const connSty = 'style="max-width:100px;font-size:10px;padding:1px 2px"';
+  const W = 'style="width:100%;font-size:10px;padding:1px 2px;box-sizing:border-box"';
+  const wrap = 'style="display:flex;flex-direction:column;gap:2px;width:110px"';
 
   if (compType === 'Drill Pipe') {
     const odOpts = dpODs().map(od => `<option value="${od}">${od}"</option>`).join('');
-    return `<select class="bha-cat-od" ${selSty} onchange="_bhaDPODChanged(this)">
-              <option value="">OD…</option>${odOpts}
-            </select>
-            <select class="bha-cat-conn" ${connSty} onchange="_bhaDPConnChanged(this)">
-              <option value="">Conn…</option>
-            </select>`;
+    return `<div ${wrap}>
+      <select class="bha-cat-od" ${W} onchange="_bhaDPODChanged(this)">
+        <option value="">OD…</option>${odOpts}
+      </select>
+      <select class="bha-cat-conn" ${W} onchange="_bhaDPConnChanged(this)">
+        <option value="">Conn…</option>
+      </select>
+    </div>`;
   }
   if (compType === 'Drill Collar') {
     const odOpts = dcODs().map(od => `<option value="${od}">${od}"</option>`).join('');
-    return `<select class="bha-cat-od" ${selSty} onchange="_bhaDCODChanged(this)">
-              <option value="">OD…</option>${odOpts}
-            </select>
-            <select class="bha-cat-id" ${selSty} onchange="_bhaDCIDChanged(this)">
-              <option value="">ID…</option>
-            </select>`;
+    return `<div ${wrap}>
+      <select class="bha-cat-od" ${W} onchange="_bhaDCODChanged(this)">
+        <option value="">OD…</option>${odOpts}
+      </select>
+      <select class="bha-cat-id" ${W} onchange="_bhaDCIDChanged(this)">
+        <option value="">ID…</option>
+      </select>
+    </div>`;
   }
   if (compType === 'HWDP') {
     const nomOpts = hwdpNoms('conv').map(n => `<option value="${n}">${n}"</option>`).join('');
-    return `<select class="bha-cat-type" ${selSty} onchange="_bhaHWDPTypeChanged(this)">
-              <option value="conv">Conv</option>
-              <option value="spiral">Spiral</option>
-            </select>
-            <select class="bha-cat-od" ${selSty} onchange="_bhaHWDPODChanged(this)">
-              <option value="">Nom…</option>${nomOpts}
-            </select>
-            <select class="bha-cat-conn" ${connSty} onchange="_bhaHWDPConnChanged(this)">
-              <option value="">Conn…</option>
-            </select>`;
+    return `<div ${wrap}>
+      <select class="bha-cat-type" ${W} onchange="_bhaHWDPTypeChanged(this)">
+        <option value="conv">Conv</option>
+        <option value="spiral">Spiral</option>
+      </select>
+      <select class="bha-cat-od" ${W} onchange="_bhaHWDPODChanged(this)">
+        <option value="">Nom…</option>${nomOpts}
+      </select>
+      <select class="bha-cat-conn" ${W} onchange="_bhaHWDPConnChanged(this)">
+        <option value="">Conn…</option>
+      </select>
+    </div>`;
   }
   return '';
 }
@@ -78,7 +84,7 @@ function bhaAddRow(preset) {
           `<option${k === comp ? ' selected' : ''}>${k}</option>`).join('')}
       </select>
     </td>
-    <td class="bha-cat-td" style="white-space:nowrap">${_bhaCatCellHTML(comp)}</td>
+    <td class="bha-cat-td">${_bhaCatCellHTML(comp)}</td>
     <td class="editable"><input type="number" step="0.125" value="${p.od}"  onchange="bhaSave()"></td>
     <td class="editable"><input type="number" step="0.125" value="${p.id}"  onchange="bhaSave()"></td>
     <td class="editable"><input type="number" step="1"     value="${p.wt}"  onchange="bhaSave()"></td>
