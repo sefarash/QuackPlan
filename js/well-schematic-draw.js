@@ -1,6 +1,18 @@
 // ===== WELL SCHEMATIC DRAW =====
 // Draws the always-visible right-panel schematic as a concentric casing diagram.
 
+function _mdToTVD(survey, md) {
+  if (!survey || survey.length === 0) return md;
+  if (md <= survey[0].md) return survey[0].tvd;
+  for (let i = 1; i < survey.length; i++) {
+    if (md <= survey[i].md) {
+      const t = (md - survey[i - 1].md) / (survey[i].md - survey[i - 1].md);
+      return survey[i - 1].tvd + t * (survey[i].tvd - survey[i - 1].tvd);
+    }
+  }
+  return survey[survey.length - 1].tvd;
+}
+
 function drawSchematic(survey) {
   const canvas = document.getElementById('schematicCanvas');
   if (!canvas) return;
@@ -126,15 +138,33 @@ function drawSchematic(survey) {
 
     }
 
-    // Label on right side of right wall
+    // Label on right side of right wall — 3 lines anchored at shoe
     const sh0 = isOH ? 2 : Math.min(13, halfW * 0.55);
     const lx  = cx + halfW + sh0 + 5;
-    const ly  = Math.max(PAD_T + 8, Math.min(H - PAD_B - 8, (yTop + yBot) / 2));
+    const LH  = 11;  // line height px
+
+    const botMD  = +(row.bot  || maxDepth);
+    const tvdVal = Math.round(_mdToTVD(survey, botMD));
+    const grade  = row.grade      || '';
+    const wt     = row.nomWt_ppf  ? `${row.nomWt_ppf}ppf` : '';
+    const line1  = grade || wt
+      ? `${size}" ${grade}${wt ? ' ' + wt : ''}`.trim()
+      : `${size}" ${row.def}`;
+    const line2  = `TVD: ${tvdVal.toLocaleString()}ft`;
+    const line3  = `MD: ${Math.round(botMD).toLocaleString()}ft`;
+
+    // Clamp block so it stays within canvas
+    const blockH = LH * 3;
+    const lyBase = Math.max(PAD_T + 2, Math.min(H - PAD_B - blockH - 2, yBot - LH));
+
     ctx.fillStyle    = color;
-    ctx.font         = '9px sans-serif';
+    ctx.font         = 'bold 9px sans-serif';
     ctx.textAlign    = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${size}" ${row.def}`, lx, ly);
+    ctx.textBaseline = 'top';
+    ctx.fillText(line1, lx, lyBase);
+    ctx.font = '9px sans-serif';
+    ctx.fillText(line2, lx, lyBase + LH);
+    ctx.fillText(line3, lx, lyBase + LH * 2);
   });
 
 
