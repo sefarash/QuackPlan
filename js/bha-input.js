@@ -7,13 +7,58 @@ const BHA_PRESETS = {
   'MWD':         { od: 6.5,   id: 2.25,  wt: 800  },
   'RSS':         { od: 6.75,  id: 2.25,  wt: 1200 },
   'Stabilizer':  { od: 8.375, id: 2.25,  wt: 400  },
-  'HWDP':        { od: 5.0,   id: 3.0,   wt: 49.3 },
-  'Drill Collar':{ od: 6.5,   id: 2.25,  wt: 2050 },
-  'Drill Pipe':  { od: 5.0,   id: 4.276, wt: 0    },
+  'HWDP':        { od: 5.0,   id: 3.0,   wt: 1600 },
+  'Drill Collar':{ od: 6.5,   id: 2.25,  wt: 2976 },
+  'Drill Pipe':  { od: 5.0,   id: 4.276, wt: 710  },
   'Casing':      { od: 9.625, id: 8.835, wt: 47   },
 };
 
 const BHA_GRADES = ['S-135', 'G-105', 'X-95', 'E-75'];
+
+// ── Catalogue cell HTML builders ───────────────────────────────────────────────
+
+function _bhaCatCellHTML(compType) {
+  const selSty = 'style="max-width:60px;font-size:10px;padding:1px 2px"';
+  const connSty = 'style="max-width:100px;font-size:10px;padding:1px 2px"';
+
+  if (compType === 'Drill Pipe') {
+    const odOpts = dpODs().map(od => `<option value="${od}">${od}"</option>`).join('');
+    return `<select class="bha-cat-od" ${selSty} onchange="_bhaDPODChanged(this)">
+              <option value="">OD…</option>${odOpts}
+            </select>
+            <select class="bha-cat-conn" ${connSty} onchange="_bhaDPConnChanged(this)">
+              <option value="">Conn…</option>
+            </select>`;
+  }
+  if (compType === 'Drill Collar') {
+    const odOpts = dcODs().map(od => `<option value="${od}">${od}"</option>`).join('');
+    return `<select class="bha-cat-od" ${selSty} onchange="_bhaDCODChanged(this)">
+              <option value="">OD…</option>${odOpts}
+            </select>
+            <select class="bha-cat-id" ${selSty} onchange="_bhaDCIDChanged(this)">
+              <option value="">ID…</option>
+            </select>`;
+  }
+  if (compType === 'HWDP') {
+    const nomOpts = hwdpNoms('conv').map(n => `<option value="${n}">${n}"</option>`).join('');
+    return `<select class="bha-cat-type" ${selSty} onchange="_bhaHWDPTypeChanged(this)">
+              <option value="conv">Conv</option>
+              <option value="spiral">Spiral</option>
+            </select>
+            <select class="bha-cat-od" ${selSty} onchange="_bhaHWDPODChanged(this)">
+              <option value="">Nom…</option>${nomOpts}
+            </select>
+            <select class="bha-cat-conn" ${connSty} onchange="_bhaHWDPConnChanged(this)">
+              <option value="">Conn…</option>
+            </select>`;
+  }
+  return '';
+}
+
+function _bhaRebuildCatCell(tr, compType) {
+  const td = tr.querySelector('.bha-cat-td');
+  if (td) td.innerHTML = _bhaCatCellHTML(compType);
+}
 
 // ── BHA table ─────────────────────────────────────────────────────────────────
 
@@ -28,18 +73,19 @@ function bhaAddRow(preset) {
   tr.innerHTML = `
     <td class="drag-handle">⠿</td>
     <td class="editable">
-      <select onchange="bhaPresetFill(this)">
+      <select class="bha-type" onchange="bhaPresetFill(this)">
         ${Object.keys(BHA_PRESETS).map(k =>
           `<option${k === comp ? ' selected' : ''}>${k}</option>`).join('')}
       </select>
     </td>
+    <td class="bha-cat-td" style="white-space:nowrap">${_bhaCatCellHTML(comp)}</td>
     <td class="editable"><input type="number" step="0.125" value="${p.od}"  onchange="bhaSave()"></td>
     <td class="editable"><input type="number" step="0.125" value="${p.id}"  onchange="bhaSave()"></td>
     <td class="editable"><input type="number" step="1"     value="${p.wt}"  onchange="bhaSave()"></td>
     <td class="editable"><input type="number" step="1"     value="30"       onchange="bhaSave()"></td>
     <td class="calc-cell" data-col="ppf">—</td>
-    <td class="editable"><select onchange="bhaSave()">${gradeOpts}</select></td>
-    <td class="editable"><input type="text"   value="" placeholder="e.g. NC50" onchange="bhaSave()"></td>
+    <td class="editable"><select class="bha-grade" onchange="bhaSave()">${gradeOpts}</select></td>
+    <td class="editable"><input class="bha-conn" type="text" value="" placeholder="e.g. NC50" onchange="bhaSave()"></td>
     <td class="calc-cell" data-col="cumwt">—</td>
     <td class="calc-cell" data-col="cumlen">—</td>
     <td class="row-act"><button onclick="this.closest('tr').remove();bhaSave()">✕</button></td>`;
@@ -55,14 +101,133 @@ function bhaPresetFill(sel) {
   inputs[0].value = p.od;
   inputs[1].value = p.id;
   inputs[2].value = p.wt;
+  _bhaRebuildCatCell(row, sel.value);
   bhaSave();
 }
 
-// Recompute PPF, CumWt, CumLen — accumulate from bottom row (bit) upward
+// ── Catalogue change handlers ──────────────────────────────────────────────────
+
+function _bhaDPODChanged(sel, doFill) {
+  const tr      = sel.closest('tr');
+  const connSel = tr.querySelector('.bha-cat-conn');
+  if (!connSel) return;
+  const od    = sel.value;
+  const conns = od ? dpConnectionsByOD(od) : [];
+  connSel.innerHTML = `<option value="">Conn…</option>` +
+    conns.map(c => `<option value="${c}">${c}</option>`).join('');
+  connSel.value = '';
+  if (doFill !== false && od) {
+    const nums = tr.querySelectorAll('input[type=number]');
+    nums[0].value = _bhaFracToDecimal(od);
+    bhaSave();
+  }
+}
+
+function _bhaDPConnChanged(sel) {
+  const tr   = sel.closest('tr');
+  const od   = tr.querySelector('.bha-cat-od')?.value;
+  const conn = sel.value;
+  if (!od || !conn) return;
+  const spec = dpSpec(od, conn);
+  if (!spec) return;
+  const nums  = tr.querySelectorAll('input[type=number]');
+  const grSel = tr.querySelector('.bha-grade');
+  const cText = tr.querySelector('.bha-conn');
+  nums[0].value = spec.od_in;
+  nums[1].value = spec.tubeID;
+  const len = +(nums[3]?.value || 30);
+  nums[2].value = Math.round(spec.adjWt * len);
+  if (grSel) grSel.value = spec.grade;
+  if (cText) cText.value = spec.conn;
+  bhaSave();
+}
+
+function _bhaDCODChanged(sel, doFill) {
+  const tr    = sel.closest('tr');
+  const idSel = tr.querySelector('.bha-cat-id');
+  if (!idSel) return;
+  const od  = sel.value;
+  const ids = od ? dcIDsByOD(od) : [];
+  idSel.innerHTML = `<option value="">ID…</option>` +
+    ids.map(id => `<option value="${id}">${id}"</option>`).join('');
+  idSel.value = '';
+  if (doFill !== false && od) {
+    const nums = tr.querySelectorAll('input[type=number]');
+    nums[0].value = _bhaFracToDecimal(od);
+    bhaSave();
+  }
+}
+
+function _bhaDCIDChanged(sel) {
+  const tr   = sel.closest('tr');
+  const od   = tr.querySelector('.bha-cat-od')?.value;
+  const id   = sel.value;
+  if (!od || !id) return;
+  const spec = dcSpec(od, id);
+  if (!spec) return;
+  const nums  = tr.querySelectorAll('input[type=number]');
+  const cText = tr.querySelector('.bha-conn');
+  nums[0].value = spec.od_in;
+  nums[1].value = spec.id_in;
+  const len = +(nums[3]?.value || 30);
+  nums[2].value = Math.round(spec.unitWt * len);
+  if (cText) cText.value = spec.conn;
+  bhaSave();
+}
+
+function _bhaHWDPTypeChanged(sel, doFill) {
+  const tr      = sel.closest('tr');
+  const type    = sel.value;
+  const odSel   = tr.querySelector('.bha-cat-od');
+  const connSel = tr.querySelector('.bha-cat-conn');
+  if (!odSel) return;
+  const noms = hwdpNoms(type);
+  odSel.innerHTML = `<option value="">Nom…</option>` +
+    noms.map(n => `<option value="${n}">${n}"</option>`).join('');
+  odSel.value = '';
+  if (connSel) { connSel.innerHTML = `<option value="">Conn…</option>`; connSel.value = ''; }
+}
+
+function _bhaHWDPODChanged(sel, doFill) {
+  const tr      = sel.closest('tr');
+  const type    = tr.querySelector('.bha-cat-type')?.value || 'conv';
+  const nom     = sel.value;
+  const connSel = tr.querySelector('.bha-cat-conn');
+  if (!connSel) return;
+  const conns = nom ? hwdpConnectionsByNom(type, nom) : [];
+  connSel.innerHTML = `<option value="">Conn…</option>` +
+    conns.map(c => `<option value="${c}">${c}</option>`).join('');
+  connSel.value = '';
+  if (doFill !== false && nom) {
+    const nums = tr.querySelectorAll('input[type=number]');
+    nums[0].value = _bhaFracToDecimal(nom);
+    bhaSave();
+  }
+}
+
+function _bhaHWDPConnChanged(sel) {
+  const tr   = sel.closest('tr');
+  const type = tr.querySelector('.bha-cat-type')?.value || 'conv';
+  const nom  = tr.querySelector('.bha-cat-od')?.value;
+  const conn = sel.value;
+  if (!nom || !conn) return;
+  const spec = hwdpSpec(type, nom, conn);
+  if (!spec) return;
+  const nums  = tr.querySelectorAll('input[type=number]');
+  const cText = tr.querySelector('.bha-conn');
+  nums[0].value = spec.od_in;
+  nums[1].value = spec.id_in;
+  const len = +(nums[3]?.value || 30);
+  nums[2].value = Math.round(spec.pf * len);
+  if (cText) cText.value = spec.conn;
+  bhaSave();
+}
+
+// ── Recalculate PPF and cumulative weight/length ────────────────────────────────
+
 function _bhaRecalc() {
   const rows = [...document.getElementById('bhaBody').rows];
 
-  // Collect per-row values
   const data = rows.map(tr => {
     const nums = tr.querySelectorAll('input[type=number]');
     const wt   = +(nums[2]?.value || 0);
@@ -70,7 +235,6 @@ function _bhaRecalc() {
     return { tr, wt, len, ppf: len > 0 ? wt / len : 0, cumWt: 0, cumLen: 0 };
   });
 
-  // Accumulate from bottom (last row = bit) to top
   let cumWt = 0, cumLen = 0;
   for (let i = data.length - 1; i >= 0; i--) {
     cumWt  += data[i].wt;
@@ -79,7 +243,6 @@ function _bhaRecalc() {
     data[i].cumLen = cumLen;
   }
 
-  // Write back to DOM
   data.forEach(({ tr, ppf, cumWt, cumLen }) => {
     const ppfCell    = tr.querySelector('[data-col="ppf"]');
     const cumWtCell  = tr.querySelector('[data-col="cumwt"]');
@@ -95,16 +258,47 @@ function bhaLoadState(data) {
   body.innerHTML = '';
   (data || []).forEach(row => {
     bhaAddRow(row.comp);
-    const last   = body.rows[body.rows.length - 1];
-    const nums   = last.querySelectorAll('input[type=number]');
-    const sels   = last.querySelectorAll('select');
-    const texts  = last.querySelectorAll('input[type=text]');
-    if (nums[0]) nums[0].value  = row.od    ?? nums[0].value;
-    if (nums[1]) nums[1].value  = row.id    ?? nums[1].value;
-    if (nums[2]) nums[2].value  = row.wt    ?? nums[2].value;
-    if (nums[3]) nums[3].value  = row.len   ?? nums[3].value;
-    if (sels[1]) sels[1].value  = row.grade ?? sels[1].value;
-    if (texts[0]) texts[0].value = row.conn  ?? '';
+    const last  = body.rows[body.rows.length - 1];
+    const nums  = last.querySelectorAll('input[type=number]');
+    if (nums[0]) nums[0].value = row.od    ?? nums[0].value;
+    if (nums[1]) nums[1].value = row.id    ?? nums[1].value;
+    if (nums[2]) nums[2].value = row.wt    ?? nums[2].value;
+    if (nums[3]) nums[3].value = row.len   ?? nums[3].value;
+    const grSel = last.querySelector('.bha-grade');
+    const cText = last.querySelector('.bha-conn');
+    if (grSel && row.grade) grSel.value = row.grade;
+    if (cText && row.conn !== undefined) cText.value = row.conn;
+
+    // Restore catalogue selections without triggering auto-fill of numbers
+    const comp = row.comp;
+    if (comp === 'Drill Pipe' && row.catOD) {
+      const catODSel   = last.querySelector('.bha-cat-od');
+      const catConnSel = last.querySelector('.bha-cat-conn');
+      if (catODSel) {
+        catODSel.value = row.catOD;
+        _bhaDPODChanged(catODSel, false);
+        if (catConnSel && row.catConn) catConnSel.value = row.catConn;
+      }
+    } else if (comp === 'Drill Collar' && row.catOD) {
+      const catODSel = last.querySelector('.bha-cat-od');
+      const catIDSel = last.querySelector('.bha-cat-id');
+      if (catODSel) {
+        catODSel.value = row.catOD;
+        _bhaDCODChanged(catODSel, false);
+        if (catIDSel && row.catID) catIDSel.value = row.catID;
+      }
+    } else if (comp === 'HWDP' && row.catOD) {
+      const catTypeSel = last.querySelector('.bha-cat-type');
+      const catODSel   = last.querySelector('.bha-cat-od');
+      const catConnSel = last.querySelector('.bha-cat-conn');
+      if (catTypeSel && row.catType) catTypeSel.value = row.catType;
+      if (catTypeSel) _bhaHWDPTypeChanged(catTypeSel, false);
+      if (catODSel) {
+        catODSel.value = row.catOD;
+        _bhaHWDPODChanged(catODSel, false);
+        if (catConnSel && row.catConn) catConnSel.value = row.catConn;
+      }
+    }
   });
   bhaSave();
 }
@@ -114,17 +308,19 @@ function bhaSave() {
   if (!qpState.currentScenarioId) return;
   const rows = [];
   for (const tr of document.getElementById('bhaBody').rows) {
-    const sels  = tr.querySelectorAll('select');
-    const nums  = tr.querySelectorAll('input[type=number]');
-    const texts = tr.querySelectorAll('input[type=text]');
+    const nums = tr.querySelectorAll('input[type=number]');
     rows.push({
-      comp:  sels[0]?.value,
-      od:    nums[0]?.value,
-      id:    nums[1]?.value,
-      wt:    nums[2]?.value,
-      len:   nums[3]?.value,
-      grade: sels[1]?.value,
-      conn:  texts[0]?.value,
+      comp:    tr.querySelector('.bha-type')?.value,
+      od:      nums[0]?.value,
+      id:      nums[1]?.value,
+      wt:      nums[2]?.value,
+      len:     nums[3]?.value,
+      grade:   tr.querySelector('.bha-grade')?.value,
+      conn:    tr.querySelector('.bha-conn')?.value,
+      catType: tr.querySelector('.bha-cat-type')?.value  || '',
+      catOD:   tr.querySelector('.bha-cat-od')?.value    || '',
+      catConn: tr.querySelector('.bha-cat-conn')?.value  || '',
+      catID:   tr.querySelector('.bha-cat-id')?.value    || '',
     });
   }
   dbSaveScenarioData(qpState.currentScenarioId, 'bha', rows);
@@ -199,17 +395,15 @@ function mwdTableChange() {
 function bhaGet() {
   const rows = [];
   for (const tr of document.getElementById('bhaBody').rows) {
-    const sels  = tr.querySelectorAll('select');
-    const nums  = tr.querySelectorAll('input[type=number]');
-    const texts = tr.querySelectorAll('input[type=text]');
+    const nums = tr.querySelectorAll('input[type=number]');
     rows.push({
-      type:       sels[0]?.value || 'Drill Collar',
+      type:       tr.querySelector('.bha-type')?.value || 'Drill Collar',
       od:         +(nums[0]?.value || 6.5),
       id:         +(nums[1]?.value || 2.25),
       weightLbs:  +(nums[2]?.value || 2050),
       lengthFt:   +(nums[3]?.value || 30),
-      grade:      sels[1]?.value || 'S-135',
-      conn:       texts[0]?.value || '',
+      grade:      tr.querySelector('.bha-grade')?.value || 'S-135',
+      conn:       tr.querySelector('.bha-conn')?.value || '',
     });
   }
 
