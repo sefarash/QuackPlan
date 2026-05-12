@@ -326,19 +326,23 @@ function _schOdOptions() {
   ).join('');
 }
 
-function _schGradeOptions(od) {
-  if (!od) return '<option value="">— pick OD first —</option>';
-  return catalogueByOD(od).map(r =>
-    `<option value="${r[1]}_${r[2]}">${r[1]} lb/ft — ${r[2]}</option>`
-  ).join('');
+function _schWtOptions(od) {
+  if (!od) return '';
+  const unique = [...new Set(catalogueByOD(od).map(r => r[1]))];
+  return unique.map(wt => `<option value="${wt}">${wt} lb/ft</option>`).join('');
+}
+
+function _schGradeOptions(od, wt) {
+  if (!od || !wt) return '';
+  return catalogueByOD(od)
+    .filter(r => r[1] === +wt)
+    .map(r => `<option value="${r[2]}">${r[2]}</option>`)
+    .join('');
 }
 
 function schematicAddRow(preset) {
   const body = document.getElementById('schematicBody');
   const tr   = document.createElement('tr');
-
-  const defaultOD = preset?.od || '';
-  const gradeOpts = _schGradeOptions(defaultOD);
 
   tr.innerHTML = `
     <td class="drag-handle">⠿</td>
@@ -359,10 +363,14 @@ function schematicAddRow(preset) {
         ${_schOdOptions()}
       </select>
     </td>
-    <td class="editable" style="min-width:140px">
+    <td class="editable" style="min-width:100px">
+      <select class="sch-wt" onchange="_schWtChanged(this)" style="width:100%">
+        <option value="">— Wt —</option>
+      </select>
+    </td>
+    <td class="editable" style="min-width:90px">
       <select class="sch-grade" onchange="_schGradeChanged(this)" style="width:100%">
-        <option value="">— Wt / Grade —</option>
-        ${gradeOpts}
+        <option value="">— Grade —</option>
       </select>
     </td>
     <td class="editable" style="min-width:60px">
@@ -377,31 +385,43 @@ function schematicAddRow(preset) {
 }
 
 function _schOdChanged(odSel) {
-  const tr       = odSel.closest('tr');
-  const gradeSel = tr.querySelector('.sch-grade');
-  const sizeIn   = tr.querySelector('.sch-size');
-  const od       = odSel.value;
+  const tr    = odSel.closest('tr');
+  const wtSel = tr.querySelector('.sch-wt');
+  const grSel = tr.querySelector('.sch-grade');
+  const sizeIn = tr.querySelector('.sch-size');
+  const od    = odSel.value;
 
-  // Repopulate grade dropdown
-  gradeSel.innerHTML = `<option value="">— Wt / Grade —</option>${_schGradeOptions(od)}`;
-  gradeSel.value = '';
+  wtSel.innerHTML = `<option value="">— Wt —</option>${_schWtOptions(od)}`;
+  wtSel.value = '';
+  grSel.innerHTML = '<option value="">— Grade —</option>';
+  grSel.value = '';
 
-  // Auto-fill size from OD decimal
   if (od) sizeIn.value = _odToDecimal(od);
   _schStoreCatalogueSpec(tr, null);
   schematicSave();
 }
 
+function _schWtChanged(wtSel) {
+  const tr    = wtSel.closest('tr');
+  const od    = tr.querySelector('.sch-od')?.value;
+  const grSel = tr.querySelector('.sch-grade');
+  const wt    = wtSel.value;
+
+  grSel.innerHTML = `<option value="">— Grade —</option>${_schGradeOptions(od, wt)}`;
+  grSel.value = '';
+  _schStoreCatalogueSpec(tr, null);
+  schematicSave();
+}
+
 function _schGradeChanged(gradeSel) {
-  const tr  = gradeSel.closest('tr');
-  const od  = tr.querySelector('.sch-od').value;
-  const val = gradeSel.value;           // "nomWt_grade" e.g. "15_L-80"
+  const tr    = gradeSel.closest('tr');
+  const od    = tr.querySelector('.sch-od')?.value;
+  const wt    = tr.querySelector('.sch-wt')?.value;
+  const grade = gradeSel.value;
 
-  if (!val || !od) { _schStoreCatalogueSpec(tr, null); schematicSave(); return; }
+  if (!grade || !od || !wt) { _schStoreCatalogueSpec(tr, null); schematicSave(); return; }
 
-  const [wStr, grade] = val.split('_');
-  const nomWt = parseFloat(wStr);
-  const spec  = catalogueByOD(od).find(r => r[1] === nomWt && r[2] === grade);
+  const spec = catalogueByOD(od).find(r => r[1] === +wt && r[2] === grade);
   _schStoreCatalogueSpec(tr, spec ? catalogueSpec(spec) : null);
   schematicSave();
 }
@@ -415,21 +435,39 @@ function schematicLoadRows(data) {
   const body = document.getElementById('schematicBody');
   body.innerHTML = '';
   (data || []).forEach(row => {
-    schematicAddRow({ size: row.size, top: row.top, bot: row.bot, od: row.od || '' });
+    schematicAddRow({ size: row.size, top: row.top, bot: row.bot });
     const tr     = body.rows[body.rows.length - 1];
     const selDef = tr.querySelector('select');
     const odSel  = tr.querySelector('.sch-od');
-    const gradSel= tr.querySelector('.sch-grade');
+    const wtSel  = tr.querySelector('.sch-wt');
+    const grSel  = tr.querySelector('.sch-grade');
     const sizeIn = tr.querySelector('.sch-size');
 
-    if (selDef)  selDef.value  = row.def  ?? 'Open Hole';
-    if (sizeIn)  sizeIn.value  = row.size ?? 9.625;
+    if (selDef) selDef.value = row.def  ?? 'Open Hole';
+    if (sizeIn) sizeIn.value = row.size ?? 9.625;
 
-    // Restore catalogue selections
     if (row.od && odSel) {
       odSel.value = row.od;
-      gradSel.innerHTML = `<option value="">— Wt / Grade —</option>${_schGradeOptions(row.od)}`;
-      if (row.grade) gradSel.value = row.grade;
+
+      // Backward-compat: old data stored grade as "87.5_H-40" combined
+      let savedWt    = row.wt    || '';
+      let savedGrade = row.grade || '';
+      if (!savedWt && savedGrade.includes('_')) {
+        const i = savedGrade.indexOf('_');
+        savedWt    = savedGrade.slice(0, i);
+        savedGrade = savedGrade.slice(i + 1);
+      }
+
+      if (wtSel) {
+        wtSel.innerHTML = `<option value="">— Wt —</option>${_schWtOptions(row.od)}`;
+        if (savedWt) {
+          wtSel.value = savedWt;
+          if (grSel) {
+            grSel.innerHTML = `<option value="">— Grade —</option>${_schGradeOptions(row.od, savedWt)}`;
+            if (savedGrade) grSel.value = savedGrade;
+          }
+        }
+      }
     }
     if (row.casingSpec) {
       try { _schStoreCatalogueSpec(tr, JSON.parse(row.casingSpec)); } catch (_) {}
@@ -444,17 +482,18 @@ function schematicSave() {
   for (const tr of document.getElementById('schematicBody').rows) {
     const selDef  = tr.querySelector('select');
     const odSel   = tr.querySelector('.sch-od');
-    const gradSel = tr.querySelector('.sch-grade');
+    const wtSel   = tr.querySelector('.sch-wt');
+    const grSel   = tr.querySelector('.sch-grade');
     const sizeIn  = tr.querySelector('.sch-size');
-    // inputs[type=number]: [0]=size, [1]=top, [2]=bot
     const inputs  = tr.querySelectorAll('input[type=number]');
     rows.push({
       def:        selDef?.value,
       size:       sizeIn?.value ?? inputs[0]?.value,
       top:        inputs[1]?.value,
       bot:        inputs[2]?.value,
-      od:         odSel?.value   || '',
-      grade:      gradSel?.value || '',
+      od:         odSel?.value  || '',
+      wt:         wtSel?.value  || '',
+      grade:      grSel?.value  || '',
       casingSpec: tr.dataset.casingSpec || '',
     });
   }
