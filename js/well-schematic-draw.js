@@ -270,6 +270,12 @@ function _readSchematicRows() {
     const sel    = tr.querySelector('select');
     const inputs = tr.querySelectorAll('input[type=number]');
     const spec   = tr.dataset.casingSpec ? (() => { try { return JSON.parse(tr.dataset.casingSpec); } catch (_) { return null; } })() : null;
+    const wtSel  = tr.querySelector('.sch-wt');
+    const grSel  = tr.querySelector('.sch-grade');
+    const wtTxt  = tr.querySelector('.sch-wt-txt');
+    const grTxt  = tr.querySelector('.sch-grade-txt');
+    const isWtCustom = wtSel?.value === 'custom';
+    const isGrCustom = grSel?.value === 'custom';
     rows.push({
       def:  sel?.value        || 'Open Hole',
       size: inputs[0]?.value  || 9.625,
@@ -281,7 +287,10 @@ function _readSchematicRows() {
         id_in:     spec.id_in,
         collapse:  spec.collapse,
         burst:     spec.burst,
-      } : {}),
+      } : {
+        grade:     isGrCustom ? (grTxt?.value || '') : '',
+        nomWt_ppf: isWtCustom ? (wtTxt?.value ? +wtTxt.value : null) : null,
+      }),
     });
   }
   return rows;
