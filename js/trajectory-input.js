@@ -36,6 +36,7 @@ function traj1Recalc() {
   if (stations.length < 1) return;
 
   const survey = computeSurvey(stations);
+  qpState.baseSurvey = survey;
   qpState.survey = survey;
 
   survey.forEach((pt, i) => {
@@ -204,6 +205,7 @@ function traj2Recalc() {
   if (stations.length < 2) return;
 
   const survey = computeSurvey(stations);
+  qpState.baseSurvey = survey;
   qpState.survey = survey;
 
   survey.forEach((pt, i) => {
@@ -311,11 +313,19 @@ function tortRecalc() {
       tort: inputs[2]?.value, mode: sel?.value || 'random',
     });
   }
-  if (!qpState.survey.length) return;
-  const base    = qpState.survey.map(s => ({ md: s.md, inc: s.inc, az: s.az || s.azimuth || 0 }));
-  const applied = applyTortuosity(base, intervals);
+  // Always start from the planned (clean) survey so repeated recalcs don't stack tortuosity
+  const base = (qpState.baseSurvey || qpState.survey || []);
+  if (!base.length) return;
+
+  const baseStations = base.map(s => ({ md: s.md, inc: s.inc, az: s.az || s.azimuth || 0 }));
+  const applied = intervals.length ? applyTortuosity(baseStations, intervals) : baseStations;
   const survey  = computeSurvey(applied);
+
+  // Store as effective survey so qpCompute() picks it up
+  qpState.survey = survey;
+
   if (typeof drawSchematic === 'function') drawSchematic(survey);
+  if (typeof qpCompute === 'function') qpCompute();
 }
 
 // ── Well Schematic table ──────────────────────────────────────────────────────
