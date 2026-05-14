@@ -226,3 +226,103 @@ QuackPlan needs data from third party?
 - HTML/CSS UI structure — no framework migration required
 - `qpState` data flow pattern (`survey → compute → draw`)
 - The no-bundler, no-framework constraint — can be maintained through all phases
+
+---
+
+## Multi-user roadmap
+
+Multi-user is a spectrum. Each level builds on the previous one and the jump in engineering complexity is non-linear. Do not skip levels.
+
+### Level 1 — User accounts (auth, private data, any device)
+
+Each user logs in; their wells are private to them but stored centrally so they can access them from any machine.
+
+**What changes:**
+- Scenarios move from browser `IndexedDB` to a server-side database. Every `dbSaveScenarioData()` call in `db-engine.js` becomes a `fetch('/api/...')` POST. `db-engine.js` is the single file to replace.
+- Auth layer: signup, login, session token (JWT or cookie). The app checks for a valid session on load; unauthenticated users see a login screen.
+- The project hierarchy (currently flat per-browser) becomes per-user in the database.
+
+**Recommended stack (low ops burden):**
+- **Cloudflare Workers + D1** (SQLite at the edge, generous free tier, zero server management) — best fit for a solo dev.
+- **Supabase** (Postgres + built-in auth + auto-generated REST API) — faster to stand up if SQL familiarity is low.
+
+**Effort:** 1–2 weeks. This is the gate that unlocks all subsequent levels.
+
+**Code impact:** `db-engine.js` rewrite + login UI. Compute engines, chart code, and input panels are untouched.
+
+---
+
+### Level 2 — Sharing (read-only links)
+
+A user generates a share link for a well plan. The recipient can view results but not edit.
+
+**What changes on top of Level 1:**
+- Permission model: each scenario/well gets a `visibility` flag (`private` | `shared`) and an `owner_id`.
+- Share-link generation: a short token stored in the database maps to a scenario ID. Anyone with the token can `GET` the scenario but not `POST`/`PATCH`.
+- The UI adds a "Share" button that copies the link to clipboard.
+- The app renders a read-only mode when loaded with a share token (inputs disabled, no save calls).
+
+**Effort:** ~1 week on top of Level 1.
+
+**Code impact:** permission check middleware server-side; `readonly` flag passed to the app that disables all `onchange` handlers and save calls.
+
+---
+
+### Level 3 — Real-time collaboration (multiple editors, same well)
+
+Two engineers edit the same scenario simultaneously and see each other's changes.
+
+**This is where complexity increases non-linearly. Do not underestimate it.**
+
+**Problems that must be solved:**
+
+| Problem | Options | Notes |
+|---|---|---|
+| Conflict resolution | Last-write-wins / operational transforms / CRDTs | Last-write-wins is simplest but loses data; CRDTs (e.g. Yjs) are correct but complex |
+| Real-time transport | WebSockets (Socket.io) or Server-Sent Events | WebSockets needed for bi-directional sync |
+| Presence awareness | "Alice is editing BHA row 3" indicator | Requires cursor/field tracking |
+| Optimistic UI | Show local changes immediately before server confirms | Adds rollback complexity |
+| Offline / reconnect | What happens when a user loses connection mid-edit | Must reconcile on reconnect |
+
+**Recommended library if pursuing this:** [Yjs](https://yjs.dev/) — a battle-tested CRDT library that can sync arbitrary JS objects. It has a learning curve but removes the need to write custom conflict resolution.
+
+**Effort:** 4–8 weeks minimum. Linear, Figma, and Notion took years to get this right. Budget 5× your initial estimate.
+
+**Do not attempt Level 3 before Level 1 and 2 are stable and in production.**
+
+---
+
+### Level 4 — Organizations and teams
+
+Companies have many users, role-based permissions, shared resource libraries (casing catalogues, fluid templates), and billing per seat.
+
+**What changes on top of Level 3:**
+- `org_id` added to every entity (user, well, scenario, catalogue entry).
+- Role model: `admin` | `engineer` | `viewer` per org. Admins manage members and billing; engineers create/edit; viewers read-only.
+- Shared catalogues: org-level BHA component libraries, casing specs, fluid templates that all members can access.
+- Billing: seat count, plan limits, usage metering.
+- Audit log: who changed what, when — required by many operators.
+
+**Effort:** 2–4 months of sustained engineering. This is a product in itself, not a feature.
+
+---
+
+### Multi-user decision guide
+
+```
+Do you need users on different devices?    → Level 1 (start here)
+Do engineers need to share results?        → Level 2
+Do two engineers edit the same well?       → Level 3 (high effort, validate need first)
+Do you have multiple companies/teams?      → Level 4
+```
+
+### Architectural prerequisite for any level
+
+**Phase 1 JSON export (integration roadmap) must be done first.** The JSON schema it produces becomes the canonical data model that the server database stores, the API exchanges, and the sync layer operates on. Building multi-user without a defined data contract first leads to schema churn that costs weeks.
+
+### What will NOT change at any level
+
+- All computation engines (`tdCompute`, `computeSurvey`, `computeRheology`, etc.) — pure functions, no network dependency
+- Canvas drawing and chart interaction code
+- Input panel HTML and read-at-compute-time pattern
+- `qpState` in-memory flow (`survey → compute → draw`) — the server just becomes the source that populates it on load
