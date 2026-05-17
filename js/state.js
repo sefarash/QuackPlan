@@ -88,6 +88,7 @@ function redrawOutputPanel(name) {
   else if (name === 'overpull'   && r)           drawOverpull(r);
   else if (name === 'broomstick' && r)           drawBroomstick(r);
   else if (name === 'hydraulics' && h)           { drawHydSweep(h); drawHydPie(h); }
+  else if (name === 'surgeswab')                 drawSurgeSwab();
   else if (name === 'afe')                       drawAFE();
   else if (name === 'cd')                        drawCasingDesign();
   else if (name === 'kt')                        drawKickTolerance();

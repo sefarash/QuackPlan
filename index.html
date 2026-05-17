@@ -518,6 +518,26 @@
       </div>
     </div>
 
+    <!-- Surge / Swab -->
+    <div id="panel-surgeswab" class="output-panel">
+      <div class="output-canvas-wrap">
+        <canvas id="surgeSwabCanvas"></canvas>
+      </div>
+      <div class="chart-controls" style="margin-top:8px;margin-bottom:4px">
+        <label>Trip speed &nbsp;
+          <input type="number" id="ssSpeedMin" value="10" step="5" style="width:42px;text-align:right"
+            oninput="document.getElementById('ssSpeedSlider').min=this.value;drawSurgeSwab()">
+          <input type="range" id="ssSpeedSlider" min="10" max="200" step="5" value="60"
+            oninput="document.getElementById('ssSpeedVal').textContent=this.value;drawSurgeSwab()"
+            style="width:120px;vertical-align:middle">
+          <input type="number" id="ssSpeedMax" value="200" step="5" style="width:42px"
+            oninput="document.getElementById('ssSpeedSlider').max=this.value;drawSurgeSwab()">
+          &nbsp;<span id="ssSpeedVal">60</span> ft/min
+        </label>
+        <button class="hdr-btn" onclick="drawSurgeSwab()">Recompute</button>
+      </div>
+    </div>
+
     <!-- Casing Design -->
     <div id="panel-cd" class="output-panel">
       <div class="chart-controls">
@@ -605,7 +625,8 @@
     <button class="output-tab" onclick="switchOutputTab('buckling',this)">Buckling</button>
     <button class="output-tab" onclick="switchOutputTab('overpull',this)">Overpull</button>
     <button class="output-tab" onclick="switchOutputTab('broomstick',this)">Broomstick</button>
-    <button class="output-tab" onclick="switchOutputTab('hydraulics',this)">Hydraulics</button>
+    <button class="output-tab" onclick="switchOutputTab('hydraulics',this)">SPP / ECD</button>
+    <button class="output-tab" onclick="switchOutputTab('surgeswab',this)">Surge / Swab</button>
     <button class="output-tab" onclick="switchOutputTab('cd',this)">Casing Design</button>
     <button class="output-tab" onclick="switchOutputTab('kt',this)">Kick Tolerance</button>
     <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
@@ -684,6 +705,7 @@
 <script src="js/compute-engine.js"></script>
 <script src="js/td-charts.js"></script>
 <script src="js/hydraulics-ui.js"></script>
+<script src="js/surge-swab.js"></script>
 <script src="js/afe-chart.js"></script>
 <script src="js/trajectory-plot.js"></script>
 <script src="js/export.js"></script>
@@ -711,7 +733,7 @@
 
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
-     'hydSweepCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','ktCanvas'].forEach(id => CI.attach(id));
+     'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','ktCanvas'].forEach(id => CI.attach(id));
 
     makeRowsDraggable('traj1Body',      traj1Recalc);
     makeRowsDraggable('traj2Body',      traj2Recalc);
