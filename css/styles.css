@@ -78,24 +78,24 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 /* Input tabs (top) */
 .input-tabs {
   display: flex;
-  gap: 2px;
+  gap: 6px;
   margin-left: 4px;
 }
 
 .input-tab {
-  padding: 6px 16px;
-  border: 1px solid var(--border-dk);
-  border-radius: 4px 4px 0 0;
-  background: var(--bg-panel);
+  padding: 5px 16px;
+  border: 1.5px solid var(--border-dk);
+  border-radius: 999px;
+  background: transparent;
   color: var(--accent);
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   letter-spacing: 0.02em;
 }
 
-.input-tab:hover { background: #c4e0f0; }
+.input-tab:hover { background: var(--bg-panel); }
 .input-tab.active {
   background: var(--bg-table-hd);
   color: #fff;
@@ -328,17 +328,17 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 
 .output-tab {
   padding: 5px 14px;
-  border: 1px solid var(--border-dk);
-  border-radius: 0 0 4px 4px;
-  background: var(--bg-panel);
+  border: 1.5px solid var(--border-dk);
+  border-radius: 999px;
+  background: transparent;
   color: var(--accent);
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.output-tab:hover { background: #c4e0f0; }
+.output-tab:hover { background: var(--bg-panel); }
 .output-tab.active { background: var(--bg-table-hd); color: #fff; border-color: var(--bg-table-hd); }
 
 .footer-right {
@@ -764,8 +764,8 @@ body.dark .tree-node.active,
 body.dark .tree-node.selected        { color: #fff; }
 body.dark .hierarchy-header          { color: var(--accent); }
 
-body.dark .input-tab:hover           { background: #1e3448; }
-body.dark .output-tab:hover          { background: #1e3448; }
+body.dark .input-tab:hover           { background: var(--bg-panel); }
+body.dark .output-tab:hover          { background: var(--bg-panel); }
 body.dark .qp-table .row-act         { background: #162030 !important; }
 body.dark .qp-table .drag-handle     { color: #4a7090; }
 body.dark tr.row-drag-over td        { background: #1a3a55 !important; }
