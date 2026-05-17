@@ -33,6 +33,7 @@
 
   --panel-left:  260px;
   --panel-right: 320px;
+  --scenario-strip-h: 36px;
   --header-h:    52px;
   --footer-h:    44px;
   --tab-h:       36px;
@@ -45,6 +46,62 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; background: var(--bg); }
 
+/* ── Scenario strip (Direction C — top tab bar) ─────────────────── */
+.scenario-strip {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--scenario-strip-h);
+  z-index: 101;
+  background: #0f3d52;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 12px;
+  gap: 2px;
+}
+
+.scenario-tab {
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 6px 6px 0 0;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.65);
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+  max-width: 340px;
+  overflow: hidden;
+}
+
+.scenario-tab.active {
+  background: #fff;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.scenario-tab strong { font-weight: 600; }
+.scenario-tab .st-sep { opacity: 0.45; margin: 0 2px; }
+
+.scenario-new-btn {
+  margin-left: auto;
+  margin-bottom: 4px;
+  width: 24px; height: 24px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.scenario-new-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
 /* ── Header ─────────────────────────────────────────────────────── */
 .qp-header {
   height: var(--header-h);
@@ -55,7 +112,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   gap: 12px;
   padding: 0 16px;
   position: fixed;
-  top: 0; left: 0; right: 0;
+  top: var(--scenario-strip-h); left: 0; right: 0;
   z-index: 100;
 }
 
@@ -75,31 +132,33 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 
 .header-sep { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
 
-/* Input tabs (top) */
+/* Input tabs (pill style — Direction C) */
 .input-tabs {
   display: flex;
-  gap: 2px;
+  gap: 4px;
   margin-left: 4px;
 }
 
 .input-tab {
-  padding: 6px 16px;
-  border: 1px solid var(--border-dk);
-  border-radius: 4px 4px 0 0;
-  background: var(--bg-panel);
+  padding: 5px 16px;
+  border: 1.5px solid var(--border-dk);
+  border-radius: 20px;
+  background: transparent;
   color: var(--accent);
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.13s, color 0.13s, box-shadow 0.13s;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.input-tab:hover { background: #c4e0f0; }
+.input-tab:hover { background: var(--bg-panel); }
 .input-tab.active {
-  background: var(--bg-table-hd);
+  background: var(--accent);
   color: #fff;
-  border-color: var(--bg-table-hd);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(26,95,122,0.22);
 }
 
 .header-right {
@@ -134,13 +193,23 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 /* ── App layout ──────────────────────────────────────────────────── */
 .qp-app {
   position: fixed;
-  top: var(--header-h);
+  top: calc(var(--scenario-strip-h) + var(--header-h));
   bottom: var(--footer-h);
   left: 0; right: 0;
   display: grid;
   grid-template-columns: var(--panel-left) 1fr var(--panel-right);
   overflow: hidden;
+  transition: grid-template-columns 0.2s;
 }
+
+/* Hierarchy icon-rail mode */
+.qp-app.hierarchy-rail {
+  grid-template-columns: 40px 1fr var(--panel-right);
+}
+.qp-app.hierarchy-rail .hierarchy-title,
+.qp-app.hierarchy-rail .hierarchy-add-btn,
+.qp-app.hierarchy-rail #hierarchyTree { display: none; }
+.qp-app.hierarchy-rail .hierarchy-header { justify-content: center; padding: 8px 4px; }
 
 /* ── Left — Project Hierarchy ─────────────────────────────────────── */
 .panel-hierarchy {
@@ -154,7 +223,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px 8px;
+  padding: 6px 8px 6px 4px;
   font-size: 11px;
   font-weight: 700;
   color: var(--accent);
@@ -162,7 +231,24 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   letter-spacing: 0.06em;
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
+  gap: 4px;
 }
+
+.hierarchy-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.hierarchy-toggle {
+  width: 22px; height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 9px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.13s;
+}
+.hierarchy-toggle:hover { background: var(--bg-panel); }
 
 .hierarchy-add-btn {
   width: 20px; height: 20px;
@@ -259,15 +345,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   gap: 8px;
 }
 
-/* Output panels */
-.output-panel {
-  display: none;
-  position: absolute;
-  inset: 0;
-  padding: 12px;
-}
-
-.output-panel.active { display: flex; flex-direction: column; }
+/* Output panels live inside .drawer-content (see footer section above) */
 
 .output-canvas-wrap {
   flex: 1;
@@ -312,19 +390,67 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   height: 100%;
 }
 
-/* ── Footer — Output tabs ────────────────────────────────────────── */
+/* ── Footer — Resizable output drawer (Direction C) ──────────────── */
 .qp-footer {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   height: var(--footer-h);
-  background: #fff;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Drag handle — top strip of the drawer */
+.drawer-handle {
+  height: 44px;
+  flex-shrink: 0;
+  background: var(--bg-card);
   border-top: 2px solid var(--border-dk);
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 12px;
   gap: 2px;
-  z-index: 100;
+  cursor: ns-resize;
+  position: relative;
+  user-select: none;
 }
+
+/* Grip dots */
+.drawer-handle::before {
+  content: '⋯';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  color: var(--border);
+  letter-spacing: 3px;
+  line-height: 1;
+}
+
+/* Buttons inside the handle should not trigger the drag cursor */
+.drawer-handle button,
+.drawer-handle nav { cursor: pointer; }
+
+/* Output content area below the handle */
+.drawer-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+}
+
+/* Output panels now live inside .drawer-content */
+.output-panel {
+  display: none;
+  position: absolute;
+  inset: 0;
+  padding: 12px;
+}
+
+.output-panel.active { display: flex; flex-direction: column; }
 
 .output-tab {
   padding: 5px 14px;

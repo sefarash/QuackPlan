@@ -8,6 +8,16 @@
 </head>
 <body>
 
+<!-- ═══════════════════════ SCENARIO STRIP ═══════════════════════ -->
+<div class="scenario-strip" id="scenarioStrip">
+  <div class="scenario-tab active" id="activeScenarioTab">
+    <strong id="hdrWellName">No well selected</strong>
+    <span class="st-sep">›</span>
+    <span id="hdrScenarioName">—</span>
+  </div>
+  <button class="scenario-new-btn" onclick="showNewProjectModal()" title="New project">＋</button>
+</div>
+
 <!-- ═══════════════════════ HEADER ═══════════════════════ -->
 <header class="qp-header">
   <div class="qp-logo">
@@ -34,11 +44,6 @@
   </nav>
 
   <div class="header-right">
-    <div class="hdr-scenario" id="hdrContext">
-      <strong id="hdrWellName">No well selected</strong>
-      &nbsp;|&nbsp;
-      <span id="hdrScenarioName">—</span>
-    </div>
     <button class="hdr-btn" onclick="showNewProjectModal()">+ Project</button>
     <button class="hdr-btn primary" onclick="qpCompute()">⚡ Compute</button>
   </div>
@@ -50,7 +55,8 @@
   <!-- LEFT — Project Hierarchy -->
   <div class="panel-hierarchy" id="hierarchyPanel">
     <div class="hierarchy-header">
-      Project Hierarchy
+      <button class="hierarchy-toggle" id="hierarchyToggle" onclick="toggleHierarchyRail()" title="Collapse sidebar">◀</button>
+      <span class="hierarchy-title">Project Hierarchy</span>
       <button class="hierarchy-add-btn" title="New project" onclick="showNewProjectModal()">+</button>
     </div>
     <div id="hierarchyTree">
@@ -374,7 +380,37 @@
       </table>
     </div>
 
-    <!-- ── OUTPUT PANELS ── -->
+
+  </div><!-- /panel-center -->
+
+  <!-- RIGHT — Well Schematic -->
+  <div class="panel-schematic">
+    <div class="schematic-header">Well Schematic</div>
+    <div class="schematic-canvas-wrap">
+      <canvas id="schematicCanvas"></canvas>
+    </div>
+  </div>
+
+</div><!-- /qp-app -->
+
+<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
+<footer class="qp-footer" id="outputDrawer">
+  <div class="drawer-handle" id="drawerHandle">
+    <nav id="outputTabs">
+      <button class="output-tab" onclick="switchOutputTab('trajplot',this);expandDrawer()">Profile</button>
+      <button class="output-tab" onclick="switchOutputTab('torque',this);expandDrawer()">Torque</button>
+      <button class="output-tab" onclick="switchOutputTab('buckling',this);expandDrawer()">Buckling</button>
+      <button class="output-tab" onclick="switchOutputTab('overpull',this);expandDrawer()">Overpull</button>
+      <button class="output-tab" onclick="switchOutputTab('broomstick',this);expandDrawer()">Broomstick</button>
+      <button class="output-tab" onclick="switchOutputTab('hydraulics',this);expandDrawer()">Hydraulics</button>
+      <button class="output-tab" onclick="switchOutputTab('cd',this);expandDrawer()">Casing Design</button>
+      <button class="output-tab" onclick="switchOutputTab('kt',this);expandDrawer()">Kick Tolerance</button>
+      <button class="output-tab" onclick="switchOutputTab('afe',this);expandDrawer()">Initial AFE</button>
+    </nav>
+    <div class="footer-right" id="footerStatus">Ready</div>
+  </div>
+
+  <div class="drawer-content" id="drawerContent">
 
     <!-- Trajectory Plot -->
     <div id="panel-trajplot" class="output-panel">
@@ -517,15 +553,12 @@
         <button class="hdr-btn" onclick="exportChartPNG('cdCollapseCanvas','collapse.png')">⬇ Collapse PNG</button>
       </div>
       <div style="display:flex;flex:1;gap:10px;min-height:0">
-        <!-- Burst chart -->
         <div class="output-canvas-wrap" style="flex:1">
           <canvas id="cdBurstCanvas"></canvas>
         </div>
-        <!-- Collapse chart -->
         <div class="output-canvas-wrap" style="flex:1">
           <canvas id="cdCollapseCanvas"></canvas>
         </div>
-        <!-- Ratings table -->
         <div style="flex:0 0 340px;min-width:0;overflow-y:auto;padding-right:4px">
           <div id="cdRatingsDiv"></div>
         </div>
@@ -541,11 +574,9 @@
         <button class="hdr-btn" onclick="exportChartPNG('ktCanvas','ppfg_kt.png')">⬇ PNG</button>
       </div>
       <div style="display:flex;flex:1;gap:10px;min-height:0">
-        <!-- Left: PPFG chart -->
         <div class="output-canvas-wrap" style="flex:1">
           <canvas id="ktCanvas"></canvas>
         </div>
-        <!-- Right: KT results -->
         <div style="flex:1;min-width:0;overflow-y:auto;padding-right:4px">
           <div class="section-label" style="margin-bottom:6px">Kick Tolerance per Section</div>
           <div id="ktResultsDiv"></div>
@@ -566,32 +597,7 @@
       </div>
     </div>
 
-  </div><!-- /panel-center -->
-
-  <!-- RIGHT — Well Schematic -->
-  <div class="panel-schematic">
-    <div class="schematic-header">Well Schematic</div>
-    <div class="schematic-canvas-wrap">
-      <canvas id="schematicCanvas"></canvas>
-    </div>
-  </div>
-
-</div><!-- /qp-app -->
-
-<!-- ═══════════════════════ FOOTER ═══════════════════════ -->
-<footer class="qp-footer">
-  <nav id="outputTabs">
-    <button class="output-tab" onclick="switchOutputTab('trajplot',this)">Profile</button>
-    <button class="output-tab" onclick="switchOutputTab('torque',this)">Torque</button>
-    <button class="output-tab" onclick="switchOutputTab('buckling',this)">Buckling</button>
-    <button class="output-tab" onclick="switchOutputTab('overpull',this)">Overpull</button>
-    <button class="output-tab" onclick="switchOutputTab('broomstick',this)">Broomstick</button>
-    <button class="output-tab" onclick="switchOutputTab('hydraulics',this)">Hydraulics</button>
-    <button class="output-tab" onclick="switchOutputTab('cd',this)">Casing Design</button>
-    <button class="output-tab" onclick="switchOutputTab('kt',this)">Kick Tolerance</button>
-    <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
-  </nav>
-  <div class="footer-right" id="footerStatus">Ready</div>
+  </div><!-- /drawer-content -->
 </footer>
 
 <!-- ═══════════════════════ MODALS ═══════════════════════ -->
@@ -664,6 +670,27 @@
 <script src="js/row-drag.js"></script>
 <script src="js/output-controls.js"></script>
 <script>
+  // ── Drawer resize ────────────────────────────────────────────────────
+  const DRAWER_PEEK    = 44;
+  const DRAWER_DEFAULT = 320;
+  let drawerH  = +localStorage.getItem('qp_drawer_h') || DRAWER_PEEK;
+  let _dragging = false, _dragY0 = 0, _dragH0 = 0;
+
+  function setDrawerH(h) {
+    h = Math.max(DRAWER_PEEK, Math.min(h, window.innerHeight * 0.85));
+    drawerH = h;
+    document.documentElement.style.setProperty('--footer-h', h + 'px');
+    localStorage.setItem('qp_drawer_h', h);
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  function expandDrawer() {
+    if (drawerH <= DRAWER_PEEK) setDrawerH(DRAWER_DEFAULT);
+  }
+
+  // restore saved height immediately (before DOMContentLoaded)
+  setDrawerH(drawerH);
+
   document.addEventListener('DOMContentLoaded', () => {
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
@@ -680,7 +707,41 @@
     makeRowsDraggable('servicesBody',    activityRecalc);
     makeRowsDraggable('casingCostBody',  casingCostRecalc);
     makeRowsDraggable('ppfgBody',        ppfgRecalc);
+
+    // Drawer drag
+    const handle = document.getElementById('drawerHandle');
+    handle.addEventListener('mousedown', e => {
+      if (e.target.closest('button, nav, a')) return;
+      _dragging = true; _dragY0 = e.clientY; _dragH0 = drawerH;
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', e => {
+      if (!_dragging) return;
+      setDrawerH(_dragH0 + (_dragY0 - e.clientY));
+    });
+    window.addEventListener('mouseup', () => { _dragging = false; });
+    handle.addEventListener('dblclick', e => {
+      if (e.target.closest('button, nav, a')) return;
+      setDrawerH(drawerH <= DRAWER_PEEK ? DRAWER_DEFAULT : DRAWER_PEEK);
+    });
+
+    // Restore hierarchy collapsed state
+    if (localStorage.getItem('qp_hier_collapsed')) {
+      document.querySelector('.qp-app').classList.add('hierarchy-rail');
+      const btn = document.getElementById('hierarchyToggle');
+      if (btn) btn.textContent = '▶';
+    }
   });
+
+  // ── Hierarchy rail toggle ─────────────────────────────────────────────
+  function toggleHierarchyRail() {
+    const app       = document.querySelector('.qp-app');
+    const btn       = document.getElementById('hierarchyToggle');
+    const collapsed = app.classList.toggle('hierarchy-rail');
+    btn.textContent = collapsed ? '▶' : '◀';
+    localStorage.setItem('qp_hier_collapsed', collapsed ? '1' : '');
+    window.dispatchEvent(new Event('resize'));
+  }
 </script>
 </body>
 </html>
