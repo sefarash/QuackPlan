@@ -403,7 +403,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 
 .qp-table .row-act {
   width: 28px;
-  background: #f8f8f8 !important;
+  background: var(--bg-panel) !important;
 }
 
 .qp-table th.drag-col { width: 18px; padding: 0; }
@@ -736,16 +736,16 @@ body.dark {
   --bg-panel:    #162030;
   --bg-card:     #1c2a3a;
   --bg-table-hd: #1a5f7a;
-  --bg-table-alt:#162535;
-  --bg-input:    #2a2700;
-  --bg-calc:     #102030;
+  --bg-table-alt:#1a2d40;
+  --bg-input:    #2e2c00;
+  --bg-calc:     #142238;
   --accent:      #3aafd8;
   --accent-lt:   #5ac8f0;
   --accent-hl:   #f0c040;
-  --border:      #243a50;
+  --border:      #2a4560;
   --border-dk:   #2a7fa8;
-  --text:        #c8dce8;
-  --text-dim:    #5a8098;
+  --text:        #d4e8f4;
+  --text-dim:    #8ab4cc;
   --text-hd:     #ffffff;
   --danger:      #e05555;
   --success:     #2aad6a;
@@ -758,18 +758,38 @@ body.dark {
 body.dark .input-tab:hover           { background: #1e3448; }
 body.dark .output-tab:hover          { background: #1e3448; }
 body.dark .qp-table .row-act         { background: #162030 !important; }
-body.dark .qp-table .drag-handle     { color: #3a6080; }
+body.dark .qp-table .drag-handle     { color: #4a7090; }
 body.dark tr.row-drag-over td        { background: #1a3a55 !important; }
 body.dark .row-del-btn:hover         { background: #3a1515; }
 body.dark .tree-node:hover           { background: rgba(58,175,216,0.12); }
 body.dark .tree-node .tree-actions button:hover { background: rgba(255,255,255,0.1); }
-body.dark .qp-table td input:focus   { background: #2a2600; border-radius: 2px; }
 body.dark .badge-ok                  { background: #0d2e1c; color: var(--success); }
 body.dark .badge-warn                { background: #2a1f00; color: var(--warn); }
 body.dark .badge-err                 { background: #2e0d0d; color: var(--danger); }
 body.dark .modal-backdrop            { background: rgba(0,0,0,0.6); }
-body.dark select                     { color-scheme: dark; }
 body.dark input[type="range"]        { accent-color: var(--accent); }
+
+/* Editable (yellow) cells — keep warm amber text to preserve the signal */
+body.dark .qp-table td.editable                  { color: #e8d458; }
+body.dark .qp-table td.editable input,
+body.dark .qp-table td.editable select           { color: #e8d458; }
+body.dark .qp-table td input:focus               { background: #3a3400; color: #f0e060; border-radius: 2px; }
+
+/* Calc cells — use a readable mid-blue, not the dim muted colour */
+body.dark .qp-table td.calc-cell                 { color: #8abcd4; }
+
+/* Selects everywhere: force dark styling so browser doesn't render black-on-white */
+body.dark select                                  { color-scheme: dark; color: var(--text); background-color: var(--bg-card); }
+body.dark .qp-table td select                     { background-color: transparent; color: inherit; }
+body.dark .form-row select                        { color: var(--text); background-color: var(--bg-input); }
+
+/* Form inputs (non-table) */
+body.dark .form-row input[type="text"],
+body.dark .form-row input[type="number"]          { color: var(--text); }
+
+/* Chart controls inputs */
+body.dark .chart-controls input[type="number"],
+body.dark .chart-controls select                  { color: var(--text); background: var(--bg-card); }
 
 /* Theme toggle button */
 .theme-toggle {
