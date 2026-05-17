@@ -48,7 +48,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 /* ── Header ─────────────────────────────────────────────────────── */
 .qp-header {
   height: var(--header-h);
-  background: #fff;
+  background: var(--bg-card);
   border-bottom: 2px solid var(--border-dk);
   display: flex;
   align-items: center;
@@ -120,7 +120,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   padding: 4px 10px;
   border: 1px solid var(--border-dk);
   border-radius: 4px;
-  background: #fff;
+  background: var(--bg-card);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -168,7 +168,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   width: 20px; height: 20px;
   border: 1px solid var(--accent);
   border-radius: 3px;
-  background: #fff;
+  background: var(--bg-card);
   color: var(--accent);
   font-size: 14px;
   line-height: 1;
@@ -233,7 +233,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 
 /* ── Center — Content ────────────────────────────────────────────── */
 .panel-center {
-  background: #fff;
+  background: var(--bg-card);
   overflow-y: auto;
   position: relative;
 }
@@ -275,7 +275,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
-  background: #fff;
+  background: var(--bg-card);
 }
 
 .output-canvas-wrap canvas { width: 100%; height: 100%; }
@@ -297,7 +297,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   text-transform: uppercase;
   letter-spacing: 0.06em;
   border-bottom: 1px solid var(--border);
-  background: #fff;
+  background: var(--bg-card);
 }
 
 .schematic-canvas-wrap {
@@ -317,7 +317,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   position: fixed;
   bottom: 0; left: 0; right: 0;
   height: var(--footer-h);
-  background: #fff;
+  background: var(--bg-card);
   border-top: 2px solid var(--border-dk);
   display: flex;
   align-items: center;
@@ -478,7 +478,7 @@ tr.row-drag-over td { background: #daf0fb !important; }
   padding: 4px 12px;
   border: 1px dashed var(--accent);
   border-radius: 4px;
-  background: #fff;
+  background: var(--bg-card);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -634,7 +634,7 @@ tr.row-drag-over td { background: #daf0fb !important; }
 .modal-backdrop.open { display: flex; }
 
 .modal {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 8px;
   padding: 20px 24px;
   min-width: 320px;
@@ -665,7 +665,7 @@ tr.row-drag-over td { background: #daf0fb !important; }
   border: 1px solid var(--border-dk);
 }
 
-.btn-cancel { background: #fff; color: var(--text); }
+.btn-cancel { background: var(--bg-card); color: var(--text); }
 .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .btn-primary:hover { background: var(--accent-lt); }
 
@@ -727,3 +727,61 @@ tr.row-drag-over td { background: #daf0fb !important; }
   color: #00e676 !important;
   font-weight: 700;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   DARK THEME  —  body.dark overrides all CSS variables + spot fixes
+   ══════════════════════════════════════════════════════════════════ */
+body.dark {
+  --bg:          #0e1520;
+  --bg-panel:    #162030;
+  --bg-card:     #1c2a3a;
+  --bg-table-hd: #1a5f7a;
+  --bg-table-alt:#162535;
+  --bg-input:    #2a2700;
+  --bg-calc:     #102030;
+  --accent:      #3aafd8;
+  --accent-lt:   #5ac8f0;
+  --accent-hl:   #f0c040;
+  --border:      #243a50;
+  --border-dk:   #2a7fa8;
+  --text:        #c8dce8;
+  --text-dim:    #5a8098;
+  --text-hd:     #ffffff;
+  --danger:      #e05555;
+  --success:     #2aad6a;
+  --warn:        #e0a020;
+
+  color-scheme: dark;
+}
+
+/* Spot overrides: rules that use hardcoded colours that can't be tokenised */
+body.dark .input-tab:hover           { background: #1e3448; }
+body.dark .output-tab:hover          { background: #1e3448; }
+body.dark .qp-table .row-act         { background: #162030 !important; }
+body.dark .qp-table .drag-handle     { color: #3a6080; }
+body.dark tr.row-drag-over td        { background: #1a3a55 !important; }
+body.dark .row-del-btn:hover         { background: #3a1515; }
+body.dark .tree-node:hover           { background: rgba(58,175,216,0.12); }
+body.dark .tree-node .tree-actions button:hover { background: rgba(255,255,255,0.1); }
+body.dark .qp-table td input:focus   { background: #2a2600; border-radius: 2px; }
+body.dark .badge-ok                  { background: #0d2e1c; color: var(--success); }
+body.dark .badge-warn                { background: #2a1f00; color: var(--warn); }
+body.dark .badge-err                 { background: #2e0d0d; color: var(--danger); }
+body.dark .modal-backdrop            { background: rgba(0,0,0,0.6); }
+body.dark select                     { color-scheme: dark; }
+body.dark input[type="range"]        { accent-color: var(--accent); }
+
+/* Theme toggle button */
+.theme-toggle {
+  width: 30px; height: 30px;
+  border: 1px solid var(--border-dk);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.theme-toggle:hover { background: var(--bg-panel); }

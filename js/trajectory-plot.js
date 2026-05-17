@@ -33,9 +33,10 @@ function _drawVS(survey) {
   const yMax = Math.max(...pts.map(p => p.tvd), 100) * 1.10;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, 'Horizontal Departure (ft)', 'TVD (ft)');
+  const C = _qpColors();
 
   // Title
-  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText('Vertical Section', g.l + g.pw / 2, g.t - 14);
 
@@ -65,7 +66,7 @@ function _drawVS(survey) {
     if (sy < g.t - 2 || sy > g.t + g.ph + 2) return;
 
     // Dashed horizontal line to shoe
-    ctx.strokeStyle = '#9ecce3'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
+    ctx.strokeStyle = C.border; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
     ctx.beginPath(); ctx.moveTo(g.l, sy); ctx.lineTo(bx, sy); ctx.stroke();
     ctx.setLineDash([]);
 
@@ -77,7 +78,7 @@ function _drawVS(survey) {
     ctx.lineTo(bx, sy + 4);
     ctx.closePath(); ctx.fill();
 
-    ctx.fillStyle = '#1a2b38'; ctx.font = '9px sans-serif';
+    ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText(`${row.size}" ${row.def}  ${Math.round(st.tvd)}'TVD`, bx + 9, sy);
   });
@@ -85,15 +86,15 @@ function _drawVS(survey) {
   // ── MD tick labels ──
   const last     = pts[pts.length - 1];
   const interval = _niceInterval(last.md, 6);
-  ctx.fillStyle = '#5a7a8e'; ctx.font = '9px sans-serif';
+  ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
   for (let md = interval; md < last.md - interval * 0.5; md += interval) {
     const st  = _interpSurvey(survey, md);
     const dep = Math.sqrt(st.north * st.north + st.east * st.east);
     const px  = g.l + (dep    / xMax) * g.pw;
     const py  = g.t + (st.tvd / yMax) * g.ph;
-    ctx.fillStyle = '#9ecce3';
+    ctx.fillStyle = C.border;
     ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#5a7a8e';
+    ctx.fillStyle = C.dim;
     ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
     ctx.fillText(Math.round(md) + "'", px - 3, py - 2);
   }
@@ -101,7 +102,7 @@ function _drawVS(survey) {
   // ── Surface marker ──
   ctx.fillStyle = '#2a7fa8';
   ctx.beginPath(); ctx.arc(g.l, g.t, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#1a2b38'; ctx.font = '9px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
   ctx.fillText('Surface  0\' MD', g.l + 7, g.t - 1);
 
@@ -110,7 +111,7 @@ function _drawVS(survey) {
   const tdy = g.t  + (last.tvd / yMax) * g.ph;
   ctx.fillStyle = '#c0392b';
   ctx.beginPath(); ctx.arc(tdx, tdy, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 9px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = 'bold 9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   const tdIndent = ctx.measureText('TD  ').width;
   ctx.fillText(`TD  ${Math.round(last.tvd).toLocaleString()}' TVD`, tdx + 7, tdy + 2);
@@ -150,30 +151,31 @@ function _drawPlan(survey) {
 
   // Grid
   const ticks = 4;
-  ctx.strokeStyle = '#e8f0f5'; ctx.lineWidth = 1;
+  const C = _qpColors();
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= ticks; i++) {
     const e = E0 + (i / ticks) * range;
     const n = N0 + (i / ticks) * range;
     ctx.beginPath(); ctx.moveTo(toX(e), PP.t); ctx.lineTo(toX(e), PP.t + ph); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(PP.l, toY(n)); ctx.lineTo(PP.l + pw, toY(n)); ctx.stroke();
-    ctx.fillStyle = '#5a7a8e'; ctx.font = '8px sans-serif';
+    ctx.fillStyle = C.dim; ctx.font = '8px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(_shortFt(e), toX(e), PP.t + ph + 3);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillText(_shortFt(n), PP.l - 2, toY(n));
   }
-  ctx.strokeStyle = '#9ecce3'; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(PP.l, PP.t, pw, ph);
 
   // Axis labels
-  ctx.fillStyle = '#5a7a8e'; ctx.font = '10px sans-serif';
+  ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillText('Easting (ft)', PP.l + pw / 2, H - 16);
   ctx.save(); ctx.translate(13, PP.t + ph / 2); ctx.rotate(-Math.PI / 2);
   ctx.fillText('Northing (ft)', 0, 0); ctx.restore();
 
   // Title
-  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText('Plan View', PP.l + pw / 2, PP.t - 14);
 
@@ -197,7 +199,7 @@ function _drawPlan(survey) {
 
   // North arrow (inside top-right of plot)
   const arX = PP.l + pw - 18, arY = PP.t + 26;
-  ctx.strokeStyle = '#1a2b38'; ctx.fillStyle = '#1a2b38'; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = C.text; ctx.fillStyle = C.text; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(arX, arY + 16); ctx.lineTo(arX, arY - 16); ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(arX, arY - 16); ctx.lineTo(arX - 5, arY - 4); ctx.lineTo(arX + 5, arY - 4);
@@ -210,7 +212,7 @@ function _drawPlan(survey) {
   ctx.beginPath(); ctx.arc(PP.l + 6, PP.t + ph - 18, 4, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#c0392b';
   ctx.beginPath(); ctx.arc(PP.l + 6, PP.t + ph - 6, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#1a2b38'; ctx.font = '9px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   ctx.fillText('Wellhead', PP.l + 13, PP.t + ph - 18);
   ctx.fillText('TD', PP.l + 13, PP.t + ph - 6);

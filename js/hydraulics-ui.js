@@ -38,11 +38,12 @@ function drawHydSweep(h) {
   const opY = g.t + (1 - h.pumpPressure / maxSPP) * g.ph;
   ctx.fillStyle = '#f0a500';
   ctx.beginPath(); ctx.arc(opX, opY, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#1a2b38'; ctx.font = '10px sans-serif';
+  const C = _qpColors();
+  ctx.fillStyle = C.text; ctx.font = '10px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
   ctx.fillText(`${h.flowRate} gpm / ${h.pumpPressure} psi`, opX + 8, opY - 2);
 
-  ctx.fillStyle = '#1a2b38'; ctx.font = '11px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = '11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   ctx.fillText(`ECD at bit: ${h.ecdAtBit} ppg   HSI: ${h.hsi?.toFixed(2) ?? '—'}`, g.l, g.t + 4);
 
@@ -53,6 +54,7 @@ function drawHydPie(h) {
   const c = _chartSetup('hydPieCanvas');
   if (!c) return;
   const { ctx, W, H } = c;
+  const C = _qpColors();
 
   if (!h?.pumpPressure) { _noData(ctx, W, H, '—'); return; }
 
@@ -76,7 +78,7 @@ function drawHydPie(h) {
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, radius, angle, angle + sweep);
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = C.bg; ctx.lineWidth = 2; ctx.stroke();
 
     // Label for slices > 10%
     if (sl.val / total > 0.08) {
@@ -91,12 +93,12 @@ function drawHydPie(h) {
   });
 
   // Centre hole
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = C.bg;
   ctx.beginPath(); ctx.arc(cx, cy, radius * 0.42, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(h.pumpPressure + ' psi', cx, cy - 6);
-  ctx.font = '9px sans-serif'; ctx.fillStyle = '#5a7a8e';
+  ctx.font = '9px sans-serif'; ctx.fillStyle = C.dim;
   ctx.fillText('Total SPP', cx, cy + 8);
 
   // Legend below
@@ -104,7 +106,7 @@ function drawHydPie(h) {
   slices.forEach(sl => {
     ctx.fillStyle = sl.color;
     ctx.fillRect(lx, ly, 10, 10);
-    ctx.fillStyle = '#1a2b38'; ctx.font = '9px sans-serif';
+    ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
     ctx.fillText(sl.label, lx + 13, ly);
     lx += Math.max(sl.label.length * 6 + 20, 52);

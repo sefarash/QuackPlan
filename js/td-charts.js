@@ -12,34 +12,36 @@ function _chartSetup(canvasId) {
   canvas.width  = rect.width  || canvas.parentElement.clientWidth  || 800;
   canvas.height = rect.height || canvas.parentElement.clientHeight || 500;
   const ctx = canvas.getContext('2d');
+  const C = _qpColors();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  return { ctx, W: canvas.width, H: canvas.height };
+  return { ctx, W: canvas.width, H: canvas.height, C };
 }
 
 function _chartGrid(ctx, W, H, xMax, yMax, xLabel, yLabel) {
   const { t, b, l, r } = CHART_PAD;
   const pw = W - l - r, ph = H - t - b;
+  const C = _qpColors();
 
-  ctx.strokeStyle = '#e8f0f5'; ctx.lineWidth = 1;
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
     const x = l + pw * i / 5;
     const y = t + ph * i / 5;
     ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
-    ctx.fillStyle = '#5a7a8e'; ctx.font = '10px sans-serif';
+    ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillText((xMax * i / 5).toFixed(0), x, t - 14);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillText((yMax * (5 - i) / 5).toFixed(0), l - 5, y);
   }
 
-  ctx.strokeStyle = '#9ecce3'; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(l, t, pw, ph);
 
   ctx.save();
-  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText(xLabel, l + pw / 2, t - 30);
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
@@ -204,7 +206,7 @@ function drawOverpull(r) {
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
   // BF annotation
-  ctx.fillStyle = '#5a7a8e'; ctx.font = '9px sans-serif';
+  ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
   ctx.textAlign = 'right'; ctx.textBaseline = 'top';
   ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} klbs`, g.l + g.pw - 4, g.t + 4);
 
@@ -331,7 +333,7 @@ function drawBroomstick(r) {
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hookload (kips)', 'MD (ft)');
 
-  ctx.fillStyle = '#5a7a8e'; ctx.font = '9px sans-serif';
+  ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} kips`,
     g.l + 4, g.t + 4);
@@ -371,7 +373,7 @@ function drawBroomstick(r) {
   const pw = g.pw, ph = g.ph;
   const labelMidY = g.t + ph * 0.65;
 
-  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = _qpColors().text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   ctx.fillText('Slack off', g.l + 6, labelMidY);
 
@@ -414,25 +416,26 @@ function drawBroomstick(r) {
 function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel) {
   const { t, b, l, r } = CHART_PAD;
   const pw = W - l - r, ph = H - t - b;
+  const C = _qpColors();
 
-  ctx.strokeStyle = '#e8f0f5'; ctx.lineWidth = 1;
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
     const x = l + pw * i / 5;
     const y = t + ph * i / 5;
     ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
-    ctx.fillStyle = '#5a7a8e'; ctx.font = '10px sans-serif';
+    ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillText((xMax * i / 5).toFixed(0), x, t - 14);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillText((yMax * i / 5).toFixed(0), l - 5, y);
   }
 
-  ctx.strokeStyle = '#9ecce3'; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(l, t, pw, ph);
 
   ctx.save();
-  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText(xLabel, l + pw / 2, t - 30);
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
@@ -456,11 +459,12 @@ function _chartLineDepthDown(ctx, pts, color, lw, g, xMax, yMax) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _legend(ctx, W, t, labels, colors) {
+  const C = _qpColors();
   let x = W - CHART_PAD.r - labels.reduce((s, l) => s + l.length * 7 + 24, 0);
   labels.forEach((lbl, i) => {
     ctx.fillStyle   = colors[i];
     ctx.fillRect(x, t + 4, 14, 4);
-    ctx.fillStyle   = '#1a2b38';
+    ctx.fillStyle   = C.text;
     ctx.font        = '10px sans-serif';
     ctx.textAlign   = 'left';
     ctx.textBaseline = 'middle';
@@ -470,7 +474,7 @@ function _legend(ctx, W, t, labels, colors) {
 }
 
 function _noData(ctx, W, H, msg) {
-  ctx.fillStyle = '#5a7a8e'; ctx.font = '13px sans-serif';
+  ctx.fillStyle = _qpColors().dim; ctx.font = '13px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(msg, W / 2, H / 2);
 }

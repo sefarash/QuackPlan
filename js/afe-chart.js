@@ -42,10 +42,11 @@ function drawAFE() {
   const ph = H - t - b;
 
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  const C = _qpColors();
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
 
   // Grid + axis labels
-  ctx.strokeStyle = '#e8f0f5'; ctx.lineWidth = 1;
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
     const y = t + ph * i / 5;
     const x = l + pw * i / 5;
@@ -54,7 +55,7 @@ function drawAFE() {
     ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
 
     // Left axis — Depth, 0 at top, maxDepth at bottom
-    ctx.fillStyle = '#5a7a8e'; ctx.font = '10px sans-serif';
+    ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillText((maxDepth * i / 5).toFixed(0), l - 5, y);
 
@@ -72,7 +73,7 @@ function drawAFE() {
       l + pw + 4, y);
   }
 
-  ctx.strokeStyle = '#9ecce3'; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(l, t, pw, ph);
 
   // Axis titles
@@ -80,7 +81,7 @@ function drawAFE() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   ctx.fillText('Cum. Days', l + pw / 2, t - 20);
 
-  ctx.fillStyle = '#5a7a8e';
+  ctx.fillStyle = C.dim;
   ctx.save(); ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   ctx.fillText('Depth (ft)', 0, 0); ctx.restore();
@@ -124,7 +125,7 @@ function drawAFE() {
 
     // Label — flip side and above/below to reduce crowding
     const nearRight = x > l + pw * 0.6;
-    ctx.fillStyle = '#1a3a50'; ctx.font = '9px sans-serif';
+    ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
     ctx.textAlign    = nearRight ? 'right' : 'left';
     ctx.textBaseline = i % 2 === 0 ? 'bottom' : 'top';
     ctx.fillText(a.name, nearRight ? x - 5 : x + 5, i % 2 === 0 ? y - 4 : y + 4);
@@ -150,7 +151,7 @@ function drawAFE() {
   });
 
   // Total summary
-  ctx.fillStyle = '#1a2b38'; ctx.font = 'bold 11px sans-serif';
+  ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   const totalCostFmt = cumCost >= 1e6
     ? '$' + (cumCost / 1e6).toFixed(2) + 'M'

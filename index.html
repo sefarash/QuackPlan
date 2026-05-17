@@ -41,6 +41,7 @@
     </div>
     <button class="hdr-btn" onclick="showNewProjectModal()">+ Project</button>
     <button class="hdr-btn primary" onclick="qpCompute()">⚡ Compute</button>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark / light theme">🌙</button>
   </div>
 </header>
 
@@ -637,6 +638,15 @@
   </div>
 </div>
 
+<!-- ═══════════════════════ THEME INIT (before paint) ═══════════════════════ -->
+<script>
+  (function() {
+    if (localStorage.getItem('qp_theme') === 'dark') {
+      document.body.classList.add('dark');
+    }
+  })();
+</script>
+
 <!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
 <script src="js/chart-interaction.js"></script>
 <script src="js/survey-engine.js"></script>
@@ -664,7 +674,23 @@
 <script src="js/row-drag.js"></script>
 <script src="js/output-controls.js"></script>
 <script>
+  // ── Theme toggle ──────────────────────────────────────────────────
+  function toggleTheme() {
+    const dark = document.body.classList.toggle('dark');
+    localStorage.setItem('qp_theme', dark ? 'dark' : 'light');
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = dark ? '☀️' : '🌙';
+    // redraw charts so they repaint on the new background
+    window.dispatchEvent(new Event('resize'));
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    // Sync toggle icon with restored theme
+    if (document.body.classList.contains('dark')) {
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = '☀️';
+    }
+
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
      'hydSweepCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','ktCanvas'].forEach(id => CI.attach(id));

@@ -1,4 +1,18 @@
 // ===== GLOBAL STATE =====
+
+// Returns theme-aware canvas colors, read from CSS variables at draw time.
+function _qpColors() {
+  const s   = getComputedStyle(document.documentElement);
+  const get = v => s.getPropertyValue(v).trim();
+  const dark = document.body.classList.contains('dark');
+  return {
+    bg:     get('--bg-card')  || '#ffffff',
+    grid:   dark ? '#1e3448' : '#e8f0f5',
+    border: get('--border')   || '#9ecce3',
+    dim:    get('--text-dim') || '#5a7a8e',
+    text:   get('--text')     || '#1a2b38',
+  };
+}
 let qpState = {
   activeInputTab:  'trajectory',
   activeOutputTab: null,
