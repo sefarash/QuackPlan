@@ -755,6 +755,15 @@ body.dark {
 }
 
 /* Spot overrides: rules that use hardcoded colours that can't be tokenised */
+
+/* Hierarchy — explicit text colour so cascade/color-scheme don't wash it out */
+body.dark .panel-hierarchy           { color: var(--text); }
+body.dark .tree-node                 { color: var(--text); }
+body.dark .tree-node[data-level="4"] { color: var(--text-dim); }
+body.dark .tree-node.active,
+body.dark .tree-node.selected        { color: #fff; }
+body.dark .hierarchy-header          { color: var(--accent); }
+
 body.dark .input-tab:hover           { background: #1e3448; }
 body.dark .output-tab:hover          { background: #1e3448; }
 body.dark .qp-table .row-act         { background: #162030 !important; }
