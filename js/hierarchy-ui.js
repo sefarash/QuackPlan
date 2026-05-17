@@ -13,23 +13,57 @@ const NODE_LABELS = {
 let _modalCallback = null;   // fn(name) called on OK
 let _editNodeId    = null;   // non-null when renaming
 
-// ── Gate: block inputs when no scenario is selected ───────────────────────────
+// ── Gate: controls input access based on selection level ─────────────────────
+//
+//  Levels:
+//    locked   — nothing / project / field / well selected
+//               → full overlay, Run disabled, all tabs inaccessible
+//    borehole — borehole selected (no scenario)
+//               → overlay hidden, Trajectory / Well Schematic / PPFG / Activity active
+//               → Casing/BHA + Drilling Fluid grayed out, Run disabled
+//    scenario — scenario selected
+//               → all tabs active, Run enabled
+//
 function _updateGate() {
-  const locked  = !qpState.currentScenarioId;
+  const hasScenario = !!qpState.currentScenarioId;
+  const hasBorehole = !!qpState.currentBoreholeId;
+  const locked      = !hasBorehole && !hasScenario;
+
+  // ── Overlay ──
   const overlay = document.getElementById('gateOverlay');
   const center  = document.getElementById('centerPanel');
-  const runBtn  = document.querySelector('.hdr-btn.primary');
-
   if (overlay) overlay.classList.toggle('active', locked);
-  if (center)  {
+  if (center) {
     center.classList.toggle('locked', locked);
     if (locked) center.scrollTop = 0;
   }
+
+  // ── Run button ──
+  const runBtn = document.querySelector('.hdr-btn.primary');
   if (runBtn) {
-    runBtn.disabled = locked;
-    runBtn.style.opacity = locked ? '0.35' : '';
-    runBtn.style.cursor  = locked ? 'not-allowed' : '';
+    const runLocked = !hasScenario;
+    runBtn.disabled          = runLocked;
+    runBtn.style.opacity     = runLocked ? '0.35' : '';
+    runBtn.style.cursor      = runLocked ? 'not-allowed' : '';
   }
+
+  // ── Per-tab access ──
+  _setTabDisabled('tabBha',   !hasScenario);
+  _setTabDisabled('tabFluid', !hasScenario);
+
+  // If the active tab just became disabled, fall back to Trajectory
+  const activeTab = qpState.activeInputTab;
+  if (!hasScenario && (activeTab === 'bha' || activeTab === 'fluid')) {
+    const trajBtn = document.querySelector('#inputTabs .input-tab');
+    if (trajBtn) switchInputTab('trajectory', trajBtn);
+  }
+}
+
+function _setTabDisabled(id, disabled) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.disabled = disabled;
+  btn.classList.toggle('tab-disabled', disabled);
 }
 
 // Collapsed node IDs persisted in localStorage
@@ -63,6 +97,7 @@ function _renderNode(parent, node, depth) {
   row.dataset.id    = node.id;
 
   const isActive = node.id === qpState.currentScenarioId
+                || node.id === qpState.currentBoreholeId
                 || node.id === qpState.currentWellId;
   if (isActive) row.classList.add('active');
 
@@ -147,17 +182,37 @@ function _renderNode(parent, node, depth) {
 function _selectNode(node) {
   if (node.type === 'scenario') {
     qpState.currentScenarioId = node.id;
+    qpState.currentBoreholeId = node.parentId;
     // Walk up borehole → well to get name and datums
     dbGet(node.parentId).then(bh => bh ? dbGet(bh.parentId) : null).then(well => {
       setHeaderContext(well ? well.name : '?', node.name);
       _applyWellDatums(well);
     });
     _loadScenario(node.id);
+
+  } else if (node.type === 'borehole') {
+    qpState.currentBoreholeId = node.id;
+    qpState.currentScenarioId = null;
+    // Walk up to well for datums
+    dbGet(node.parentId).then(well => {
+      setHeaderContext(well ? well.name : '?', node.name);
+      _applyWellDatums(well);
+    });
+
   } else if (node.type === 'well') {
-    qpState.currentWellId = node.id;
+    qpState.currentWellId     = node.id;
+    qpState.currentBoreholeId = null;
+    qpState.currentScenarioId = null;
     setHeaderContext(node.name, '—');
     _applyWellDatums(node);
+
+  } else {
+    // project or field — clear everything below
+    qpState.currentBoreholeId = null;
+    qpState.currentScenarioId = null;
+    setHeaderContext('No well selected', '—');
   }
+
   _updateGate();
   hierarchyRefresh();
 }
@@ -279,8 +334,11 @@ function _promptRename(node) {
 
 function _confirmDelete(node) {
   if (!confirm('Delete "' + node.name + '" and all its children?')) return;
-  if (node.id === qpState.currentScenarioId) qpState.currentScenarioId = null;
+  if (node.id === qpState.currentScenarioId)  qpState.currentScenarioId  = null;
+  if (node.id === qpState.currentBoreholeId) qpState.currentBoreholeId = null;
   if (node.id === qpState.currentWellId)     qpState.currentWellId     = null;
+  // Deleting a borehole also invalidates any child scenario
+  if (node.type === 'borehole') qpState.currentScenarioId = null;
   dbDelete(node.id).then(() => {
     setHeaderContext('No well selected', '—');
     _updateGate();

@@ -17,8 +17,9 @@ let qpState = {
   activeInputTab:  'trajectory',
   activeOutputTab: null,
   activeTrajOpt:   'opt1',
-  currentWellId:   null,
-  currentScenarioId: null,
+  currentWellId:      null,
+  currentBoreholeId:  null,
+  currentScenarioId:  null,
   wellDatums:      null,   // { rkb, gl } from the parent well node
   survey:          [],
   tdResult:        null,

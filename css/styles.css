@@ -102,6 +102,13 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   border-color: var(--bg-table-hd);
 }
 
+.input-tab.tab-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.input-tab.tab-disabled:hover { background: transparent; }
+
 .header-right {
   margin-left: auto;
   display: flex;
@@ -305,6 +312,15 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   color: var(--accent);
   font-weight: 700;
 }
+
+.gate-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.gate-hint strong { color: var(--accent); }
 
 /* Input panels */
 .input-panel {

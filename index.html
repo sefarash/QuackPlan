@@ -27,8 +27,8 @@
   <nav class="input-tabs" id="inputTabs">
     <button class="input-tab active" onclick="switchInputTab('trajectory',this)">Trajectory</button>
     <button class="input-tab" onclick="switchInputTab('schematic',this)">Well Schematic</button>
-    <button class="input-tab" onclick="switchInputTab('bha',this)">Casing / BHA</button>
-    <button class="input-tab" onclick="switchInputTab('fluid',this)">Drilling Fluid</button>
+    <button class="input-tab" id="tabBha"   onclick="switchInputTab('bha',this)">Casing / BHA</button>
+    <button class="input-tab" id="tabFluid" onclick="switchInputTab('fluid',this)">Drilling Fluid</button>
     <button class="input-tab" onclick="switchInputTab('ppfg',this)">PPFG</button>
     <button class="input-tab" onclick="switchInputTab('activity',this)">Activity</button>
   </nav>
@@ -72,9 +72,10 @@
           <span>Project</span><span class="gate-arrow">→</span>
           <span>Field</span><span class="gate-arrow">→</span>
           <span>Well</span><span class="gate-arrow">→</span>
-          <span>Borehole</span><span class="gate-arrow">→</span>
-          <span class="gate-step-active">Scenario</span>
+          <span class="gate-step-active">Borehole</span><span class="gate-arrow">→</span>
+          <span>Scenario</span>
         </div>
+        <p class="gate-hint">Select a <strong>Borehole</strong> to access Trajectory, Schematic, PPFG &amp; Activity.<br>Add a <strong>Scenario</strong> to unlock Casing/BHA and Drilling Fluid.</p>
         <button class="btn btn-primary" onclick="showNewProjectModal()">+ New Project</button>
       </div>
     </div>
