@@ -62,6 +62,23 @@
   <!-- CENTER — Input + Output panels -->
   <div class="panel-center" id="centerPanel">
 
+    <!-- ── GATE OVERLAY — shown when no scenario is selected ── -->
+    <div class="gate-overlay" id="gateOverlay">
+      <div class="gate-message">
+        <div class="gate-duck">🦆</div>
+        <h2>No scenario selected</h2>
+        <p>Build your project hierarchy to start entering well data.</p>
+        <div class="gate-steps">
+          <span>Project</span><span class="gate-arrow">→</span>
+          <span>Field</span><span class="gate-arrow">→</span>
+          <span>Well</span><span class="gate-arrow">→</span>
+          <span>Borehole</span><span class="gate-arrow">→</span>
+          <span class="gate-step-active">Scenario</span>
+        </div>
+        <button class="btn btn-primary" onclick="showNewProjectModal()">+ New Project</button>
+      </div>
+    </div>
+
     <!-- ── INPUT PANELS ── -->
 
     <!-- Trajectory -->

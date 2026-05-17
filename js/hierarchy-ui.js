@@ -13,6 +13,25 @@ const NODE_LABELS = {
 let _modalCallback = null;   // fn(name) called on OK
 let _editNodeId    = null;   // non-null when renaming
 
+// ── Gate: block inputs when no scenario is selected ───────────────────────────
+function _updateGate() {
+  const locked  = !qpState.currentScenarioId;
+  const overlay = document.getElementById('gateOverlay');
+  const center  = document.getElementById('centerPanel');
+  const runBtn  = document.querySelector('.hdr-btn.primary');
+
+  if (overlay) overlay.classList.toggle('active', locked);
+  if (center)  {
+    center.classList.toggle('locked', locked);
+    if (locked) center.scrollTop = 0;
+  }
+  if (runBtn) {
+    runBtn.disabled = locked;
+    runBtn.style.opacity = locked ? '0.35' : '';
+    runBtn.style.cursor  = locked ? 'not-allowed' : '';
+  }
+}
+
 // Collapsed node IDs persisted in localStorage
 const _collapsed = new Set(
   JSON.parse(localStorage.getItem('qp_collapsed') || '[]')
@@ -139,6 +158,7 @@ function _selectNode(node) {
     setHeaderContext(node.name, '—');
     _applyWellDatums(node);
   }
+  _updateGate();
   hierarchyRefresh();
 }
 
@@ -263,6 +283,7 @@ function _confirmDelete(node) {
   if (node.id === qpState.currentWellId)     qpState.currentWellId     = null;
   dbDelete(node.id).then(() => {
     setHeaderContext('No well selected', '—');
+    _updateGate();
     hierarchyRefresh();
   });
 }
@@ -310,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const lastId = +localStorage.getItem('qp_lastScenarioId');
   if (lastId) {
     dbGet(lastId).then(node => {
-      if (!node) return;
+      if (!node) { _updateGate(); return; }
       qpState.currentScenarioId = lastId;
       _loadScenario(lastId);
       // Restore header context and well datums
@@ -320,8 +341,11 @@ document.addEventListener('DOMContentLoaded', () => {
           setHeaderContext(well?.name || '?', node.name);
           _applyWellDatums(well);
         });
+      _updateGate();
       hierarchyRefresh();
     });
+  } else {
+    _updateGate();
   }
 });
 
