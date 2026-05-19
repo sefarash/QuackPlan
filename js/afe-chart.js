@@ -21,15 +21,22 @@ function drawAFE() {
   });
 
   // Inject casing costs as cost steps at each casing shoe depth (length = shoe MD)
+  let unallocated = 0;
   (act.casingCosts || []).filter(c => c.total > 0 && c.length > 0).forEach(c => {
     const shoeDepth = +(c.length);
     const casCost   = +(c.total);
-    pts.forEach(p => { if (p.depth >= shoeDepth) p.cost += casCost; });
+    let applied = false;
+    pts.forEach(p => { if (p.depth >= shoeDepth) { p.cost += casCost; applied = true; } });
+    if (!applied) unallocated += casCost;  // shoe beyond TD — defer to last point
     cumCost += casCost;
   });
 
   const lumpSum = act.services.reduce((s, sv) => s + (sv.lumpSum || 0), 0);
+  unallocated += lumpSum;
   cumCost += lumpSum;
+
+  // Flush any unallocated costs to the last activity point so the curve reaches day 0
+  if (unallocated > 0 && pts.length > 1) pts[pts.length - 1].cost += unallocated;
 
   const maxDepth = Math.max(...pts.map(p => p.depth), 1);
   const maxDays  = Math.max(...pts.map(p => p.days), 1);
