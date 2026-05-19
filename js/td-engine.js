@@ -153,6 +153,8 @@ function _march(elements, axialSign, hasTorque, T0, tau0, ffs) {
 }
 
 // ----- Dawson-Paslay sinusoidal + Chen helical buckling -----
+// Dawson-Paslay (1984):  F_sin = 2 * sqrt(EI * w_lbf/in * sin(α) / r)
+// Chen-Cheung-Cheatham (1990): F_hel = 2√2 * sqrt(…) = √2 * F_sin
 function _buckling(elements, rotOnStations) {
   const bkSt = [];
   let firstSin = null, firstHel = null, overall = 'OK';
@@ -167,7 +169,7 @@ function _buckling(elements, rotOnStations) {
     if (sinA > 1e-4) {
       const sq = _K.E * el.I * (el.W_bl / 12) * sinA / el.rCl_in;
       fSin = 2 * Math.sqrt(Math.max(sq, 0));
-      fHel = 2 * Math.SQRT2 * fSin;
+      fHel = Math.SQRT2 * fSin;   // ratio = √2 per Chen et al.
     }
 
     const status =
