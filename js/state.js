@@ -90,6 +90,7 @@ function redrawOutputPanel(name) {
   else if (name === 'hydraulics' && h)           { drawHydSweep(h); drawHydPie(h); }
   else if (name === 'surgeswab')                 drawSurgeSwab();
   else if (name === 'afe')                       drawAFE();
+  else if (name === 'finaldiagram')              drawFinalDiagram();
   else if (name === 'cd')                        drawCasingDesign();
   else if (name === 'kt')                        drawKickTolerance();
 }

@@ -601,6 +601,18 @@
       </div>
     </div>
 
+    <!-- Final Diagram -->
+    <div id="panel-finaldiagram" class="output-panel">
+      <div class="chart-controls">
+        <span class="text-dim">Wellbore completion diagram — elements from Handover table</span>
+        <button class="hdr-btn" onclick="drawFinalDiagram()">Redraw</button>
+        <button class="hdr-btn" onclick="exportChartPNG('finalDiagramCanvas','final-diagram.png')">⬇ PNG</button>
+      </div>
+      <div class="output-canvas-wrap">
+        <canvas id="finalDiagramCanvas"></canvas>
+      </div>
+    </div>
+
     <!-- Initial AFE -->
     <div id="panel-afe" class="output-panel">
       <div class="chart-controls">
@@ -639,6 +651,7 @@
     <button class="output-tab" onclick="switchOutputTab('cd',this)">Casing Design</button>
     <button class="output-tab" onclick="switchOutputTab('kt',this)">Kick Tolerance</button>
     <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
+    <button class="output-tab" onclick="switchOutputTab('finaldiagram',this)">Final Diagram</button>
   </nav>
   <div class="footer-right" id="footerStatus">Ready</div>
 </footer>
@@ -716,6 +729,7 @@
 <script src="js/td-charts.js"></script>
 <script src="js/hydraulics-ui.js"></script>
 <script src="js/surge-swab.js"></script>
+<script src="js/final-diagram.js"></script>
 <script src="js/afe-chart.js"></script>
 <script src="js/trajectory-plot.js"></script>
 <script src="js/export.js"></script>
@@ -743,7 +757,8 @@
 
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
-     'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','ktCanvas'].forEach(id => CI.attach(id));
+     'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','ktCanvas',
+     'finalDiagramCanvas'].forEach(id => CI.attach(id));
 
     makeRowsDraggable('traj1Body',      traj1Recalc);
     makeRowsDraggable('traj2Body',      traj2Recalc);
