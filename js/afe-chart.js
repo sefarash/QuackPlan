@@ -1,5 +1,8 @@
 // ===== AFE CHART =====
 // Depth on left-Y (depth-down), Cum. Days on top-X, Cum. Cost on right-Y
+// Both curves share the Days X axis:
+//   Days curve  — x=days, y=depth   (top-left → bottom-right)
+//   Cost curve  — x=days, y=cost    (bottom-left → top-right, read off right axis)
 
 function drawAFE() {
   const c = _chartSetup('afeCanvas');
@@ -32,10 +35,13 @@ function drawAFE() {
   });
 
   const lumpSum = act.services.reduce((s, sv) => s + (sv.lumpSum || 0), 0);
-  unallocated += lumpSum;
   cumCost += lumpSum;
 
-  // Flush any unallocated costs to the last activity point so the curve reaches day 0
+  // Lump sums are up-front costs — add to every point so the curve starts from day 0
+  // at the correct cost level (they're already baked into cumCost for the total).
+  if (lumpSum > 0) pts.forEach(p => { p.cost += lumpSum; });
+
+  // Flush any casing costs that couldn't be applied (shoe beyond TD) to the last point
   if (unallocated > 0 && pts.length > 1) pts[pts.length - 1].cost += unallocated;
 
   const maxDepth = Math.max(...pts.map(p => p.depth), 1);
@@ -108,12 +114,12 @@ function drawAFE() {
   });
   ctx.stroke();
 
-  // Cost curve: x=cost (inverted — $0 at right, $maxCost at left), y=depth
+  // Cost curve: x=days (shared X axis), y=cost mapped to right Y axis (bottom=$0, top=$maxCost)
   ctx.strokeStyle = '#1a7a4a'; ctx.lineWidth = 2;
   ctx.beginPath();
   pts.forEach((p, i) => {
-    const x = l + (1 - p.cost / maxCost) * pw;
-    const y = t + (p.depth / maxDepth) * ph;
+    const x = l + (p.days / maxDays) * pw;
+    const y = t + (1 - p.cost / maxCost) * ph;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
