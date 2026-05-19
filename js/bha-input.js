@@ -538,6 +538,36 @@ function mwdTableChange() {
   }
   const el = document.getElementById('mwdTotalDisplay');
   if (el) el.textContent = total.toLocaleString() + ' psi';
+  mwdSave();
+}
+
+function mwdSave() {
+  if (!qpState.currentScenarioId) return;
+  const rows = [];
+  for (const tr of document.getElementById('mwdBody').rows) {
+    const inputs = tr.querySelectorAll('input');
+    rows.push({ name: inputs[0]?.value ?? '', psi: +(inputs[1]?.value ?? 0) });
+  }
+  dbSaveScenarioData(qpState.currentScenarioId, 'mwd', rows);
+}
+
+function mwdLoadState(data) {
+  const body = document.getElementById('mwdBody');
+  body.innerHTML = '';
+  const rows = (data && data.length) ? data : [
+    { name: 'MWD',          psi: 400 },
+    { name: 'Drive System', psi: 750 },
+  ];
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="drag-handle">⠿</td>
+      <td class="editable"><input value="${r.name ?? ''}" onchange="mwdTableChange()"></td>
+      <td class="editable"><input type="number" value="${+(r.psi ?? 0)}" onchange="mwdTableChange()"></td>
+      <td class="row-act"></td>`;
+    body.appendChild(tr);
+  });
+  mwdTableChange();
 }
 
 // ── Init: seed a minimal BHA on first load ─────────────────────────────────────
@@ -552,5 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('nozzleBody').rows.length) {
     nozzleAddRow();
   }
-  mwdTableChange();
+  if (!document.getElementById('mwdBody').rows.length) {
+    mwdLoadState(null);  // seeds MWD + Drive System defaults
+  }
 });

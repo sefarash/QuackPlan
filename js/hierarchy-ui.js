@@ -232,11 +232,14 @@ function _loadScenario(id) {
     // Clear all tables first so stale rows don't persist
     document.getElementById('traj1Body').innerHTML      = '';
     document.getElementById('traj2Body').innerHTML      = '';
+    document.getElementById('tortBody').innerHTML       = '';
     document.getElementById('schematicBody').innerHTML  = '';
     document.getElementById('bhaBody').innerHTML        = '';
     document.getElementById('nozzleBody').innerHTML     = '';
+    document.getElementById('mwdBody').innerHTML        = '';
     document.getElementById('activityBody').innerHTML   = '';
     document.getElementById('servicesBody').innerHTML   = '';
+    document.getElementById('casingCostBody').innerHTML = '';
 
     if (d.traj1 && d.traj1.length) {
       trajLoadRows(d.traj1);
@@ -250,6 +253,8 @@ function _loadScenario(id) {
     if (d.fluid)     fluidLoadState(d.fluid);
     if (d.bha)       bhaLoadState(d.bha);
     if (d.nozzles)   nozzleLoadState(d.nozzles);
+                     mwdLoadState(d.mwd);
+    if (d.tort)      tortLoadState(d.tort);
     if (d.activity)  activityLoadState(d.activity);
     if (d.ppfg)      ppfgLoadState(d.ppfg);
 

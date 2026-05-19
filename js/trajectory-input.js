@@ -326,6 +326,39 @@ function tortRecalc() {
 
   if (typeof drawSchematic === 'function') drawSchematic(survey);
   if (typeof qpCompute === 'function') qpCompute();
+
+  tortSave();
+}
+
+function tortSave() {
+  if (!qpState.currentScenarioId) return;
+  const rows = [];
+  for (const tr of document.getElementById('tortBody').rows) {
+    const inputs = tr.querySelectorAll('input[type=number]');
+    const sel    = tr.querySelector('select');
+    rows.push({
+      startMD: inputs[0]?.value ?? 0,
+      endMD:   inputs[1]?.value ?? 5000,
+      tort:    inputs[2]?.value ?? 0.5,
+      mode:    sel?.value ?? 'random',
+    });
+  }
+  dbSaveScenarioData(qpState.currentScenarioId, 'tort', rows);
+}
+
+function tortLoadState(data) {
+  const body = document.getElementById('tortBody');
+  body.innerHTML = '';
+  (data || []).forEach(r => {
+    tortAddRow();
+    const tr     = body.rows[body.rows.length - 1];
+    const inputs = tr.querySelectorAll('input[type=number]');
+    const sel    = tr.querySelector('select');
+    if (inputs[0]) inputs[0].value = r.startMD ?? 0;
+    if (inputs[1]) inputs[1].value = r.endMD   ?? 5000;
+    if (inputs[2]) inputs[2].value = r.tort    ?? 0.5;
+    if (sel) sel.value = r.mode ?? 'random';
+  });
 }
 
 // ── Well Schematic table ──────────────────────────────────────────────────────
