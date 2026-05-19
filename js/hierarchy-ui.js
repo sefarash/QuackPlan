@@ -240,6 +240,7 @@ function _loadScenario(id) {
     document.getElementById('activityBody').innerHTML   = '';
     document.getElementById('servicesBody').innerHTML   = '';
     document.getElementById('casingCostBody').innerHTML = '';
+    document.getElementById('handoverBody').innerHTML   = '';
 
     if (d.traj1 && d.traj1.length) {
       trajLoadRows(d.traj1);
@@ -256,6 +257,7 @@ function _loadScenario(id) {
                      mwdLoadState(d.mwd);
     if (d.tort)      tortLoadState(d.tort);
     if (d.activity)  activityLoadState(d.activity);
+                     handoverLoadState(d.handover);
     if (d.ppfg)      ppfgLoadState(d.ppfg);
 
     // Persist last-used scenario ID so reload restores it

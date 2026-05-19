@@ -31,6 +31,7 @@
     <button class="input-tab" id="tabFluid" onclick="switchInputTab('fluid',this)">Drilling Fluid</button>
     <button class="input-tab" onclick="switchInputTab('ppfg',this)">PPFG</button>
     <button class="input-tab" onclick="switchInputTab('activity',this)">Activity</button>
+    <button class="input-tab" onclick="switchInputTab('handover',this)">Handover</button>
   </nav>
 
   <div class="header-right">
@@ -355,6 +356,25 @@
           <button class="add-row-btn" onclick="casingCostAddRow()">+ Add casing</button>
         </div>
       </div>
+    </div>
+
+    <!-- Handover -->
+    <div id="panel-handover" class="input-panel">
+      <div class="panel-title">🗂 Handover</div>
+      <table class="qp-table" id="handoverTable">
+        <thead>
+          <tr>
+            <th class="drag-col"></th>
+            <th>Element</th>
+            <th>Size / Type</th>
+            <th>Top MD (ft)</th>
+            <th>Bottom MD (ft)</th>
+            <th class="row-act"></th>
+          </tr>
+        </thead>
+        <tbody id="handoverBody"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="handoverAddRow()">+ Add element</button>
     </div>
 
     <!-- PPFG Input -->
@@ -691,6 +711,7 @@
 <script src="js/bha-input.js"></script>
 <script src="js/fluid-input.js"></script>
 <script src="js/activity-input.js"></script>
+<script src="js/handover-input.js"></script>
 <script src="js/compute-engine.js"></script>
 <script src="js/td-charts.js"></script>
 <script src="js/hydraulics-ui.js"></script>
@@ -731,6 +752,7 @@
     makeRowsDraggable('bhaBody',        bhaSave);
     makeRowsDraggable('nozzleBody',     nozzleRecalc);
     makeRowsDraggable('mwdBody',        mwdTableChange);
+    makeRowsDraggable('handoverBody',    handoverSave);
     makeRowsDraggable('activityBody',    activityRecalc);
     makeRowsDraggable('servicesBody',    activityRecalc);
     makeRowsDraggable('casingCostBody',  casingCostRecalc);
