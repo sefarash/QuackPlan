@@ -37,9 +37,10 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
   const SS = 'style="display:block;width:100%;font-size:10px;padding:1px 2px;box-sizing:border-box"';
   const IS = 'style="width:100%;font-size:10px;padding:1px 2px;box-sizing:border-box"';
 
-  const isDP   = comp === 'Drill Pipe';
-  const isDC   = comp === 'Drill Collar';
-  const isHWDP = comp === 'HWDP';
+  const isDP     = comp === 'Drill Pipe';
+  const isDC     = comp === 'Drill Collar';
+  const isHWDP   = comp === 'HWDP';
+  const isCasing = comp === 'Casing';
 
   const safeConn = String(_conn).replace(/"/g, '&quot;');
 
@@ -82,11 +83,23 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
         style="${isCustom ? '' : 'display:none;'}width:100%;font-size:10px;margin-top:2px;box-sizing:border-box"
         oninput="_bhaOdCustomInput(this)">
       <input class="bha-od-n" type="hidden" value="${_od}">`;
+  } else if (isCasing) {
+    const isCustom = catOD === 'custom';
+    const opts = CATALOGUE_ODS.map(o =>
+      `<option value="${o}"${o === catOD ? ' selected' : ''}>${o}"</option>`).join('');
+    odCell = `<select class="bha-cat-od" ${SS} onchange="_bhaCasingODChanged(this)">
+        <option value="">OD…</option>${opts}
+        <option value="custom"${isCustom ? ' selected' : ''}>Custom…</option></select>
+      <input class="bha-od-custom" type="number" step="0.125" placeholder="OD (in)"
+        value="${isCustom ? _od : ''}"
+        style="${isCustom ? '' : 'display:none;'}width:100%;font-size:10px;margin-top:2px;box-sizing:border-box"
+        oninput="_bhaOdCustomInput(this)">
+      <input class="bha-od-n" type="hidden" value="${_od}">`;
   } else {
     odCell = `<input class="bha-od-n" type="number" step="0.125" value="${_od}" ${IS} onchange="bhaSave()">`;
   }
 
-  // ── Nom. Weight column (DP only) ──────────────────────────────────────────
+  // ── Nom. Weight column (DP and Casing) ────────────────────────────────────
   let nomWtCell;
   if (isDP) {
     const nomWts = (catOD && catOD !== 'custom') ? dpNomWtsByOD(catOD) : [];
@@ -94,6 +107,14 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
       `<option value="${w}"${w == catNomWt ? ' selected' : ''}>${w} ppf</option>`).join('');
     nomWtCell = `<select class="bha-cat-nomwt" ${SS} onchange="_bhaDPNomWtChanged(this)">
         <option value="">Wt…</option>${nomWtOpts}</select>`;
+  } else if (isCasing) {
+    const wts = (catOD && catOD !== 'custom')
+      ? [...new Set(catalogueByOD(catOD).map(r => r[1]))]
+      : [];
+    const wtOpts = wts.map(w =>
+      `<option value="${w}"${w == catNomWt ? ' selected' : ''}>${w} ppf</option>`).join('');
+    nomWtCell = `<select class="bha-cat-nomwt" ${SS} onchange="_bhaCasingNomWtChanged(this)">
+        <option value="">Wt…</option>${wtOpts}</select>`;
   } else {
     nomWtCell = ``;
   }
@@ -121,6 +142,14 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
         <option value="conv"${!isSp ? ' selected' : ''}>Conv</option>
         <option value="spiral"${isSp ? ' selected' : ''}>Spiral</option>
       </select>`;
+  } else if (isCasing) {
+    const grades = (catOD && catOD !== 'custom' && catNomWt)
+      ? [...new Set(catalogueByOD(catOD).filter(r => r[1] === +catNomWt).map(r => r[2]))]
+      : [];
+    const grOpts = grades.map(g =>
+      `<option value="${g}"${g === catGrade ? ' selected' : ''}>${g}</option>`).join('');
+    gradeCell = `<select class="bha-cat-grade" ${SS} onchange="_bhaCasingGradeChanged(this)">
+        <option value="">Grade…</option>${grOpts}</select>`;
   } else {
     const gradeOpts = BHA_GRADES.map(g =>
       `<option${g === _gr ? ' selected' : ''}>${g}</option>`).join('');
@@ -401,6 +430,60 @@ function _bhaHWDPConnChanged(sel) {
   bhaSave();
 }
 
+// ── Casing catalogue cascade ──────────────────────────────────────────────────
+
+function _bhaCasingODChanged(sel) {
+  const tr       = sel.closest('tr');
+  const od       = sel.value;
+  const custom   = tr.querySelector('.bha-od-custom');
+  const odN      = tr.querySelector('.bha-od-n');
+  const nomWtSel = tr.querySelector('.bha-cat-nomwt');
+  const grSel    = tr.querySelector('.bha-cat-grade');
+
+  if (od === 'custom') {
+    if (custom) custom.style.display = '';
+    if (nomWtSel) nomWtSel.innerHTML = '<option value="">Wt…</option>';
+    if (grSel)   grSel.innerHTML    = '<option value="">Grade…</option>';
+  } else {
+    if (custom) { custom.style.display = 'none'; custom.value = ''; }
+    if (odN)    odN.value = od ? _bhaFracToDecimal(od) : '';
+    const wts = od ? [...new Set(catalogueByOD(od).map(r => r[1]))] : [];
+    if (nomWtSel) nomWtSel.innerHTML = '<option value="">Wt…</option>' +
+      wts.map(w => `<option value="${w}">${w} ppf</option>`).join('');
+    if (grSel)   grSel.innerHTML = '<option value="">Grade…</option>';
+  }
+  bhaSave();
+}
+
+function _bhaCasingNomWtChanged(sel) {
+  const tr    = sel.closest('tr');
+  const od    = tr.querySelector('.bha-cat-od')?.value;
+  const wt    = +sel.value;
+  const grSel = tr.querySelector('.bha-cat-grade');
+  const grades = (od && wt)
+    ? [...new Set(catalogueByOD(od).filter(r => r[1] === wt).map(r => r[2]))]
+    : [];
+  if (grSel) grSel.innerHTML = '<option value="">Grade…</option>' +
+    grades.map(g => `<option value="${g}">${g}</option>`).join('');
+  bhaSave();
+}
+
+function _bhaCasingGradeChanged(sel) {
+  const tr    = sel.closest('tr');
+  const od    = tr.querySelector('.bha-cat-od')?.value;
+  const wt    = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);
+  const grade = sel.value;
+  const row   = catalogueByOD(od).find(r => r[1] === wt && r[2] === grade);
+  if (row) {
+    const spec = catalogueSpec(row);
+    const idN  = tr.querySelector('.bha-id-n');
+    const odN  = tr.querySelector('.bha-od-n');
+    if (idN) idN.value = spec.id_in;
+    if (odN) odN.value = spec.od_in;
+  }
+  bhaSave();
+}
+
 // ── Recalculate PPF and cumulative weight/length ────────────────────────────────
 
 function _bhaRecalc() {
@@ -475,8 +558,9 @@ function bhaGet() {
     const comp     = tr.querySelector('.bha-type')?.value || 'Drill Collar';
     const catODSel = tr.querySelector('.bha-cat-od');
     const odN      = tr.querySelector('.bha-od-n');
-    const odVal    = catODSel?.value
-      ? _bhaFracToDecimal(catODSel.value)
+    const catODVal = catODSel?.value;
+    const odVal    = (catODVal && catODVal !== 'custom')
+      ? _bhaFracToDecimal(catODVal)
       : +(odN?.value || 6.5);
     rows.push({
       type:      comp,
