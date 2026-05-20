@@ -50,15 +50,9 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
     const isCustom = catOD === 'custom';
     const opts = dpODs().map(o =>
       `<option value="${o}"${o === catOD ? ' selected' : ''}>${o}"</option>`).join('');
-    const nomWts = (catOD && catOD !== 'custom') ? dpNomWtsByOD(catOD) : [];
-    const nomWtOpts = nomWts.map(w =>
-      `<option value="${w}"${w == catNomWt ? ' selected' : ''}>${w} ppf</option>`).join('');
-    const nomWtVis = (catOD && catOD !== 'custom') ? '' : 'display:none;';
     odCell = `<select class="bha-cat-od" ${SS} onchange="_bhaDPODChanged(this)">
         <option value="">OD…</option>${opts}
         <option value="custom"${isCustom ? ' selected' : ''}>Custom…</option></select>
-      <select class="bha-cat-nomwt" style="${nomWtVis}width:100%;font-size:10px;padding:1px 2px;margin-top:2px;box-sizing:border-box" onchange="_bhaDPNomWtChanged(this)">
-        <option value="">Wt…</option>${nomWtOpts}</select>
       <input class="bha-od-custom" type="number" step="0.125" placeholder="OD (in)"
         value="${isCustom ? _od : ''}"
         style="${isCustom ? '' : 'display:none;'}width:100%;font-size:10px;margin-top:2px;box-sizing:border-box"
@@ -90,6 +84,18 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
       <input class="bha-od-n" type="hidden" value="${_od}">`;
   } else {
     odCell = `<input class="bha-od-n" type="number" step="0.125" value="${_od}" ${IS} onchange="bhaSave()">`;
+  }
+
+  // ── Nom. Weight column (DP only) ──────────────────────────────────────────
+  let nomWtCell;
+  if (isDP) {
+    const nomWts = (catOD && catOD !== 'custom') ? dpNomWtsByOD(catOD) : [];
+    const nomWtOpts = nomWts.map(w =>
+      `<option value="${w}"${w == catNomWt ? ' selected' : ''}>${w} ppf</option>`).join('');
+    nomWtCell = `<select class="bha-cat-nomwt" ${SS} onchange="_bhaDPNomWtChanged(this)">
+        <option value="">Wt…</option>${nomWtOpts}</select>`;
+  } else {
+    nomWtCell = ``;
   }
 
   // ── Grade column ───────────────────────────────────────────────────────────
@@ -152,6 +158,7 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
     <td class="drag-handle">⠿</td>
     <td class="editable"><select class="bha-type" onchange="bhaPresetFill(this)">${typeOpts}</select></td>
     <td class="editable">${odCell}</td>
+    <td class="editable">${nomWtCell}</td>
     <td class="editable">${gradeCell}</td>
     <td class="editable">${connCell}</td>
     <td class="editable"><input class="bha-id-n" type="number" step="0.125" value="${_id}" onchange="bhaSave()"></td>
