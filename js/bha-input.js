@@ -22,7 +22,7 @@ const BHA_GRADES = ['S-135', 'G-105', 'X-95', 'E-75'];
 // catConn  = connection string for DP/HWDP catalogue selects
 
 function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
-                         catOD, catGrade, catConn) {
+                         catOD, catGrade, catConn, catNomWt) {
   const p    = BHA_PRESETS[comp] || BHA_PRESETS['Drill Collar'];
   const _od  = od   ?? p.od;
   const _id  = id   ?? p.id;
@@ -50,9 +50,15 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
     const isCustom = catOD === 'custom';
     const opts = dpODs().map(o =>
       `<option value="${o}"${o === catOD ? ' selected' : ''}>${o}"</option>`).join('');
+    const nomWts = (catOD && catOD !== 'custom') ? dpNomWtsByOD(catOD) : [];
+    const nomWtOpts = nomWts.map(w =>
+      `<option value="${w}"${w == catNomWt ? ' selected' : ''}>${w} ppf</option>`).join('');
+    const nomWtVis = (catOD && catOD !== 'custom') ? '' : 'display:none;';
     odCell = `<select class="bha-cat-od" ${SS} onchange="_bhaDPODChanged(this)">
         <option value="">OD…</option>${opts}
         <option value="custom"${isCustom ? ' selected' : ''}>Custom…</option></select>
+      <select class="bha-cat-nomwt" style="${nomWtVis}width:100%;font-size:10px;padding:1px 2px;margin-top:2px;box-sizing:border-box" onchange="_bhaDPNomWtChanged(this)">
+        <option value="">Wt…</option>${nomWtOpts}</select>
       <input class="bha-od-custom" type="number" step="0.125" placeholder="OD (in)"
         value="${isCustom ? _od : ''}"
         style="${isCustom ? '' : 'display:none;'}width:100%;font-size:10px;margin-top:2px;box-sizing:border-box"
@@ -89,8 +95,8 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
   // ── Grade column ───────────────────────────────────────────────────────────
   let gradeCell;
   if (isDP) {
-    const grOpts = catOD
-      ? dpGradesByOD(catOD).map(g =>
+    const grOpts = (catOD && catNomWt)
+      ? dpGradesByODWt(catOD, +catNomWt).map(g =>
           `<option value="${g}"${g === catGrade ? ' selected' : ''}>${g}</option>`).join('')
       : '';
     gradeCell = `<select class="bha-cat-grade" ${SS} onchange="_bhaDPGradeChanged(this)">
@@ -118,8 +124,8 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
   // ── Connection column ──────────────────────────────────────────────────────
   let connCell;
   if (isDP) {
-    const connOpts = (catOD && catGrade)
-      ? dpConnectionsByODGrade(catOD, catGrade).map(c =>
+    const connOpts = (catOD && catNomWt && catGrade)
+      ? dpConnectionsByODWtGrade(catOD, +catNomWt, catGrade).map(c =>
           `<option value="${c}"${c === catConn ? ' selected' : ''}>${c}</option>`).join('')
       : '';
     connCell = `<select class="bha-cat-conn" ${SS} onchange="_bhaDPConnChanged(this)">
@@ -177,15 +183,17 @@ function bhaPresetFill(sel) {
 
 // ── Catalogue change handlers ──────────────────────────────────────────────────
 
-// Drill Pipe — OD changed → repopulate Grade, clear Connection
+// Drill Pipe — OD changed → repopulate NomWt, clear Grade + Connection
 function _bhaDPODChanged(sel) {
-  const tr       = sel.closest('tr');
-  const od       = sel.value;
-  const odN      = tr.querySelector('.bha-od-n');
-  const odCustom = tr.querySelector('.bha-od-custom');
+  const tr        = sel.closest('tr');
+  const od        = sel.value;
+  const odN       = tr.querySelector('.bha-od-n');
+  const odCustom  = tr.querySelector('.bha-od-custom');
+  const nomWtSel  = tr.querySelector('.bha-cat-nomwt');
 
   if (od === 'custom') {
     if (odCustom) { odCustom.style.display = ''; odCustom.focus(); }
+    if (nomWtSel) nomWtSel.style.display = 'none';
     const grSel = tr.querySelector('.bha-cat-grade');
     if (grSel) { grSel.innerHTML = '<option value="">Grade…</option>'; grSel.value = ''; }
     const connSel = tr.querySelector('.bha-cat-conn');
@@ -197,9 +205,29 @@ function _bhaDPODChanged(sel) {
   if (odCustom) odCustom.style.display = 'none';
   if (odN) odN.value = od ? _bhaFracToDecimal(od) : '';
 
+  if (nomWtSel) {
+    const nomWts = od ? dpNomWtsByOD(od) : [];
+    nomWtSel.innerHTML = `<option value="">Wt…</option>` +
+      nomWts.map(w => `<option value="${w}">${w} ppf</option>`).join('');
+    nomWtSel.value = '';
+    nomWtSel.style.display = od ? '' : 'none';
+  }
+
   const grSel = tr.querySelector('.bha-cat-grade');
+  if (grSel) { grSel.innerHTML = '<option value="">Grade…</option>'; grSel.value = ''; }
+  const connSel = tr.querySelector('.bha-cat-conn');
+  if (connSel) { connSel.innerHTML = '<option value="">Conn…</option>'; connSel.value = ''; }
+  bhaSave();
+}
+
+// Drill Pipe — NomWt changed → repopulate Grade, clear Connection
+function _bhaDPNomWtChanged(sel) {
+  const tr      = sel.closest('tr');
+  const od      = tr.querySelector('.bha-cat-od')?.value;
+  const nomWt   = +sel.value;
+  const grSel   = tr.querySelector('.bha-cat-grade');
   if (grSel) {
-    const grades = od ? dpGradesByOD(od) : [];
+    const grades = (od && nomWt) ? dpGradesByODWt(od, nomWt) : [];
     grSel.innerHTML = `<option value="">Grade…</option>` +
       grades.map(g => `<option value="${g}">${g}</option>`).join('');
     grSel.value = '';
@@ -218,12 +246,13 @@ function _bhaOdCustomInput(input) {
 
 // Drill Pipe — Grade changed → repopulate Connection
 function _bhaDPGradeChanged(sel) {
-  const tr    = sel.closest('tr');
-  const od    = tr.querySelector('.bha-cat-od')?.value;
-  const grade = sel.value;
+  const tr      = sel.closest('tr');
+  const od      = tr.querySelector('.bha-cat-od')?.value;
+  const nomWt   = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);
+  const grade   = sel.value;
   const connSel = tr.querySelector('.bha-cat-conn');
   if (connSel) {
-    const conns = (od && grade) ? dpConnectionsByODGrade(od, grade) : [];
+    const conns = (od && nomWt && grade) ? dpConnectionsByODWtGrade(od, nomWt, grade) : [];
     connSel.innerHTML = `<option value="">Conn…</option>` +
       conns.map(c => `<option value="${c}">${c}</option>`).join('');
     connSel.value = '';
@@ -235,10 +264,11 @@ function _bhaDPGradeChanged(sel) {
 function _bhaDPConnChanged(sel) {
   const tr    = sel.closest('tr');
   const od    = tr.querySelector('.bha-cat-od')?.value;
+  const nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);
   const grade = tr.querySelector('.bha-cat-grade')?.value;
   const conn  = sel.value;
-  if (!od || !grade || !conn) return;
-  const spec = dpSpecFull(od, grade, conn);
+  if (!od || !nomWt || !grade || !conn) return;
+  const spec = dpSpecFull(od, nomWt, grade, conn);
   if (!spec) return;
   const lenN  = tr.querySelector('.bha-len-n');
   const idN   = tr.querySelector('.bha-id-n');
@@ -401,7 +431,7 @@ function bhaLoadState(data) {
     tr.innerHTML = _makeBhaRowHTML(
       row.comp, row.od, row.id, row.wt, row.len,
       row.grade, row.conn,
-      row.catOD, row.catGrade, row.catConn
+      row.catOD, row.catGrade, row.catConn, row.catNomWt
     );
     body.appendChild(tr);
   });
@@ -422,6 +452,7 @@ function bhaSave() {
       grade:    tr.querySelector('.bha-grade')?.value      || '',
       conn:     tr.querySelector('.bha-conn')?.value       || tr.querySelector('.bha-cat-conn')?.value || '',
       catOD:    tr.querySelector('.bha-cat-od')?.value     || '',
+      catNomWt: tr.querySelector('.bha-cat-nomwt')?.value  || '',
       catGrade: tr.querySelector('.bha-cat-grade')?.value  || '',
       catConn:  tr.querySelector('.bha-cat-conn')?.value   || '',
     });
