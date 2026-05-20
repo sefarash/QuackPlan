@@ -123,14 +123,15 @@ function drawBuckling(r) {
   const bk = r.buckling;
   if (!bk?.stations?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  // Sliding (rotOff) compressive loads for comparison
-  const rotOffSt = r.modes?.rotOff?.ffSensitivity?.mid?.stations || [];
-  const slidePts = rotOffSt.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
+  // Sliding comp: use rotOn high-FF (same WOB, higher friction = conservative for oriented drilling).
+  // rotOff has T0=0 and axialSign=0 → always zero comp, useless for buckling comparison.
+  const slideSt  = r.modes?.rotOn?.ffSensitivity?.high?.stations || [];
+  const slidePts = slideSt.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
 
   const maxMD = Math.max(...bk.stations.map(s => s.md), 1);
   const xMax  = Math.max(
     ...bk.stations.map(s => Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0, -s.axialLoad_lbf || 0)),
-    ...rotOffSt.map(s => Math.max(-s.axialLoad_lbf, 0)),
+    ...slideSt.map(s => Math.max(-s.axialLoad_lbf, 0)),
     1
   ) / 1000 * 1.1;
 
