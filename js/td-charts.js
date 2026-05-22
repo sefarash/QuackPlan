@@ -120,12 +120,23 @@ function drawBuckling(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const bk = r.buckling;
+  // Read buckling panel controls — these drive WOB and FF independently of the Torque panel
+  const _wobRaw  = document.getElementById('buckWOB')?.value;
+  const wob_klbs = (_wobRaw === '' || _wobRaw == null ? 15 : +_wobRaw);
+  const ffMid    = +(document.getElementById('buckFFmid')?.value || 0.30);
+  const mw       = fluidGet().mudWeight;
+
+  if (!qpState.survey?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
+
+  // Run fresh T&D using the buckling panel's WOB (not torqWOB)
+  const res = tdCompute(qpState.survey, bhaGet(), null, mw,
+    { ffCased: ffMid, ffOpen: ffMid, wob_klbs, overpullMargin_lbf: 100000 });
+
+  const bk = res?.buckling;
   if (!bk?.stations?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  // Sliding comp: use rotOn high-FF (same WOB, higher friction = conservative for oriented drilling).
-  // rotOff has T0=0 and axialSign=0 → always zero comp, useless for buckling comparison.
-  const slideSt  = r.modes?.rotOn?.ffSensitivity?.high?.stations || [];
+  // Sliding comp: high-FF (ffMid+0.05) from the auto-generated sensitivity sweep
+  const slideSt  = res.modes?.rotOn?.ffSensitivity?.high?.stations || [];
   const slidePts = slideSt.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
 
   const maxMD = Math.max(...bk.stations.map(s => s.md), 1);
