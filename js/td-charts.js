@@ -165,6 +165,8 @@ function drawBuckling(r) {
     1
   ) / 1000 * 1.1;
 
+  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Critical Load (klbs)', 'MD (ft)');
+
   const liveCurves = [
     { pts: sinPts,   color: '#c0392b', label: 'Sinusoidal'       },
     { pts: helPts,   color: '#2a7fa8', label: 'Helical'          },
