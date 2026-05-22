@@ -230,10 +230,10 @@ function drawOverpull(r) {
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
-  // BF annotation
+  // BF annotation — bottom-right corner (curves at TD sit on the left, so no overlap)
   ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
-  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} klbs`, g.l + g.pw - 4, g.t + 4);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} klbs`, g.l + g.pw - 4, g.t + g.ph - 4);
 
   // ── Section labels ──────────────────────────────────────────────────────────
   ctx.font = 'bold 10px sans-serif'; ctx.textBaseline = 'top';
