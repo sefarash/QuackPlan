@@ -116,8 +116,11 @@ function drawSurgeSwab() {
   CI.register(CID, { pad: g, xMax: speedMax, yMax, xLabel: 'Trip Speed (ft/min)', yLabel: 'Pressure (psi)', depthDown: false });
   CI.drawFrozen(ctx, CID);
 
-  _chartLine(ctx, surgePts, '#c0392b', 2.5, g.l, g.t, g.pw, g.ph, speedMax, yMax);
+  // Draw swab solid first, surge dashed on top — both visible even when values are equal
   _chartLine(ctx, swabPts,  '#1a5f7a', 2.5, g.l, g.t, g.pw, g.ph, speedMax, yMax);
+  ctx.setLineDash([8, 4]);
+  _chartLine(ctx, surgePts, '#c0392b', 2.5, g.l, g.t, g.pw, g.ph, speedMax, yMax);
+  ctx.setLineDash([]);
 
   // Operating point
   const cur = _computeSurgeSwab(speedCur);
