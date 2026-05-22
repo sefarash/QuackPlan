@@ -537,12 +537,12 @@
       </div>
       <div class="chart-controls" style="margin-top:8px;margin-bottom:4px">
         <label>Trip speed &nbsp;
-          <input type="number" id="ssSpeedMin" value="10" step="5" style="width:42px;text-align:right"
+          <input type="number" id="ssSpeedMin" value="10" step="5" style="width:55px;text-align:right"
             oninput="document.getElementById('ssSpeedSlider').min=this.value;drawSurgeSwab()">
           <input type="range" id="ssSpeedSlider" min="10" max="200" step="5" value="60"
             oninput="document.getElementById('ssSpeedVal').textContent=this.value;drawSurgeSwab()"
             style="width:120px;vertical-align:middle">
-          <input type="number" id="ssSpeedMax" value="200" step="5" style="width:42px"
+          <input type="number" id="ssSpeedMax" value="200" step="5" style="width:55px"
             oninput="document.getElementById('ssSpeedSlider').max=this.value;drawSurgeSwab()">
           &nbsp;<span id="ssSpeedVal">60</span> ft/min
         </label>
