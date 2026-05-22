@@ -135,24 +135,35 @@ function drawBuckling(r) {
   const bk = res?.buckling;
   if (!bk?.stations?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  // Sliding comp: high-FF (ffMid+0.05) from the auto-generated sensitivity sweep
-  const slideSt  = res.modes?.rotOn?.ffSensitivity?.high?.stations || [];
-  const slidePts = slideSt.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
+  // Use all n+1 march stations — these include the bit point at TD so compression
+  // shows all the way to the bottom of the well, not just to the top of the last element.
+  const rotAllSt   = res.modes?.rotOn?.ffSensitivity?.mid?.stations  || [];
+  const slideAllSt = res.modes?.rotOn?.ffSensitivity?.high?.stations || [];
+  const rotPts     = rotAllSt.map(s   => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
+  const slidePts   = slideAllSt.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
 
-  const maxMD = Math.max(...bk.stations.map(s => s.md), 1);
-  const xMax  = Math.max(
-    ...bk.stations.map(s => Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0, -s.axialLoad_lbf || 0)),
-    ...slideSt.map(s => Math.max(-s.axialLoad_lbf, 0)),
-    1
-  ) / 1000 * 1.1;
-
-  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Critical Load (klbs)', 'MD (ft)');
+  // bk.stations use el.md0 (top of each element), so the last element's bottom
+  // (= survey TD) is missing. Use survey TD for the Y-axis max and extend the
+  // critical-load lines down to TD (inclination is constant in the tangent so
+  // F_sin/F_hel are the same all the way to the bit).
+  const maxMD = qpState.survey[qpState.survey.length - 1].md;
 
   const sinPts   = bk.stations.filter(s => s.fSin_lbf != null)
                                .map(s => ({ x: s.fSin_lbf / 1000, y: s.md }));
   const helPts   = bk.stations.filter(s => s.fHel_lbf != null)
                                .map(s => ({ x: s.fHel_lbf / 1000, y: s.md }));
-  const rotPts   = bk.stations.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
+
+  // Append the TD closing point (same critical load as last station, extended to bit depth)
+  const lastBk = bk.stations[bk.stations.length - 1];
+  if (lastBk?.fSin_lbf != null) sinPts.push({ x: lastBk.fSin_lbf / 1000, y: maxMD });
+  if (lastBk?.fHel_lbf != null) helPts.push({ x: lastBk.fHel_lbf / 1000, y: maxMD });
+
+  const xMax = Math.max(
+    ...bk.stations.map(s => Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0)),
+    ...rotAllSt.map(s   => Math.max(-s.axialLoad_lbf, 0)),
+    ...slideAllSt.map(s => Math.max(-s.axialLoad_lbf, 0)),
+    1
+  ) / 1000 * 1.1;
 
   const liveCurves = [
     { pts: sinPts,   color: '#c0392b', label: 'Sinusoidal'       },
