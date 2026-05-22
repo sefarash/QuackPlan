@@ -166,6 +166,16 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
   const px = v => g.l + (v / maxGrad) * g.pw;
   const py = d => g.t + (d / (maxTVD || 1)) * g.ph;
 
+  CI.storeLive('ktCanvas', [
+    { pts: ppfgPts.map(p => ({ x: p.pp, y: p.tvd })), color: '#1a7a4a', label: 'PP' },
+    { pts: ppfgPts.map(p => ({ x: p.fg, y: p.tvd })), color: '#c0392b', label: 'FG' },
+  ]);
+  CI.register('ktCanvas', {
+    pad: g, xMax: maxGrad, yMax: maxTVD || 1,
+    xLabel: 'Gradient (ppg)', yLabel: 'TVD (ft)', depthDown: true,
+  });
+  CI.drawFrozen(ctx, 'ktCanvas');
+
   // Shaded mud window (between PP and FG)
   ctx.fillStyle = 'rgba(42,127,168,0.07)';
   ctx.beginPath();
@@ -207,10 +217,6 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
 
   _legend(ctx, W, g.t, ['PP', 'FG', 'MW'], ['#1a7a4a', '#c0392b', '#7a4aa0']);
 
-  CI.register('ktCanvas', {
-    pad: g, xMax: maxGrad, yMax: maxTVD || 1,
-    xLabel: 'Gradient (ppg)', yLabel: 'TVD (ft)', depthDown: true,
-  });
   CI.drawAnnotations(ctx, 'ktCanvas');
 }
 
