@@ -104,6 +104,18 @@ function drawAFE() {
   ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   ctx.fillText('Cum. Cost ($)', 0, 0); ctx.restore();
 
+  CI.storeLive('afeCanvas', [
+    { pts: pts.map(p => ({ x: p.days, y: p.depth })), color: '#2a7fa8', label: 'Days' },
+    { pts: pts.map(p => ({ x: p.days, y: p.cost  })), color: '#1a7a4a', label: 'Cost' },
+  ]);
+  CI.register('afeCanvas', {
+    pad: { l, t, pw, ph },
+    xMax: maxDays, yMax: maxDepth,
+    xLabel: 'Cum. Days', yLabel: 'Depth (ft)',
+    depthDown: true,
+  });
+  CI.drawFrozen(ctx, 'afeCanvas');
+
   // Days curve: x=days, y=depth (depth-down)
   ctx.strokeStyle = '#2a7fa8'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -124,7 +136,8 @@ function drawAFE() {
   });
   ctx.stroke();
 
-  // Activity phase labels — dot + name at each activity endpoint on the Days curve
+  // Activity phase labels — dot always; label only when far enough from the previous one
+  let lastLx = -999, lastLy = -999, labelIdx = 0;
   act.activities.forEach((a, i) => {
     if (!a.name) return;
     const pt = pts[i + 1];
@@ -132,16 +145,22 @@ function drawAFE() {
     const x = l + (pt.days  / maxDays)  * pw;
     const y = t + (pt.depth / maxDepth) * ph;
 
-    // Dot on the days curve
+    // Dot on the days curve always
     ctx.fillStyle = '#2a7fa8';
     ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
 
-    // Label — flip side and above/below to reduce crowding
+    // Skip label if too close to the previous one (keeps dots, removes text clutter)
+    const isLast = i === act.activities.length - 1;
+    if (Math.hypot(x - lastLx, y - lastLy) < 36 && !isLast) return;
+    lastLx = x; lastLy = y;
+
     const nearRight = x > l + pw * 0.6;
+    const above = labelIdx % 2 === 0;
     ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
     ctx.textAlign    = nearRight ? 'right' : 'left';
-    ctx.textBaseline = i % 2 === 0 ? 'bottom' : 'top';
-    ctx.fillText(a.name, nearRight ? x - 5 : x + 5, i % 2 === 0 ? y - 4 : y + 4);
+    ctx.textBaseline = above ? 'bottom' : 'top';
+    ctx.fillText(a.name, nearRight ? x - 5 : x + 5, above ? y - 4 : y + 4);
+    labelIdx++;
   });
 
   // Phase callout lines — horizontal dashed lines at each casing shoe depth
@@ -173,11 +192,5 @@ function drawAFE() {
 
   _legend(ctx, W, t, ['Days', 'Cost'], ['#2a7fa8', '#1a7a4a']);
 
-  CI.register('afeCanvas', {
-    pad: { l, t, pw, ph },
-    xMax: maxDays, yMax: maxDepth,
-    xLabel: 'Cum. Days', yLabel: 'Depth (ft)',
-    depthDown: true,
-  });
   CI.drawAnnotations(ctx, 'afeCanvas');
 }
