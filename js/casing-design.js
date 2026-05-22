@@ -59,20 +59,24 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse)
   }
 
   const rows = casingRows.map(row => {
-    const key   = _cdKey(row);
-    const r     = ratings[key] || {};
-    const bLim  = r.burst    ? Math.round(r.burst    / sfBurst)    : '—';
-    const cLim  = r.collapse ? Math.round(r.collapse / sfCollapse) : '—';
+    const key     = _cdKey(row);
+    const r       = ratings[key] || {};
+    const bLim    = r.burst    ? Math.round(r.burst    / sfBurst)    : null;
+    const cLim    = r.collapse ? Math.round(r.collapse / sfCollapse) : null;
     const shoeTVD = Math.round(_tvdAt(survey, +(row.bot)));
     return `<tr data-key="${key}">
-      <td>${row.size}" ${row.def}</td>
-      <td style="text-align:right">${shoeTVD.toLocaleString()}</td>
-      <td><input type="number" step="100" value="${r.burst    || ''}" placeholder="e.g. 5000"
-          style="width:78px" onchange="drawCasingDesign()"></td>
-      <td><input type="number" step="100" value="${r.collapse || ''}" placeholder="e.g. 3000"
-          style="width:78px" onchange="drawCasingDesign()"></td>
-      <td style="text-align:right;color:#1a7a4a;font-weight:bold">${bLim}</td>
-      <td style="text-align:right;color:#7a4aa0;font-weight:bold">${cLim}</td>
+      <td style="font-size:10px">${row.size}" ${row.def}<br>
+        <span style="color:#9ecce3">${shoeTVD.toLocaleString()} ft TVD</span></td>
+      <td>
+        <input type="number" step="100" value="${r.burst    || ''}" placeholder="psi"
+          style="width:72px" onchange="drawCasingDesign()">
+        ${bLim !== null ? `<div style="font-size:10px;color:#1a7a4a">Lim: ${bLim.toLocaleString()}</div>` : ''}
+      </td>
+      <td>
+        <input type="number" step="100" value="${r.collapse || ''}" placeholder="psi"
+          style="width:72px" onchange="drawCasingDesign()">
+        ${cLim !== null ? `<div style="font-size:10px;color:#7a4aa0">Lim: ${cLim.toLocaleString()}</div>` : ''}
+      </td>
     </tr>`;
   }).join('');
 
@@ -81,11 +85,8 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse)
     <table class="qp-table" style="width:100%;font-size:11px">
       <thead><tr>
         <th>Section</th>
-        <th style="text-align:right">Shoe TVD (ft)</th>
-        <th>Burst Rating (psi)</th>
-        <th>Collapse Rating (psi)</th>
-        <th style="text-align:right">Burst Limit (psi)</th>
-        <th style="text-align:right">Collapse Limit (psi)</th>
+        <th>Burst (psi)</th>
+        <th>Collapse (psi)</th>
       </tr></thead>
       <tbody id="cdRatingsBody">${rows}</tbody>
     </table>
