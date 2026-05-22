@@ -106,7 +106,8 @@ function _computeHyd(survey, fluid, bha) {
   const vPipe  = activeFlow / (2.448 * dpID * dpID);
   const rePipe = 928 * activeMW * vPipe * dpID / (pv || 1);
   const fPipe  = 0.0791 / Math.pow(Math.max(rePipe, 100), 0.25);
-  const pipeLoss = fPipe * activeMW * vPipe * vPipe / (21.1 * dpID) * totalMD_ft / 100;
+  // v in ft/s; standard field-unit Fanning pipe loss: f × MW × v² × L / (25.8 × d)
+  const pipeLoss = fPipe * activeMW * vPipe * vPipe * totalMD_ft / (25.8 * dpID);
 
   // Bit pressure drop
   const nozzVel = tfa > 0 ? activeFlow / (3.117 * tfa) : 0;
@@ -133,7 +134,7 @@ function _computeHyd(survey, fluid, bha) {
     const vP  = q / (2.448 * dpID * dpID);
     const reP = 928 * activeMW * vP * dpID / (pv || 1);
     const fP  = 0.0791 / Math.pow(Math.max(reP, 100), 0.25);
-    const pL  = fP * activeMW * vP * vP / (21.1 * dpID) * totalMD_ft / 100;
+    const pL  = fP * activeMW * vP * vP * totalMD_ft / (25.8 * dpID);
     const nV  = tfa > 0 ? q / (3.117 * tfa) : 0;
     const bD  = activeMW * nV * nV / 1120;
     let ann   = 0;
