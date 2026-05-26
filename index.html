@@ -568,6 +568,7 @@
         <button class="hdr-btn" onclick="drawCasingDesign()">Compute</button>
         <button class="hdr-btn" onclick="exportChartPNG('cdBurstCanvas','burst.png')">⬇ Burst PNG</button>
         <button class="hdr-btn" onclick="exportChartPNG('cdCollapseCanvas','collapse.png')">⬇ Collapse PNG</button>
+        <button class="hdr-btn" onclick="exportChartPNG('cdTriaxialCanvas','triaxial.png')">⬇ Triaxial PNG</button>
       </div>
       <div style="display:flex;flex:1;gap:10px;min-height:0">
         <!-- Burst chart -->
@@ -578,8 +579,12 @@
         <div class="output-canvas-wrap" style="flex:1">
           <canvas id="cdCollapseCanvas"></canvas>
         </div>
+        <!-- Triaxial / Von Mises chart -->
+        <div class="output-canvas-wrap" style="flex:1">
+          <canvas id="cdTriaxialCanvas"></canvas>
+        </div>
         <!-- Ratings table -->
-        <div style="flex:0 0 340px;min-width:0;overflow-y:auto;padding-right:4px">
+        <div style="flex:0 0 280px;min-width:0;overflow-y:auto;padding-right:4px">
           <div id="cdRatingsDiv"></div>
         </div>
       </div>
@@ -739,6 +744,7 @@
 <script src="js/trajectory-plot.js"></script>
 <script src="js/export.js"></script>
 <script src="js/casing-design.js"></script>
+<script src="js/casing-triaxial.js"></script>
 <script src="js/kick-tolerance.js"></script>
 <script src="js/row-drag.js"></script>
 <script src="js/output-controls.js"></script>
@@ -762,7 +768,7 @@
 
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
-     'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','ktCanvas',
+     'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','cdTriaxialCanvas','ktCanvas',
      'finalDiagramCanvas'].forEach(id => CI.attach(id));
 
     makeRowsDraggable('traj1Body',      traj1Recalc);

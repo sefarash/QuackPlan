@@ -31,6 +31,7 @@ function drawCasingDesign() {
   _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse);
   _drawBurstChart(casingRows, survey, maxTVD, mw, maxMasp, ratings, sfBurst);
   _drawCollapseChart(casingRows, survey, maxTVD, mw, ratings, sfCollapse);
+  drawCasingTriaxial();
 }
 
 // ── Ratings table ─────────────────────────────────────────────────────────────
