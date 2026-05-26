@@ -271,40 +271,23 @@ function drawOverpull(r) {
   if (!resMid) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
   const get = (res, mode) => res?.modes?.[mode]?.ffSensitivity?.mid?.stations || [];
-  const rihLo   = get(resLo,  'rih');
-  const rihMid  = get(resMid, 'rih');
-  const rihHi   = get(resHi,  'rih');
   const freeWt  = get(resMid, 'rotOff');
   const poohLo  = get(resLo,  'pooh');
   const poohMid = get(resMid, 'pooh');
   const poohHi  = get(resHi,  'pooh');
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
-  // Hookload = buoyed string tension + block weight
   const toV   = s => s.axialLoad_lbf / 1000 + blockWt;
-  const xMax  = Math.max(...poohHi.map(toV), ...rihLo.map(toV), 1) * 1.1;
+  const xMax  = Math.max(...poohHi.map(toV), ...freeWt.map(toV), 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
-  // BF annotation — bottom-right corner (curves at TD sit on the left, so no overlap)
   ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
   ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
   ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} klbs`, g.l + g.pw - 4, g.t + g.ph - 4);
 
-  // ── Section labels ──────────────────────────────────────────────────────────
-  ctx.font = 'bold 10px sans-serif'; ctx.textBaseline = 'top';
-  ctx.fillStyle = 'rgba(42,127,168,0.75)';
-  ctx.textAlign = 'left';
-  ctx.fillText('← SLACK-OFF', g.l + 6, g.t + 18);
-  ctx.fillStyle = 'rgba(192,57,43,0.75)';
-  ctx.textAlign = 'right';
-  ctx.fillText('PICK-UP →', g.l + g.pw - 6, g.t + 18);
-
   const toLine = sts => sts.map(s => ({ x: toV(s), y: s.md }));
   const liveCurves = [
-    { pts: toLine(rihLo),   color: '#5a9fd4', label: `SLK FF ${ffLo}`  },
-    { pts: toLine(rihMid),  color: '#2a7fa8', label: `SLK FF ${ffMid}` },
-    { pts: toLine(rihHi),   color: '#1a5f88', label: `SLK FF ${ffHi}`  },
     { pts: toLine(freeWt),  color: '#7f8c8d', label: 'Free Wt'         },
     { pts: toLine(poohLo),  color: '#e07878', label: `PKP FF ${ffLo}`  },
     { pts: toLine(poohMid), color: '#c0392b', label: `PKP FF ${ffMid}` },
@@ -314,31 +297,22 @@ function drawOverpull(r) {
   CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
   CI.drawFrozen(ctx, CID);
 
-  // Slack-off (RIH): lo/hi dashed, mid solid
-  ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[0].pts, '#5a9fd4', 1.5, g, xMax, maxMD);
-  ctx.setLineDash([]);
-  _chartLineDepthDown(ctx, liveCurves[1].pts, '#2a7fa8', 2,   g, xMax, maxMD);
-  ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[2].pts, '#1a5f88', 1.5, g, xMax, maxMD);
-
   // Free weight: gray long-dash
   ctx.setLineDash([8, 4]);
-  _chartLineDepthDown(ctx, liveCurves[3].pts, '#7f8c8d', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[0].pts, '#7f8c8d', 1.5, g, xMax, maxMD);
 
   // Pick-up (POOH): lo/hi dashed, mid solid
   ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[4].pts, '#e07878', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, '#e07878', 1.5, g, xMax, maxMD);
   ctx.setLineDash([]);
-  _chartLineDepthDown(ctx, liveCurves[5].pts, '#c0392b', 2,   g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, '#c0392b', 2,   g, xMax, maxMD);
   ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[6].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[3].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
   ctx.setLineDash([]);
 
   _legend(ctx, W, g.t,
-    [`SLK ${ffLo}`, `SLK ${ffMid}`, `SLK ${ffHi}`, 'Free Wt',
-     `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`],
-    ['#5a9fd4', '#2a7fa8', '#1a5f88', '#7f8c8d', '#e07878', '#c0392b', '#8b1a1a']);
+    ['Free Wt', `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`],
+    ['#7f8c8d', '#e07878', '#c0392b', '#8b1a1a']);
   CI.drawAnnotations(ctx, CID);
 }
 
