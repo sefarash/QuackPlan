@@ -341,7 +341,8 @@ function tdCompute(survey, bha, casingDesign, mudWeight_ppg, inputs) {
     rih:      [-1, false,   0,      0      ],
     pooh:     [+1, false,   0,      0      ],
     rotOff:   [ 0, true,    0,      0      ],
-    rotOn:    [ 0, true,   -WOB,    tauBit ],  // WellPlan rotary: axial-friction=0, torque friction tangential
+    rotOn:    [ 0, true,   -WOB,    tauBit ],  // WellPlan rotary: no axial friction, torque only
+    slideOn:  [-1, false,  -WOB,    0      ],  // sliding while drilling: axial friction, WOB at bit
     backream: [ 0, true,    0,      tauBit ],
   };
 

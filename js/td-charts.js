@@ -137,8 +137,8 @@ function drawBuckling(r) {
 
   // Use all n+1 march stations — these include the bit point at TD so compression
   // shows all the way to the bottom of the well, not just to the top of the last element.
-  const rotAllSt   = res.modes?.rotOn?.ffSensitivity?.mid?.stations  || [];
-  const slideAllSt = res.modes?.rotOn?.ffSensitivity?.high?.stations || [];
+  const rotAllSt   = res.modes?.rotOn?.ffSensitivity?.mid?.stations   || [];
+  const slideAllSt = res.modes?.slideOn?.ffSensitivity?.mid?.stations || [];
   const rotPts     = rotAllSt.map(s   => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
   const slidePts   = slideAllSt.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
 
