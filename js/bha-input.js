@@ -586,19 +586,31 @@ function bhaGet() {
                 || tr.querySelector('.bha-cat-grade')?.value || 'S-135';
     const _conn  = tr.querySelector('.bha-conn')?.value
                 || tr.querySelector('.bha-cat-conn')?.value  || '';
-    const _mut   = (comp === 'Drill Pipe' && catODVal && catODVal !== 'custom'
+    const _spec  = (comp === 'Drill Pipe' && catODVal && catODVal !== 'custom'
                     && _nomWt && _grade && _conn)
-      ? (dpSpecFull(catODVal, _nomWt, _grade, _conn)?.mut || 0) : 0;
+      ? dpSpecFull(catODVal, _nomWt, _grade, _conn) : null;
+    const _mut   = _spec?.mut || 0;
+    // Tensile yield: lesser of pipe-body yield and tool-joint tensile yield
+    const GRADE_YLD = { 'E-75': 75000, 'X-95': 95000, 'G-105': 105000, 'S-135': 135000, 'Z-140': 140000, 'V-150': 150000 };
+    let _tensYield = 0;
+    if (comp === 'Drill Pipe') {
+      const gy = GRADE_YLD[_grade] || 135000;
+      const id = +(tr.querySelector('.bha-id-n')?.value || (_spec?.tubeID ?? 0));
+      const pbYield = Math.PI / 4 * (odVal * odVal - id * id) * gy;  // lbf
+      const tjYield = _spec?.tjTensYield_lbs || Infinity;
+      _tensYield = Math.min(pbYield, tjYield);
+    }
     rows.push({
-      type:       comp,
-      od:         odVal,
-      id:         +(tr.querySelector('.bha-id-n')?.value  || 2.25),
-      weightLbs:  +(tr.querySelector('.bha-wt-n')?.value  || 0),
-      lengthFt:   +(tr.querySelector('.bha-len-n')?.value || 30),
-      nomWt_ppf:  _nomWt,
-      mut_ftlb:   _mut,
-      grade:      _grade,
-      conn:       _conn,
+      type:          comp,
+      od:            odVal,
+      id:            +(tr.querySelector('.bha-id-n')?.value  || 2.25),
+      weightLbs:     +(tr.querySelector('.bha-wt-n')?.value  || 0),
+      lengthFt:      +(tr.querySelector('.bha-len-n')?.value || 30),
+      nomWt_ppf:     _nomWt,
+      mut_ftlb:      _mut,
+      tensYield_lbs: _tensYield,
+      grade:         _grade,
+      conn:          _conn,
     });
   }
 

@@ -739,14 +739,15 @@ function dpSpecFull(od, nomWt, grade, conn) {
     row[0] === od && row[1] === nomWt && row[2] === grade && row[3] === conn);
   if (!r) return null;
   return {
-    od_in:  _bhaFracToDecimal(r[0]),
-    tubeID: r[6],
-    adjWt:  r[4],
-    grade:  r[2],
-    conn:   r[3],
-    tjod:   r[7],
-    tjid:   r[8],
-    mut:    r[11],
+    od_in:          _bhaFracToDecimal(r[0]),
+    tubeID:         r[6],
+    adjWt:          r[4],
+    grade:          r[2],
+    conn:           r[3],
+    tjod:           r[7],
+    tjid:           r[8],
+    tjTensYield_lbs: r[10],
+    mut:            r[11],
   };
 }
 

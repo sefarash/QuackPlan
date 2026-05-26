@@ -254,15 +254,17 @@ function drawOverpull(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const blockWt = +(document.getElementById('ovpBlock')?.value || 35);   // klbs
-  const dpWt  = +(document.getElementById('ovpDPwt')?.value  || 19.5);
-  const ffLo  = +(document.getElementById('ovpFFlo')?.value  || 0.20);
-  const ffMid = +(document.getElementById('ovpFFmid')?.value || 0.30);
-  const ffHi  = +(document.getElementById('ovpFFhi')?.value  || 0.40);
-  const mw    = +(document.getElementById('ovpMW')?.value    || fluidGet().mudWeight);
-  const BF    = 1 - mw / 65.5;
+  const blockWt  = +(document.getElementById('ovpBlock')?.value    || 35);
+  const dpWt     = +(document.getElementById('ovpDPwt')?.value     || 19.5);
+  const ffLo     = +(document.getElementById('ovpFFlo')?.value     || 0.20);
+  const ffMid    = +(document.getElementById('ovpFFmid')?.value    || 0.30);
+  const ffHi     = +(document.getElementById('ovpFFhi')?.value     || 0.40);
+  const mw       = +(document.getElementById('ovpMW')?.value       || fluidGet().mudWeight);
+  const yieldPct = +(document.getElementById('ovpYieldPct')?.value || 100) / 100;
+  const BF       = 1 - mw / 65.5;
 
-  const run = ff => tdCompute(qpState.survey, bhaGet(), null, mw,
+  const bha = bhaGet();
+  const run = ff => tdCompute(qpState.survey, bha, null, mw,
     { ffCased: ff, ffOpen: ff, wob_klbs: 15, dpWt_ppf: dpWt, overpullMargin_lbf: 100000 });
 
   const resLo  = run(ffLo);
@@ -278,7 +280,26 @@ function drawOverpull(r) {
 
   const maxMD = qpState.survey[qpState.survey.length - 1].md;
   const toV   = s => s.axialLoad_lbf / 1000 + blockWt;
-  const xMax  = Math.max(...poohHi.map(toV), ...freeWt.map(toV), 1) * 1.1;
+
+  // Build tensile yield step segments — DP rows listed surface→bit
+  const yieldSegs = [];
+  if (yieldPct > 0) {
+    let cumMD = 0;
+    bha.components.filter(c => c.type === 'Drill Pipe').forEach(dp => {
+      if (dp.tensYield_lbs > 0 && dp.lengthFt > 0) {
+        yieldSegs.push({
+          topMD:  cumMD,
+          botMD:  Math.min(cumMD + dp.lengthFt, maxMD),
+          yieldK: dp.tensYield_lbs * yieldPct / 1000 + blockWt,
+          label:  `${dp.od}" Yield`,
+        });
+      }
+      cumMD += dp.lengthFt;
+    });
+  }
+
+  const yieldMax = yieldSegs.length ? Math.max(...yieldSegs.map(s => s.yieldK)) : 0;
+  const xMax = Math.max(...poohHi.map(toV), ...freeWt.map(toV), yieldMax, 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
 
@@ -310,9 +331,43 @@ function drawOverpull(r) {
   _chartLineDepthDown(ctx, liveCurves[3].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
   ctx.setLineDash([]);
 
-  _legend(ctx, W, g.t,
-    ['Free Wt', `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`],
-    ['#7f8c8d', '#e07878', '#c0392b', '#8b1a1a']);
+  // Tensile yield limit step-function
+  if (yieldSegs.length) {
+    const YIELD_CLR = '#922b21';
+    ctx.strokeStyle = YIELD_CLR; ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 3]);
+    for (let i = 0; i < yieldSegs.length; i++) {
+      const seg = yieldSegs[i];
+      const x  = g.l + Math.min(seg.yieldK / xMax, 1) * g.pw;
+      const y0 = g.t + (seg.topMD / maxMD) * g.ph;
+      const y1 = g.t + (seg.botMD / maxMD) * g.ph;
+      ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+      if (i + 1 < yieldSegs.length) {
+        const xNext = g.l + Math.min(yieldSegs[i + 1].yieldK / xMax, 1) * g.pw;
+        ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(xNext, y1); ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+    const seen = new Set();
+    yieldSegs.forEach(seg => {
+      const key = seg.yieldK.toFixed(0);
+      if (seen.has(key)) return;
+      seen.add(key);
+      const x = g.l + Math.min(seg.yieldK / xMax, 1) * g.pw;
+      const y = g.t + (seg.topMD / maxMD) * g.ph + 4;
+      ctx.fillStyle = YIELD_CLR; ctx.font = '9px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText(`${seg.label}: ${seg.yieldK.toFixed(0)} k`, x + 3, y);
+    });
+  }
+
+  const legendLabels = ['Free Wt', `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`];
+  const legendColors = ['#7f8c8d', '#e07878', '#c0392b', '#8b1a1a'];
+  if (yieldSegs.length) {
+    legendLabels.push(`Yield ${Math.round(yieldPct * 100)}%`);
+    legendColors.push('#922b21');
+  }
+  _legend(ctx, W, g.t, legendLabels, legendColors);
   CI.drawAnnotations(ctx, CID);
 }
 
