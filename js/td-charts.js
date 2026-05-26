@@ -70,17 +70,19 @@ function drawTorque(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const ffLo  = +(document.getElementById('torqFFlo')?.value  || 0.20);
-  const ffMid = +(document.getElementById('torqFFmid')?.value || 0.30);
-  const ffHi  = +(document.getElementById('torqFFhi')?.value  || 0.40);
+  const ffLo   = +(document.getElementById('torqFFlo')?.value  || 0.20);
+  const ffMid  = +(document.getElementById('torqFFmid')?.value || 0.30);
+  const ffHi   = +(document.getElementById('torqFFhi')?.value  || 0.40);
   const _wobRaw = document.getElementById('torqWOB')?.value;
-  const wob   = (_wobRaw === '' || _wobRaw == null ? 15 : +_wobRaw) * 1000;
+  const wob    = (_wobRaw === '' || _wobRaw == null ? 15 : +_wobRaw) * 1000;
+  const mutPct = +(document.getElementById('torqMUTpct')?.value || 100) / 100;
 
   const modes  = r.modes?.rotOn?.ffSensitivity;
   if (!modes) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
+  const bha = bhaGet();
   const makeFF = (ff) => {
-    const res = tdCompute(qpState.survey, bhaGet(), null, fluidGet().mudWeight,
+    const res = tdCompute(qpState.survey, bha, null, fluidGet().mudWeight,
       { ffCased: ff, ffOpen: ff, wob_klbs: wob / 1000, overpullMargin_lbf: 100000 });
     return res?.modes?.rotOn?.ffSensitivity?.mid?.stations || [];
   };
@@ -89,8 +91,27 @@ function drawTorque(r) {
   const stMid = makeFF(ffMid);
   const stHi  = makeFF(ffHi);
 
-  const maxMD   = qpState.survey[qpState.survey.length - 1].md;
-  const xMax    = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), 1) * 1.1;
+  const maxMD = qpState.survey[qpState.survey.length - 1].md;
+
+  // Build MUT step segments — DP rows are listed surface→bit, so cumulative length = MD
+  const mutSegs = [];
+  if (mutPct > 0) {
+    let cumMD = 0;
+    bha.components.filter(c => c.type === 'Drill Pipe').forEach(dp => {
+      if (dp.mut_ftlb > 0 && dp.lengthFt > 0) {
+        mutSegs.push({
+          topMD: cumMD,
+          botMD: Math.min(cumMD + dp.lengthFt, maxMD),
+          mutK:  dp.mut_ftlb * mutPct / 1000,
+          label: `${dp.od}" MUT`,
+        });
+      }
+      cumMD += dp.lengthFt;
+    });
+  }
+
+  const mutMax = mutSegs.length ? Math.max(...mutSegs.map(s => s.mutK)) : 0;
+  const xMax   = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), mutMax, 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Torque (ft·lbs ×1000)', 'MD (ft)');
 
@@ -108,8 +129,43 @@ function drawTorque(r) {
   _chartLineDepthDown(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g, xMax, maxMD);
   _chartLineDepthDown(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g, xMax, maxMD);
 
-  _legend(ctx, W, g.t, ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi],
-    [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi]);
+  // MUT limit step-function: one vertical segment per DP section + horizontal connectors
+  if (mutSegs.length) {
+    ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 3]);
+    for (let i = 0; i < mutSegs.length; i++) {
+      const seg = mutSegs[i];
+      const x  = g.l + Math.min(seg.mutK / xMax, 1) * g.pw;
+      const y0 = g.t + (seg.topMD / maxMD) * g.ph;
+      const y1 = g.t + (seg.botMD / maxMD) * g.ph;
+      ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+      if (i + 1 < mutSegs.length) {
+        const xNext = g.l + Math.min(mutSegs[i + 1].mutK / xMax, 1) * g.pw;
+        ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(xNext, y1); ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+    // Label each unique MUT value once, near the top of its first segment
+    const seen = new Set();
+    mutSegs.forEach(seg => {
+      const key = seg.mutK.toFixed(1);
+      if (seen.has(key)) return;
+      seen.add(key);
+      const x = g.l + Math.min(seg.mutK / xMax, 1) * g.pw;
+      const y = g.t + (seg.topMD / maxMD) * g.ph + 4;
+      ctx.fillStyle = '#c0392b'; ctx.font = '9px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText(`${seg.label}: ${seg.mutK.toFixed(1)} k`, x + 3, y);
+    });
+  }
+
+  const legendLabels  = ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi];
+  const legendColors  = [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi];
+  if (mutSegs.length) {
+    legendLabels.push(`MUT ${Math.round(mutPct * 100)}%`);
+    legendColors.push('#c0392b');
+  }
+  _legend(ctx, W, g.t, legendLabels, legendColors);
   CI.drawAnnotations(ctx, CID);
 }
 

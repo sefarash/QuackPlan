@@ -581,17 +581,24 @@ function bhaGet() {
     const odVal    = (catODVal && catODVal !== 'custom')
       ? _bhaFracToDecimal(catODVal)
       : +(odN?.value || 6.5);
+    const _nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);
+    const _grade = tr.querySelector('.bha-grade')?.value
+                || tr.querySelector('.bha-cat-grade')?.value || 'S-135';
+    const _conn  = tr.querySelector('.bha-conn')?.value
+                || tr.querySelector('.bha-cat-conn')?.value  || '';
+    const _mut   = (comp === 'Drill Pipe' && catODVal && catODVal !== 'custom'
+                    && _nomWt && _grade && _conn)
+      ? (dpSpecFull(catODVal, _nomWt, _grade, _conn)?.mut || 0) : 0;
     rows.push({
       type:       comp,
       od:         odVal,
       id:         +(tr.querySelector('.bha-id-n')?.value  || 2.25),
       weightLbs:  +(tr.querySelector('.bha-wt-n')?.value  || 0),
       lengthFt:   +(tr.querySelector('.bha-len-n')?.value || 30),
-      nomWt_ppf:  +(tr.querySelector('.bha-cat-nomwt')?.value || 0),
-      grade:      tr.querySelector('.bha-grade')?.value
-                || tr.querySelector('.bha-cat-grade')?.value || 'S-135',
-      conn:       tr.querySelector('.bha-conn')?.value
-                || tr.querySelector('.bha-cat-conn')?.value  || '',
+      nomWt_ppf:  _nomWt,
+      mut_ftlb:   _mut,
+      grade:      _grade,
+      conn:       _conn,
     });
   }
 
