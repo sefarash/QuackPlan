@@ -31,7 +31,7 @@ function _buildElements(survey, bha, casingDesign, BF, dpWtOverride) {
   const tdMD_ft = survey[survey.length - 1].md;   // md already in feet
 
   const rawComps = (bha && bha.components) ? bha.components : [];
-  const bhaComps = rawComps.filter(c => c.type !== 'DP').reverse();
+  const bhaComps = rawComps.filter(c => c.type !== 'Drill Pipe').reverse();
   const bhaStack = [];
   let acc = 0;
   for (const c of bhaComps) {
@@ -308,7 +308,8 @@ function tdCompute(survey, bha, casingDesign, mudWeight_ppg, inputs) {
 
   // --- Calibration inputs ---
   const blockWeight_lbf  = (+document.getElementById('tdBlockWeight')?.value || 50) * 1000;
-  const dpWtCalib_ppf    = +(inputs.dpWt_ppf) || +document.getElementById('tdDpWeight')?.value || 19.5;
+  const dpWtCalib_ppf    = +(inputs.dpWt_ppf) || +document.getElementById('tdDpWeight')?.value
+                         || (bha?.dpNomWt_ppf > 1 ? bha.dpNomWt_ppf : 0) || 19.5;
 
   // MW: linked to hydraulics or override?
   const overrideEl       = document.getElementById('tdMwOverride');

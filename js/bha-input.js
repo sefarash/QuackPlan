@@ -192,7 +192,7 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
     <td class="editable">${connCell}</td>
     <td class="editable"><input class="bha-id-n" type="number" step="0.125" value="${_id}" onchange="bhaSave()"></td>
     <td class="editable"><input class="bha-wt-n" type="number" step="1"     value="${_wt}" onchange="bhaSave()"></td>
-    <td class="editable"><input class="bha-len-n" type="number" step="1"    value="${_len}" onchange="bhaSave()"></td>
+    <td class="editable"><input class="bha-len-n" type="number" step="1"    value="${_len}" onchange="_bhaLenChanged(this)"></td>
     <td class="calc-cell" data-col="ppf">—</td>
     <td class="calc-cell" data-col="cumwt">—</td>
     <td class="calc-cell" data-col="cumlen">—</td>
@@ -313,6 +313,25 @@ function _bhaDPConnChanged(sel) {
   if (idN)   idN.value   = spec.tubeID;
   if (wtN)   wtN.value   = Math.round(spec.adjWt * (+(lenN?.value || 30)));
   if (connH) connH.value = spec.conn;
+  bhaSave();
+}
+
+// Length changed — for DP rows, recalculate total weight to stay in sync
+function _bhaLenChanged(inp) {
+  const tr   = inp.closest('tr');
+  const type = tr.querySelector('.bha-type')?.value;
+  if (type === 'Drill Pipe') {
+    const od    = tr.querySelector('.bha-cat-od')?.value;
+    const nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);
+    const grade = tr.querySelector('.bha-cat-grade')?.value;
+    const conn  = tr.querySelector('.bha-conn')?.value;
+    if (od && od !== 'custom' && nomWt && grade && conn) {
+      const spec = dpSpecFull(od, nomWt, grade, conn);
+      const wtN  = tr.querySelector('.bha-wt-n');
+      const len  = +(inp.value || 0);
+      if (spec && wtN && len > 0) wtN.value = Math.round(spec.adjWt * len);
+    }
+  }
   bhaSave();
 }
 
@@ -563,15 +582,16 @@ function bhaGet() {
       ? _bhaFracToDecimal(catODVal)
       : +(odN?.value || 6.5);
     rows.push({
-      type:      comp,
-      od:        odVal,
-      id:        +(tr.querySelector('.bha-id-n')?.value  || 2.25),
-      weightLbs: +(tr.querySelector('.bha-wt-n')?.value  || 0),
-      lengthFt:  +(tr.querySelector('.bha-len-n')?.value || 30),
-      grade:     tr.querySelector('.bha-grade')?.value
-               || tr.querySelector('.bha-cat-grade')?.value || 'S-135',
-      conn:      tr.querySelector('.bha-conn')?.value
-               || tr.querySelector('.bha-cat-conn')?.value  || '',
+      type:       comp,
+      od:         odVal,
+      id:         +(tr.querySelector('.bha-id-n')?.value  || 2.25),
+      weightLbs:  +(tr.querySelector('.bha-wt-n')?.value  || 0),
+      lengthFt:   +(tr.querySelector('.bha-len-n')?.value || 30),
+      nomWt_ppf:  +(tr.querySelector('.bha-cat-nomwt')?.value || 0),
+      grade:      tr.querySelector('.bha-grade')?.value
+                || tr.querySelector('.bha-cat-grade')?.value || 'S-135',
+      conn:       tr.querySelector('.bha-conn')?.value
+                || tr.querySelector('.bha-cat-conn')?.value  || '',
     });
   }
 
@@ -590,9 +610,10 @@ function bhaGet() {
 
   return {
     components:    rows,
-    topDpOD_in:    dpRow?.od    ?? 5.0,
-    topDpID_in:    dpRow?.id    ?? 4.276,
-    bitOD_in:      bit?.od      ?? 8.5,
+    topDpOD_in:    dpRow?.od         ?? 5.0,
+    topDpID_in:    dpRow?.id         ?? 4.276,
+    dpNomWt_ppf:   dpRow?.nomWt_ppf  ?? 0,
+    bitOD_in:      bit?.od           ?? 8.5,
     tfa_in2:       tfa,
     mwdDeltaP_psi: mwdDrop,
   };
