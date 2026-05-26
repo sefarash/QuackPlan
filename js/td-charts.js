@@ -89,6 +89,17 @@ function drawTorque(r) {
   const stMid = makeFF(ffMid);
   const stHi  = makeFF(ffHi);
 
+  // Debug: log surface torque and key inputs
+  const dbgSurf = stMid[0];
+  const dbgBit  = stMid[stMid.length - 1];
+  const dbgBha  = bhaGet();
+  console.log('[Torque debug] survey pts:', qpState.survey.length,
+    'TD md:', qpState.survey[qpState.survey.length-1]?.md,
+    'dpOD:', dbgBha.topDpOD_in, 'bitOD:', dbgBha.bitOD_in,
+    'mw:', fluidGet().mudWeight, 'wob_klbs:', wob/1000,
+    'surface τ:', dbgSurf?.torque_ftlbs?.toFixed(0), 'ft-lb',
+    'bit τ:', dbgBit?.torque_ftlbs?.toFixed(0), 'ft-lb');
+
   const maxMD   = qpState.survey[qpState.survey.length - 1].md;
   const xMax    = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), 1) * 1.1;
 
