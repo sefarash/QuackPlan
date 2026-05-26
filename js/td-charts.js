@@ -170,13 +170,15 @@ function drawTorque(r) {
 }
 
 // ── Buckling chart ────────────────────────────────────────────────────────────
+// Industry-standard signed axis: compression left (negative), tension right (+)
+// Effective Axial Load runs from tension at surface into compression at depth.
+// Buckling limits are plotted as negative thresholds — crossing = buckling.
 function drawBuckling(r) {
   const CID = 'bucklingCanvas';
   const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
 
-  // Read buckling panel controls — these drive WOB and FF independently of the Torque panel
   const _wobRaw  = document.getElementById('buckWOB')?.value;
   const wob_klbs = (_wobRaw === '' || _wobRaw == null ? 15 : +_wobRaw);
   const ffMid    = +(document.getElementById('buckFFmid')?.value || 0.30);
@@ -184,66 +186,63 @@ function drawBuckling(r) {
 
   if (!qpState.survey?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  // Run fresh T&D using the buckling panel's WOB (not torqWOB)
   const res = tdCompute(qpState.survey, bhaGet(), null, mw,
     { ffCased: ffMid, ffOpen: ffMid, wob_klbs, overpullMargin_lbf: 100000 });
 
   const bk = res?.buckling;
   if (!bk?.stations?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  // Use all n+1 march stations — these include the bit point at TD so compression
-  // shows all the way to the bottom of the well, not just to the top of the last element.
   const rotAllSt   = res.modes?.rotOn?.ffSensitivity?.mid?.stations   || [];
   const slideAllSt = res.modes?.slideOn?.ffSensitivity?.mid?.stations || [];
-  const rotPts     = rotAllSt.map(s   => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
-  const slidePts   = slideAllSt.map(s => ({ x: Math.max(-s.axialLoad_lbf, 0) / 1000, y: s.md }));
+  const maxMD      = qpState.survey[qpState.survey.length - 1].md;
 
-  // bk.stations use el.md0 (top of each element), so the last element's bottom
-  // (= survey TD) is missing. Use survey TD for the Y-axis max and extend the
-  // critical-load lines down to TD (inclination is constant in the tangent so
-  // F_sin/F_hel are the same all the way to the bit).
-  const maxMD = qpState.survey[qpState.survey.length - 1].md;
+  // Effective axial load — signed (+ tension, − compression)
+  const rotPts   = rotAllSt.map(s   => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
+  const slidePts = slideAllSt.map(s => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
 
-  const sinPts   = bk.stations.filter(s => s.fSin_lbf != null)
-                               .map(s => ({ x: s.fSin_lbf / 1000, y: s.md }));
-  const helPts   = bk.stations.filter(s => s.fHel_lbf != null)
-                               .map(s => ({ x: s.fHel_lbf / 1000, y: s.md }));
-
-  // Append the TD closing point (same critical load as last station, extended to bit depth)
+  // Buckling limits on the compression (negative) side
+  const sinPts = bk.stations.filter(s => s.fSin_lbf != null)
+                             .map(s => ({ x: -s.fSin_lbf / 1000, y: s.md }));
+  const helPts = bk.stations.filter(s => s.fHel_lbf != null)
+                             .map(s => ({ x: -s.fHel_lbf / 1000, y: s.md }));
   const lastBk = bk.stations[bk.stations.length - 1];
-  if (lastBk?.fSin_lbf != null) sinPts.push({ x: lastBk.fSin_lbf / 1000, y: maxMD });
-  if (lastBk?.fHel_lbf != null) helPts.push({ x: lastBk.fHel_lbf / 1000, y: maxMD });
+  if (lastBk?.fSin_lbf != null) sinPts.push({ x: -lastBk.fSin_lbf / 1000, y: maxMD });
+  if (lastBk?.fHel_lbf != null) helPts.push({ x: -lastBk.fHel_lbf / 1000, y: maxMD });
 
-  const xMax = Math.max(
-    ...bk.stations.map(s => Math.max(s.fSin_lbf || 0, s.fHel_lbf || 0)),
-    ...rotAllSt.map(s   => Math.max(-s.axialLoad_lbf, 0)),
-    ...slideAllSt.map(s => Math.max(-s.axialLoad_lbf, 0)),
-    1
-  ) / 1000 * 1.1;
+  const allX = [...rotPts, ...slidePts, ...sinPts, ...helPts].map(p => p.x);
+  const xMin = Math.min(...allX, -1) * 1.1;
+  const xMax = Math.max(...allX,  1) * 1.1;
+  const xRange = xMax - xMin;
 
-  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Critical Load (klbs)', 'MD (ft)');
+  const g = _chartGridDepthDownSigned(ctx, W, H, xMin, xMax, maxMD, 'Axial Load (klbs)', 'MD (ft)');
 
+  // CI expects x values mapped as (p.x / xMax_ci) * pw, so shift by xMin
+  const shift = pts => pts.map(p => ({ x: p.x - xMin, y: p.y }));
   const liveCurves = [
-    { pts: sinPts,   color: '#c0392b', label: 'Sinusoidal'       },
-    { pts: helPts,   color: '#2a7fa8', label: 'Helical'          },
-    { pts: rotPts,   color: '#1a7a4a', label: 'Comp — Rotating'  },
-    { pts: slidePts, color: '#e07a1a', label: 'Comp — Sliding'   },
+    { pts: shift(sinPts),   color: '#e67e22', label: 'Sin. Limit'        },
+    { pts: shift(helPts),   color: '#c0392b', label: 'Hel. Limit'        },
+    { pts: shift(rotPts),   color: '#2a7fa8', label: 'Axial — Rotating'  },
+    { pts: shift(slidePts), color: '#7f8c8d', label: 'Axial — Sliding'   },
   ];
   CI.storeLive(CID, liveCurves);
-  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Critical Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
+  CI.register(CID, { pad: g, xMax: xRange, yMax: maxMD,
+    xLabel: 'Axial Load (klbs)', yLabel: 'MD (ft)', depthDown: true, xOffset: xMin });
   CI.drawFrozen(ctx, CID);
 
-  _chartLineDepthDown(ctx, sinPts,   '#c0392b', 1.5, g, xMax, maxMD);
-  _chartLineDepthDown(ctx, helPts,   '#2a7fa8', 1.5, g, xMax, maxMD);
-  // Sliding curve drawn dashed
+  // Sinusoidal limit — orange
+  _chartLineDepthDownSigned(ctx, sinPts,   '#e67e22', 1.5, g, xMin, xMax, maxMD);
+  // Helical limit — red
+  _chartLineDepthDownSigned(ctx, helPts,   '#c0392b', 1.5, g, xMin, xMax, maxMD);
+  // Sliding axial load — gray dashed
   ctx.setLineDash([6, 3]);
-  _chartLineDepthDown(ctx, slidePts, '#e07a1a', 2,   g, xMax, maxMD);
+  _chartLineDepthDownSigned(ctx, slidePts, '#7f8c8d', 1.5, g, xMin, xMax, maxMD);
   ctx.setLineDash([]);
-  _chartLineDepthDown(ctx, rotPts,   '#1a7a4a', 2,   g, xMax, maxMD);
+  // Rotating axial load — blue solid
+  _chartLineDepthDownSigned(ctx, rotPts,   '#2a7fa8', 2,   g, xMin, xMax, maxMD);
 
   _legend(ctx, W, g.t,
-    ['Sinusoidal', 'Helical', 'Comp — Rotating', 'Comp — Sliding (dashed)'],
-    ['#c0392b', '#2a7fa8', '#1a7a4a', '#e07a1a']);
+    ['Sin. Limit', 'Hel. Limit', 'Axial — Rotating', 'Axial — Sliding (dashed)'],
+    ['#e67e22', '#c0392b', '#2a7fa8', '#7f8c8d']);
   CI.drawAnnotations(ctx, CID);
 }
 
@@ -561,7 +560,64 @@ function _chartLineDepthDown(ctx, pts, color, lw, g, xMax, yMax) {
   ctx.beginPath();
   pts.forEach((p, i) => {
     const x = g.l + (p.x / xMax) * g.pw;
-    const y = g.t + (p.y / yMax) * g.ph;   // depth down: y increases with depth
+    const y = g.t + (p.y / yMax) * g.ph;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+// Signed x-axis variant: xMin may be negative (compression left, tension right)
+function _chartGridDepthDownSigned(ctx, W, H, xMin, xMax, yMax, xLabel, yLabel) {
+  const { t, b, l, r } = CHART_PAD;
+  const pw = W - l - r, ph = H - t - b;
+  const xRange = xMax - xMin;
+  const C = _qpColors();
+
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const x = l + pw * i / 5;
+    const y = t + ph * i / 5;
+    ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
+    ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText((xMin + xRange * i / 5).toFixed(0), x, t - 14);
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText((yMax * i / 5).toFixed(0), l - 5, y);
+  }
+
+  if (xMin < 0 && xMax > 0) {
+    const xZero = l + (-xMin / xRange) * pw;
+    ctx.strokeStyle = C.dim; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(xZero, t); ctx.lineTo(xZero, t + ph); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('0', xZero, t - 3);
+  }
+
+  ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
+  ctx.strokeRect(l, t, pw, ph);
+
+  ctx.save();
+  ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText(xLabel, l + pw / 2, t - 30);
+  ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle';
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+
+  return { l, t, pw, ph };
+}
+
+function _chartLineDepthDownSigned(ctx, pts, color, lw, g, xMin, xMax, yMax) {
+  const xRange = xMax - xMin;
+  ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  pts.forEach((p, i) => {
+    const x = g.l + ((p.x - xMin) / xRange) * g.pw;
+    const y = g.t + (p.y / yMax) * g.ph;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
