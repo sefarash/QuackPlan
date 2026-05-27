@@ -455,6 +455,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   border: 1px solid var(--border);
   text-align: center;
   background: var(--bg-calc);
+  color: var(--text);
 }
 
 .qp-table tr:nth-child(even) td { background: var(--bg-table-alt); }

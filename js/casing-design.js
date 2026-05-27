@@ -55,7 +55,7 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
   if (!div) return;
 
   if (!casingRows.length) {
-    div.innerHTML = '<p style="color:#9ecce3;padding:8px 0">Add casing strings in Well Schematic</p>';
+    div.innerHTML = '<p style="color:var(--text-dim);padding:8px 0">Add casing strings in Well Schematic</p>';
     return;
   }
 
@@ -77,28 +77,28 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
       </td>
       <td style="font-size:11px;padding:4px 4px">
         <strong>${row.size}" ${row.def}</strong><br>
-        <span style="color:#9ecce3;font-size:10px">${specLine}</span><br>
-        <span style="color:#9ecce3;font-size:10px">${shoeTVD.toLocaleString()} ft TVD</span>
+        <span style="color:var(--text-dim);font-size:10px">${specLine}</span><br>
+        <span style="color:var(--text-dim);font-size:10px">${shoeTVD.toLocaleString()} ft TVD</span>
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="100" value="${r.burst || ''}" placeholder="psi"
           style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
-        ${bLim !== null ? `<div style="font-size:10px;color:#1a7a4a">/ ${sfBurst} = ${bLim.toLocaleString()}</div>` : ''}
+        ${bLim !== null ? `<div style="font-size:10px;color:#2aad6a">/ ${sfBurst} = ${bLim.toLocaleString()}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="100" value="${r.collapse || ''}" placeholder="psi"
           style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
-        ${cLim !== null ? `<div style="font-size:10px;color:#7a4aa0">/ ${sfCollapse} = ${cLim.toLocaleString()}</div>` : ''}
+        ${cLim !== null ? `<div style="font-size:10px;color:#b07ad0">/ ${sfCollapse} = ${cLim.toLocaleString()}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="10" value="${r.tension || ''}" placeholder="klbf"
           style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
-        ${tLim !== null ? `<div style="font-size:10px;color:#2a7fa8">/ ${sfTension} = ${tLim}</div>` : ''}
+        ${tLim !== null ? `<div style="font-size:10px;color:#3aafd8">/ ${sfTension} = ${tLim}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="10" value="${r.compression || ''}" placeholder="klbf"
           style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
-        ${compLim !== null ? `<div style="font-size:10px;color:#a07a2a">/ ${sfCompression} = ${compLim}</div>` : ''}
+        ${compLim !== null ? `<div style="font-size:10px;color:#e0a020">/ ${sfCompression} = ${compLim}</div>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -116,7 +116,7 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
       </tr></thead>
       <tbody id="cdRatingsBody">${rows}</tbody>
     </table>
-    <p style="margin-top:8px;font-size:10px;color:#9ecce3">
+    <p style="margin-top:8px;font-size:10px;color:var(--text-dim)">
       Enter catalogue burst &amp; collapse ratings to show the API design box on the triaxial chart.
     </p>`;
 }

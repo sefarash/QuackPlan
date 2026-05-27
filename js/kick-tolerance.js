@@ -22,7 +22,7 @@ function drawKickTolerance() {
   if (!resultsDiv) return;
 
   if (ppfgPts.length < 1) {
-    resultsDiv.innerHTML = '<p style="color:#9ecce3;padding:8px 0">Add PPFG gradient points to the table</p>';
+    resultsDiv.innerHTML = '<p style="color:var(--text-dim);padding:8px 0">Add PPFG gradient points to the table</p>';
     return;
   }
 
@@ -31,7 +31,7 @@ function drawKickTolerance() {
     .sort((a, b) => +(a.bot) - +(b.bot));
 
   if (!casingRows.length) {
-    resultsDiv.innerHTML = '<p style="color:#9ecce3;padding:8px 0">Add casing strings in Well Schematic</p>';
+    resultsDiv.innerHTML = '<p style="color:var(--text-dim);padding:8px 0">Add casing strings in Well Schematic</p>';
     return;
   }
 
@@ -210,7 +210,7 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
     ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.moveTo(g.l, y); ctx.lineTo(g.l + g.pw, y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#7a5a2a'; ctx.font = '9px sans-serif';
+    ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText(`${row.size}"`, g.l + 2, y - 1);
   });
@@ -227,10 +227,10 @@ function _renderKTTable(results, mw) {
   if (!div) return;
 
   const rows = results.map(r => {
-    const status = r.kt === null  ? { txt: '— no PP data', cls: 'color:#9ecce3' }
-      : r.kt >= 20 ? { txt: '✓ OK',      cls: 'color:#1a7a4a;font-weight:bold' }
-      : r.kt >= 10 ? { txt: '⚠ Low',     cls: 'color:#e67e22;font-weight:bold' }
-                   : { txt: '✕ Critical', cls: 'color:#c0392b;font-weight:bold' };
+    const status = r.kt === null  ? { txt: '— no PP data', cls: 'color:var(--text-dim)' }
+      : r.kt >= 20 ? { txt: '✓ OK',      cls: 'color:#2aad6a;font-weight:bold' }
+      : r.kt >= 10 ? { txt: '⚠ Low',     cls: 'color:#e0a020;font-weight:bold' }
+                   : { txt: '✕ Critical', cls: 'color:#e05555;font-weight:bold' };
     const ktTxt = r.kt !== null ? r.kt + ' bbl' : '—';
     return `<tr>
       <td>${r.name}</td>
@@ -260,7 +260,7 @@ function _renderKTTable(results, mw) {
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p style="margin-top:8px;font-size:10px;color:#9ecce3">
+    <p style="margin-top:8px;font-size:10px;color:var(--text-dim)">
       MW = ${mw} ppg &nbsp;|&nbsp; KT ≥ 20 bbl = acceptable &nbsp;|&nbsp;
       Formula: MAASP / ((PP − MW) × 0.052) × Ann. capacity
     </p>`;
