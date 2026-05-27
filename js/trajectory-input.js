@@ -201,6 +201,7 @@ function traj2Recalc() {
     });
   }
 
+  _traj2Save();
   const stations = traj2BuildStations(rows);
   if (stations.length < 2) return;
 
@@ -219,7 +220,6 @@ function traj2Recalc() {
   });
 
   if (typeof drawSchematic === 'function') drawSchematic(survey);
-  _traj2Save();
 }
 
 function _traj2Save() {
