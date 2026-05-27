@@ -155,30 +155,31 @@ function drawSchematic(survey) {
   });
 
   // ── Label deconfliction ────────────────────────────────────────────────────
-  const LH = 11, BLOCK = LH * 3, GAP = 3;
+  const LH = 12, BLOCK = LH * 3, GAP = 6;
+  const topLimit = PAD_T + 4;
+  const botLimit = H - PAD_B - BLOCK - 4;
 
-  // Sort by shoe depth (top to bottom) so we push downward
+  // Sort top → bottom by shoe depth
   labelData.sort((a, b) => a.yShoe - b.yShoe);
 
-  // Initial placement: anchor each label just above its shoe (no canvas clamp yet)
-  labelData.forEach(lb => {
-    lb.ly = Math.max(PAD_T + 2, lb.yShoe - LH);
-  });
+  // Unconstrained preferred position (just above each shoe)
+  labelData.forEach(lb => { lb.ly = lb.yShoe - LH; });
 
-  // Forward pass: push each block below the previous — NO clamp here so
-  // labels near the bottom don't get collapsed back to the same y
+  // Forward pass: push each label below the previous (no clamping)
   for (let i = 1; i < labelData.length; i++) {
-    const minY = labelData[i - 1].ly + BLOCK + GAP;
-    if (labelData[i].ly < minY) labelData[i].ly = minY;
+    const need = labelData[i - 1].ly + BLOCK + GAP;
+    if (labelData[i].ly < need) labelData[i].ly = need;
   }
 
-  // Backward pass: clamp to canvas bottom and pull earlier labels up to maintain gaps
-  const bottomLimit = H - PAD_B - BLOCK - 2;
-  for (let i = labelData.length - 1; i >= 0; i--) {
-    const maxY = i === labelData.length - 1 ? bottomLimit : labelData[i + 1].ly - BLOCK - GAP;
-    if (labelData[i].ly > maxY) labelData[i].ly = maxY;
-    labelData[i].ly = Math.max(PAD_T + 2, labelData[i].ly);
+  // If the last label overflows the canvas bottom, shift the ENTIRE column up
+  // uniformly — this preserves spacing and avoids the backward-pass collapsing bug
+  if (labelData.length > 0) {
+    const overflow = labelData[labelData.length - 1].ly - botLimit;
+    if (overflow > 0) labelData.forEach(lb => { lb.ly -= overflow; });
   }
+
+  // Final top clamp (in case the column is taller than available space)
+  labelData.forEach(lb => { lb.ly = Math.max(topLimit, lb.ly); });
 
   // Draw labels; add a small leader dot at the shoe when label moved far from it
   ctx.font = '9px sans-serif';
