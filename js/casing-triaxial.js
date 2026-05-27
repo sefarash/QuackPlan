@@ -62,17 +62,6 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(l, t, pw, ph);
 
-  // Quadrant annotations
-  ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left';  ctx.textBaseline = 'middle';
-  ctx.fillText('← Compression', l + 6, y0 - 11);
-  ctx.textAlign = 'right';
-  ctx.fillText('Tension →', l + pw - 6, y0 - 11);
-  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText('↑ Burst', x0, y0 - 2);
-  ctx.textBaseline = 'top';
-  ctx.fillText('↓ Collapse', x0, y0 + 2);
-
   // Axis titles
   ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
@@ -80,8 +69,19 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   ctx.save();
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  ctx.fillText('Differential Pressure (psi)', 0, 0);
+  ctx.fillText('Diff. Pressure (psi)', 0, 0);
   ctx.restore();
+
+  // Direction hints near axis extremes (not at zero-crossing where dots land)
+  ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';  ctx.textBaseline = 'top';
+  ctx.fillText('← Compression', l + 2, t + ph + 16);
+  ctx.textAlign = 'right';
+  ctx.fillText('Tension →', l + pw - 2, t + ph + 16);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText('↑ Burst', l - 4, t - 6);
+  ctx.textBaseline = 'top';
+  ctx.fillText('↓ Collapse', l - 4, t + ph + 6);
 
   return { l, t, pw, ph, xR, yR };
 }
@@ -251,15 +251,23 @@ function drawCasingTriaxial() {
     { x: F_above,    y: Δp_collapse, label: 'Collapse', color: '#7a4aa0' },
     { x: F_overpull, y: 0,           label: 'Overpull', color: '#e07a1a' },
   ];
-  loadPts.forEach(pt => {
-    const { cx, cy } = _cdPt(pt, g);
-    // Dot
+  // Pre-compute canvas positions for overlap detection
+  const cPts = loadPts.map(pt => ({ ...pt, ...(_cdPt(pt, g)), labelAbove: true }));
+  for (let a = 0; a < cPts.length; a++) {
+    for (let b = a + 1; b < cPts.length; b++) {
+      if (Math.abs(cPts[a].cx - cPts[b].cx) < 70 && Math.abs(cPts[a].cy - cPts[b].cy) < 18) {
+        cPts[a].labelAbove = true;
+        cPts[b].labelAbove = false;
+      }
+    }
+  }
+  cPts.forEach(pt => {
     ctx.fillStyle = pt.color;
-    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
-    // Label
+    ctx.beginPath(); ctx.arc(pt.cx, pt.cy, 5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = _qpColors().text; ctx.font = '10px sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText(pt.label, cx + 7, cy - 2);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = pt.labelAbove ? 'bottom' : 'top';
+    ctx.fillText(pt.label, pt.cx + 7, pt.cy + (pt.labelAbove ? -3 : 3));
   });
 
   // ── Pipe spec heading ───────────────────────────────────────────────────────
