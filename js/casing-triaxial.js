@@ -37,7 +37,9 @@ function _vmEllipse(od_in, id_in, σy, DF) {
 
 // 2D symmetric grid: x ∈ [-xR, +xR], y ∈ [-yR, +yR]
 function _cdGrid2D(ctx, W, H, xR, yR) {
-  const t = 62, b = 36, l = 70, r = 20;
+  // Responsive top padding — gives enough room for 3 header lines on any screen
+  const t = Math.max(90, Math.round(H * 0.12));
+  const b = 36, l = 70, r = 20;
   const pw = W - l - r, ph = H - t - b;
   const C  = _qpColors();
 
@@ -62,26 +64,18 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(l, t, pw, ph);
 
-  // Axis titles
+  // X axis title: direction embedded so no separate hints needed near data area
   ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText('Axial Load (klbf)', l + pw / 2, t - 30);
+  ctx.fillText('Compression ←  Axial Load (klbf)  → Tension', l + pw / 2, t - 58);
+
+  // Y axis title: direction embedded
   ctx.save();
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  ctx.fillText('Diff. Pressure (psi)', 0, 0);
+  ctx.fillStyle = C.text;
+  ctx.fillText('↓ Collapse   Diff. Pressure (psi)   Burst ↑', 0, 0);
   ctx.restore();
-
-  // Direction hints near axis extremes (not at zero-crossing where dots land)
-  ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left';  ctx.textBaseline = 'top';
-  ctx.fillText('← Compression', l + 2, t + ph + 16);
-  ctx.textAlign = 'right';
-  ctx.fillText('Tension →', l + pw - 2, t + ph + 16);
-  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-  ctx.fillText('↑ Burst', l - 4, t - 6);
-  ctx.textBaseline = 'top';
-  ctx.fillText('↓ Collapse', l - 4, t + ph + 6);
 
   return { l, t, pw, ph, xR, yR };
 }
@@ -251,11 +245,11 @@ function drawCasingTriaxial() {
     { x: F_above,    y: Δp_collapse, label: 'Collapse', color: '#7a4aa0' },
     { x: F_overpull, y: 0,           label: 'Overpull', color: '#e07a1a' },
   ];
-  // Pre-compute canvas positions for overlap detection
+  // Pre-compute canvas positions, then stagger overlapping labels above/below
   const cPts = loadPts.map(pt => ({ ...pt, ...(_cdPt(pt, g)), labelAbove: true }));
   for (let a = 0; a < cPts.length; a++) {
     for (let b = a + 1; b < cPts.length; b++) {
-      if (Math.abs(cPts[a].cx - cPts[b].cx) < 70 && Math.abs(cPts[a].cy - cPts[b].cy) < 18) {
+      if (Math.abs(cPts[a].cx - cPts[b].cx) < 80 && Math.abs(cPts[a].cy - cPts[b].cy) < 24) {
         cPts[a].labelAbove = true;
         cPts[b].labelAbove = false;
       }
@@ -265,9 +259,12 @@ function drawCasingTriaxial() {
     ctx.fillStyle = pt.color;
     ctx.beginPath(); ctx.arc(pt.cx, pt.cy, 5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = _qpColors().text; ctx.font = '10px sans-serif';
-    ctx.textAlign = 'left';
+    const textW = ctx.measureText(pt.label).width;
+    const goLeft = (pt.cx + 8 + textW) > (g.l + g.pw - 4);
+    ctx.textAlign = goLeft ? 'right' : 'left';
+    const lx = goLeft ? pt.cx - 8 : pt.cx + 8;
     ctx.textBaseline = pt.labelAbove ? 'bottom' : 'top';
-    ctx.fillText(pt.label, pt.cx + 7, pt.cy + (pt.labelAbove ? -3 : 3));
+    ctx.fillText(pt.label, lx, pt.cy + (pt.labelAbove ? -12 : 12));
   });
 
   // ── Pipe spec heading ───────────────────────────────────────────────────────
@@ -285,7 +282,7 @@ function drawCasingTriaxial() {
   ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
   ctx.fillText(
     `σ_y = ${(σy / 1000).toFixed(0)} kpsi  ·  Body Yield = ${bodyYield_klbf.toFixed(0)} klbf  ·  ID = ${id_in.toFixed(3)}"`,
-    g.l + g.pw / 2, g.t - 10 - 14
+    g.l + g.pw / 2, g.t - 28
   );
 
   // ── Legend ──────────────────────────────────────────────────────────────────
