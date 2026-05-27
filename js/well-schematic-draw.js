@@ -97,6 +97,8 @@ function drawSchematic(survey) {
     'Tubing':              'rgba(74,170,106,0.14)',
   };
 
+  const labelData = [];
+
   sorted.forEach(row => {
     const size  = +(row.size || 9.625);
     const top   = +(row.top  || 0);
@@ -111,7 +113,7 @@ function drawSchematic(survey) {
     ctx.fillStyle = FILL[row.def] || 'rgba(100,150,200,0.08)';
     ctx.fillRect(cx - halfW, yTop, halfW * 2, yBot - yTop);
 
-    // Walls (skip open hole — its boundaries are implied by the innermost casing)
+    // Walls (skip open hole)
     if (!isOH) {
       ctx.strokeStyle = color;
       ctx.lineWidth   = 2;
@@ -119,52 +121,75 @@ function drawSchematic(survey) {
       ctx.beginPath(); ctx.moveTo(cx + halfW, yTop); ctx.lineTo(cx + halfW, yBot); ctx.stroke();
     }
 
-    // Shoe triangles — point outward (not for Open Hole)
+    // Shoe triangles
     if (!isOH) {
       const sh = Math.min(11, halfW * 0.55);
       ctx.fillStyle = color;
-      // Left shoe
       ctx.beginPath();
       ctx.moveTo(cx - halfW,      yBot);
       ctx.lineTo(cx - halfW,      yBot - sh);
       ctx.lineTo(cx - halfW - sh, yBot);
       ctx.closePath(); ctx.fill();
-      // Right shoe
       ctx.beginPath();
       ctx.moveTo(cx + halfW,      yBot);
       ctx.lineTo(cx + halfW,      yBot - sh);
       ctx.lineTo(cx + halfW + sh, yBot);
       ctx.closePath(); ctx.fill();
-
     }
 
-    // Label on right side of right wall — 3 lines anchored at shoe
-    const sh0 = isOH ? 2 : Math.min(13, halfW * 0.55);
-    const lx  = cx + halfW + sh0 + 5;
-    const LH  = 11;  // line height px
-
-    const botMD  = +(row.bot  || maxDepth);
+    // Collect label metadata — draw later after deconfliction
+    const sh0    = isOH ? 2 : Math.min(13, halfW * 0.55);
+    const lx     = cx + halfW + sh0 + 5;
+    const botMD  = +(row.bot || maxDepth);
     const tvdVal = Math.round(_mdToTVD(survey, botMD));
-    const grade  = row.grade      || '';
-    const wt     = row.nomWt_ppf  ? `${row.nomWt_ppf}ppf` : '';
-    const line1  = grade || wt
+    const grade  = row.grade     || '';
+    const wt     = row.nomWt_ppf ? `${row.nomWt_ppf}ppf` : '';
+    const line1  = (grade || wt)
       ? `${size}" ${grade}${wt ? ' ' + wt : ''}`.trim()
       : `${size}" ${row.def}`;
-    const line2  = `TVD: ${tvdVal.toLocaleString()}ft`;
-    const line3  = `MD: ${Math.round(botMD).toLocaleString()}ft`;
+    labelData.push({
+      lx, yShoe: yBot, color,
+      line1, line2: `TVD: ${tvdVal.toLocaleString()}ft`,
+      line3: `MD: ${Math.round(botMD).toLocaleString()}ft`,
+    });
+  });
 
-    // Clamp block so it stays within canvas
-    const blockH = LH * 3;
-    const lyBase = Math.max(PAD_T + 2, Math.min(H - PAD_B - blockH - 2, yBot - LH));
+  // ── Label deconfliction ────────────────────────────────────────────────────
+  const LH = 11, BLOCK = LH * 3, GAP = 3;
 
-    ctx.fillStyle    = color;
-    ctx.font         = 'bold 9px sans-serif';
-    ctx.textAlign    = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(line1, lx, lyBase);
+  // Sort by shoe depth (top to bottom) so we push downward
+  labelData.sort((a, b) => a.yShoe - b.yShoe);
+
+  // Initial placement: anchor each label just above its shoe
+  labelData.forEach(lb => {
+    lb.ly = Math.max(PAD_T + 2, Math.min(H - PAD_B - BLOCK - 2, lb.yShoe - LH));
+  });
+
+  // Forward pass: push each block below the previous one if they overlap
+  for (let i = 1; i < labelData.length; i++) {
+    const prev = labelData[i - 1];
+    const minY = prev.ly + BLOCK + GAP;
+    if (labelData[i].ly < minY) labelData[i].ly = minY;
+    // Hard clamp at canvas bottom
+    labelData[i].ly = Math.min(labelData[i].ly, H - PAD_B - BLOCK - 2);
+  }
+
+  // Draw labels; add a small leader dot at the shoe when label moved far from it
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  labelData.forEach(lb => {
+    // Thin leader line when label is more than BLOCK away from its shoe
+    if (Math.abs(lb.ly - (lb.yShoe - LH)) > BLOCK + GAP) {
+      ctx.strokeStyle = lb.color; ctx.lineWidth = 0.5; ctx.setLineDash([2, 2]);
+      ctx.beginPath(); ctx.moveTo(lb.lx, lb.yShoe); ctx.lineTo(lb.lx, lb.ly + BLOCK); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.fillStyle = lb.color;
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillText(lb.line1, lb.lx, lb.ly);
     ctx.font = '9px sans-serif';
-    ctx.fillText(line2, lx, lyBase + LH);
-    ctx.fillText(line3, lx, lyBase + LH * 2);
+    ctx.fillText(lb.line2, lb.lx, lb.ly + LH);
+    ctx.fillText(lb.line3, lb.lx, lb.ly + LH * 2);
   });
 
 
