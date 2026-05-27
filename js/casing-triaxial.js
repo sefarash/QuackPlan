@@ -109,8 +109,10 @@ function drawCasingTriaxial() {
   const BF      = 1 - mw / 65.5;
   const ppfgPts = _readPPFG();
   const ratings = _readCDRatings();
-  const sfBurst    = +(document.getElementById('cdSFBurst')?.value    || 1.10);
-  const sfCollapse = +(document.getElementById('cdSFCollapse')?.value || 1.00);
+  const sfBurst       = +(document.getElementById('cdSFBurst')?.value       || 1.10);
+  const sfCollapse    = +(document.getElementById('cdSFCollapse')?.value    || 1.00);
+  const sfTension     = +(document.getElementById('cdSFTension')?.value     || 1.25);
+  const sfCompression = +(document.getElementById('cdSFCompression')?.value || 1.10);
 
   const casingRows = _readSchematicRows()
     .filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0)
@@ -173,9 +175,15 @@ function drawCasingTriaxial() {
 
   // API design box from user-entered ratings / SF
   const rr              = ratings[selKey] || {};
-  const burst_rating    = rr.burst    || row.burst    || 0;
-  const collapse_rating = rr.collapse || row.collapse || 0;
-  const hasBox          = burst_rating > 0 || collapse_rating > 0;
+  const burst_rating    = rr.burst       || row.burst    || 0;
+  const collapse_rating = rr.collapse    || row.collapse || 0;
+  const tension_rating  = rr.tension     || 0;
+  const comp_rating     = rr.compression || 0;
+  const hasBox          = burst_rating > 0 || collapse_rating > 0 || tension_rating > 0 || comp_rating > 0;
+
+  // API box x-extents: use user-entered ratings if available, else body yield
+  const bx_pos = tension_rating > 0 ? tension_rating / sfTension     : bodyYield_klbf / sfTension;
+  const bx_neg = comp_rating    > 0 ? comp_rating    / sfCompression : bodyYield_klbf / sfCompression;
 
   // Axis range — fit ellipse + load cases + box
   let xR = Math.max(bodyYield_klbf * 1.15, F_overpull * 1.1, 50);
@@ -183,10 +191,11 @@ function drawCasingTriaxial() {
     σy / C_h * 1.15,
     Math.abs(Δp_collapse) * 1.15,
     Δp_burst > 0 ? Δp_burst * 1.15 : 500,
-    hasBox ? burst_rating / sfBurst * 1.15 : 0,
+    hasBox ? burst_rating    / sfBurst    * 1.15 : 0,
     hasBox ? collapse_rating / sfCollapse * 1.15 : 0,
     500
   );
+  if (hasBox) xR = Math.max(xR, bx_pos * 1.15, bx_neg * 1.15);
   xR = Math.ceil(xR / 50)  * 50;
   yR = Math.ceil(yR / 500) * 500;
 
@@ -212,22 +221,24 @@ function drawCasingTriaxial() {
 
   // ── API design box ──────────────────────────────────────────────────────────
   if (hasBox) {
-    const bx = bodyYield_klbf / sfBurst;
-    const by = burst_rating    / sfBurst;
-    const cy_b = collapse_rating / sfCollapse;
+    const by   = burst_rating    > 0 ? burst_rating    / sfBurst    : 0;
+    const cy_b = collapse_rating > 0 ? collapse_rating / sfCollapse : 0;
     const boxPts = [
-      { x: -bx, y:  by }, { x: bx, y:  by },
-      { x:  bx, y: -cy_b }, { x: -bx, y: -cy_b },
-      { x: -bx, y:  by },
+      { x: -bx_neg, y:  by }, { x: bx_pos, y:  by },
+      { x:  bx_pos, y: -cy_b }, { x: -bx_neg, y: -cy_b },
+      { x: -bx_neg, y:  by },
     ];
     ctx.setLineDash([6, 3]);
     _cdLine(ctx, boxPts, '#d35fb7', 1.5, g);
     ctx.setLineDash([]);
-    // Label bottom-right corner
-    const corner = _cdPt({ x: bx, y: -cy_b }, g);
+    // Label at bottom-right corner of box
+    const corner = _cdPt({ x: bx_pos, y: -cy_b }, g);
     ctx.fillStyle = '#d35fb7'; ctx.font = '9px sans-serif';
     ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-    ctx.fillText(`DF ${sfBurst.toFixed(2)} / ${sfCollapse.toFixed(2)}`, corner.cx - 3, corner.cy + 3);
+    ctx.fillText(
+      `B:${sfBurst.toFixed(2)} C:${sfCollapse.toFixed(2)} T:${sfTension.toFixed(2)} Cp:${sfCompression.toFixed(2)}`,
+      corner.cx - 3, corner.cy + 3
+    );
   }
 
   // ── Von Mises ellipses ──────────────────────────────────────────────────────

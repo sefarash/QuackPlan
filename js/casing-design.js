@@ -3,8 +3,10 @@
 const GAS_GRAD = 0.1; // psi/ft gas gradient
 
 function drawCasingDesign() {
-  const sfBurst    = +(document.getElementById('cdSFBurst')?.value    || 1.10);
-  const sfCollapse = +(document.getElementById('cdSFCollapse')?.value || 1.00);
+  const sfBurst       = +(document.getElementById('cdSFBurst')?.value       || 1.10);
+  const sfCollapse    = +(document.getElementById('cdSFCollapse')?.value    || 1.00);
+  const sfTension     = +(document.getElementById('cdSFTension')?.value     || 1.25);
+  const sfCompression = +(document.getElementById('cdSFCompression')?.value || 1.10);
 
   const survey     = qpState.survey || [];
   const allRows    = _readSchematicRows();
@@ -16,7 +18,7 @@ function drawCasingDesign() {
   const ratings     = _readCDRatings();
   const selectedKey = _selectedCDKey();
 
-  _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse, selectedKey);
+  _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse, sfTension, sfCompression, selectedKey);
   drawCasingTriaxial();
 }
 
@@ -36,14 +38,19 @@ function _readCDRatings() {
   for (const tr of tbody.rows) {
     const key    = tr.dataset.key;
     const inputs = tr.querySelectorAll('input[type=number]');
-    if (key) out[key] = { burst: +(inputs[0]?.value || 0), collapse: +(inputs[1]?.value || 0) };
+    if (key) out[key] = {
+      burst:       +(inputs[0]?.value || 0),
+      collapse:    +(inputs[1]?.value || 0),
+      tension:     +(inputs[2]?.value || 0),
+      compression: +(inputs[3]?.value || 0),
+    };
   }
   return out;
 }
 
 // ── Ratings + selection table ─────────────────────────────────────────────────
 
-function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse, selectedKey) {
+function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse, sfTension, sfCompression, selectedKey) {
   const div = document.getElementById('cdRatingsDiv');
   if (!div) return;
 
@@ -55,8 +62,10 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
   const rows = casingRows.map((row, idx) => {
     const key      = _cdKey(row);
     const r        = ratings[key] || {};
-    const bLim     = r.burst    ? Math.round(r.burst    / sfBurst)    : null;
-    const cLim     = r.collapse ? Math.round(r.collapse / sfCollapse) : null;
+    const bLim     = r.burst       ? Math.round(r.burst       / sfBurst)       : null;
+    const cLim     = r.collapse    ? Math.round(r.collapse    / sfCollapse)    : null;
+    const tLim     = r.tension     ? +(r.tension     / sfTension).toFixed(1)     : null;
+    const compLim  = r.compression ? +(r.compression / sfCompression).toFixed(1) : null;
     const shoeTVD  = Math.round(_tvdAt(survey, +(row.bot)));
     const checked  = (selectedKey ? key === selectedKey : idx === 0) ? 'checked' : '';
     const specLine = [row.grade, row.nomWt_ppf ? row.nomWt_ppf + ' ppf' : null]
@@ -81,6 +90,16 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
           style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
         ${cLim !== null ? `<div style="font-size:10px;color:#7a4aa0">/ ${sfCollapse} = ${cLim.toLocaleString()}</div>` : ''}
       </td>
+      <td style="padding:2px 4px">
+        <input type="number" step="10" value="${r.tension || ''}" placeholder="klbf"
+          style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
+        ${tLim !== null ? `<div style="font-size:10px;color:#2a7fa8">/ ${sfTension} = ${tLim}</div>` : ''}
+      </td>
+      <td style="padding:2px 4px">
+        <input type="number" step="10" value="${r.compression || ''}" placeholder="klbf"
+          style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
+        ${compLim !== null ? `<div style="font-size:10px;color:#a07a2a">/ ${sfCompression} = ${compLim}</div>` : ''}
+      </td>
     </tr>`;
   }).join('');
 
@@ -92,6 +111,8 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
         <th>Section</th>
         <th>Burst (psi)</th>
         <th>Collapse (psi)</th>
+        <th>Tension (klbf)</th>
+        <th>Compr. (klbf)</th>
       </tr></thead>
       <tbody id="cdRatingsBody">${rows}</tbody>
     </table>
