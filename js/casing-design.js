@@ -5,8 +5,8 @@ const GAS_GRAD = 0.1; // psi/ft gas gradient
 function drawCasingDesign() {
   const sfBurst       = +(document.getElementById('cdSFBurst')?.value       || 1.10);
   const sfCollapse    = +(document.getElementById('cdSFCollapse')?.value    || 1.00);
-  const sfTension     = +(document.getElementById('cdSFTension')?.value     || 1.25);
-  const sfCompression = +(document.getElementById('cdSFCompression')?.value || 1.10);
+  const sfTension     = +(document.getElementById('cdSFTension')?.value     || 1.30);
+  const sfCompression = +(document.getElementById('cdSFCompression')?.value || 1.30);
 
   const survey     = qpState.survey || [];
   const allRows    = _readSchematicRows();

@@ -111,8 +111,8 @@ function drawCasingTriaxial() {
   const ratings = _readCDRatings();
   const sfBurst       = +(document.getElementById('cdSFBurst')?.value       || 1.10);
   const sfCollapse    = +(document.getElementById('cdSFCollapse')?.value    || 1.00);
-  const sfTension     = +(document.getElementById('cdSFTension')?.value     || 1.25);
-  const sfCompression = +(document.getElementById('cdSFCompression')?.value || 1.10);
+  const sfTension     = +(document.getElementById('cdSFTension')?.value     || 1.30);
+  const sfCompression = +(document.getElementById('cdSFCompression')?.value || 1.30);
 
   const casingRows = _readSchematicRows()
     .filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0)
@@ -231,14 +231,32 @@ function drawCasingTriaxial() {
     ctx.setLineDash([6, 3]);
     _cdLine(ctx, boxPts, '#d35fb7', 1.5, g);
     ctx.setLineDash([]);
-    // Label at bottom-right corner of box
-    const corner = _cdPt({ x: bx_pos, y: -cy_b }, g);
+
+    // DF labels on each side — matches WellPlan convention
     ctx.fillStyle = '#d35fb7'; ctx.font = '9px sans-serif';
-    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-    ctx.fillText(
-      `B:${sfBurst.toFixed(2)} C:${sfCollapse.toFixed(2)} T:${sfTension.toFixed(2)} Cp:${sfCompression.toFixed(2)}`,
-      corner.cx - 3, corner.cy + 3
-    );
+    const xMidBox = (-bx_neg + bx_pos) / 2;
+    const yMidBox = (by - cy_b) / 2;
+
+    // Burst DF — just inside top edge
+    if (by > 0) {
+      const pt = _cdPt({ x: xMidBox, y: by }, g);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(`DF = ${sfBurst.toFixed(2)}`, pt.cx, pt.cy + 2);
+    }
+    // Collapse DF — just inside bottom edge
+    if (cy_b > 0) {
+      const pt = _cdPt({ x: xMidBox, y: -cy_b }, g);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`DF = ${sfCollapse.toFixed(2)}`, pt.cx, pt.cy - 2);
+    }
+    // Tension DF — just inside right edge (vertical midpoint)
+    const rPt = _cdPt({ x: bx_pos, y: yMidBox }, g);
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(`DF = ${sfTension.toFixed(2)}`, rPt.cx - 3, rPt.cy);
+    // Compression DF — just inside left edge
+    const lPt = _cdPt({ x: -bx_neg, y: yMidBox }, g);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(`DF = ${sfCompression.toFixed(2)}`, lPt.cx + 3, lPt.cy);
   }
 
   // ── Von Mises ellipses ──────────────────────────────────────────────────────
