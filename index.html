@@ -566,25 +566,15 @@
             style="width:60px" onchange="drawCasingDesign()">
         </label>
         <button class="hdr-btn" onclick="drawCasingDesign()">Compute</button>
-        <button class="hdr-btn" onclick="exportChartPNG('cdBurstCanvas','burst.png')">⬇ Burst PNG</button>
-        <button class="hdr-btn" onclick="exportChartPNG('cdCollapseCanvas','collapse.png')">⬇ Collapse PNG</button>
-        <button class="hdr-btn" onclick="exportChartPNG('cdTriaxialCanvas','triaxial.png')">⬇ Triaxial PNG</button>
+        <button class="hdr-btn" onclick="exportChartPNG('cdTriaxialCanvas','triaxial.png')">⬇ PNG</button>
       </div>
-      <div style="display:flex;flex:1;gap:10px;min-height:0">
-        <!-- Burst chart -->
-        <div class="output-canvas-wrap" style="flex:1">
-          <canvas id="cdBurstCanvas"></canvas>
-        </div>
-        <!-- Collapse chart -->
-        <div class="output-canvas-wrap" style="flex:1">
-          <canvas id="cdCollapseCanvas"></canvas>
-        </div>
+      <div style="display:flex;flex:1;gap:12px;min-height:0">
         <!-- Triaxial / Von Mises chart -->
-        <div class="output-canvas-wrap" style="flex:1">
+        <div class="output-canvas-wrap" style="flex:3">
           <canvas id="cdTriaxialCanvas"></canvas>
         </div>
-        <!-- Ratings table -->
-        <div style="flex:0 0 280px;min-width:0;overflow-y:auto;padding-right:4px">
+        <!-- Casing selection + ratings -->
+        <div style="flex:0 0 300px;min-width:0;overflow-y:auto;padding-right:4px">
           <div id="cdRatingsDiv"></div>
         </div>
       </div>
@@ -768,7 +758,7 @@
 
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
-     'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdBurstCanvas','cdCollapseCanvas','cdTriaxialCanvas','ktCanvas',
+     'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdTriaxialCanvas','ktCanvas',
      'finalDiagramCanvas'].forEach(id => CI.attach(id));
 
     makeRowsDraggable('traj1Body',      traj1Recalc);

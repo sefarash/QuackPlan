@@ -1,17 +1,16 @@
 // ===== CASING TRIAXIAL / VON MISES CHART =====
-// Von Mises ellipse in (Axial Load klbf, Differential Pressure psi) space
+// Von Mises envelope in (Axial Load klbf, Differential Pressure psi) space
 // X: tension right (+), compression left (-)
 // Y: burst up (+), collapse down (-)
 //
-// Ellipse derivation (Lamé + Von Mises):
-//   σ_a² - σ_a·σ_θ + σ_θ² = (σ_y / DF)²
-//   σ_a = F / A        (axial stress, psi)
-//   σ_θ = Δp · C_h     (hoop stress at inner wall, Lamé)
-//   C_h = (r_i² + r_o²) / (r_o² - r_i²)
+// Ellipse (Lamé thick-wall + Von Mises):
+//   σ_a² − σ_a·σ_θ + σ_θ² = (σ_y / DF)²
+//   σ_a = F / A_s    (axial stress, psi, tension +)
+//   σ_θ = Δp · C_h   (hoop stress at inner wall, Lamé: C_h = (r_i²+r_o²)/(r_o²−r_i²))
 //
-// Parametric solution (θ = 0 → 2π):
-//   σ_a(θ) = R·(cos θ  −  sin θ / √3)
-//   σ_θ(θ) = R·(cos θ  +  sin θ / √3),  R = σ_y / DF
+// Parametric form (θ = 0 → 2π):
+//   σ_a(θ) = R · (cos θ − sin θ / √3)
+//   σ_θ(θ) = R · (cos θ + sin θ / √3),   R = σ_y / DF
 
 const CASING_GRADE_YLD = {
   'J-55': 55000, 'K-55': 55000, 'LS-65': 65000,
@@ -20,7 +19,6 @@ const CASING_GRADE_YLD = {
   'P-110': 110000, 'Q-125': 125000,
 };
 
-// Build Von Mises ellipse points in physical (F_klbf, Δp_psi) space
 function _vmEllipse(od_in, id_in, σy, DF) {
   const r_o = od_in / 2, r_i = id_in / 2;
   const A   = Math.PI / 4 * (od_in * od_in - id_in * id_in);
@@ -46,8 +44,8 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
     const gx = l + pw * i / 5, gy = t + ph * i / 5;
-    ctx.beginPath(); ctx.moveTo(gx, t);      ctx.lineTo(gx, t + ph); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(l, gy);      ctx.lineTo(l + pw, gy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx, t);  ctx.lineTo(gx, t + ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(l, gy);  ctx.lineTo(l + pw, gy); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText((-xR + 2 * xR * i / 5).toFixed(0), gx, t + ph + 4);
@@ -55,9 +53,8 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
     ctx.fillText((yR - 2 * yR * i / 5).toFixed(0), l - 5, gy);
   }
 
-  // Zero lines
   const x0 = l + pw / 2, y0 = t + ph / 2;
-  ctx.strokeStyle = C.dim; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = C.dim; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
   ctx.beginPath(); ctx.moveTo(x0, t);  ctx.lineTo(x0, t + ph); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(l, y0);  ctx.lineTo(l + pw, y0); ctx.stroke();
   ctx.setLineDash([]);
@@ -65,16 +62,16 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(l, t, pw, ph);
 
-  // Quadrant labels
+  // Quadrant annotations
   ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
   ctx.textAlign = 'left';  ctx.textBaseline = 'middle';
-  ctx.fillText('← Compression', l + 4, t + ph / 2 - 10);
+  ctx.fillText('← Compression', l + 6, y0 - 11);
   ctx.textAlign = 'right';
-  ctx.fillText('Tension →', l + pw - 4, t + ph / 2 - 10);
+  ctx.fillText('Tension →', l + pw - 6, y0 - 11);
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText('↑ Burst', x0, t + ph / 2 - 2);
+  ctx.fillText('↑ Burst', x0, y0 - 2);
   ctx.textBaseline = 'top';
-  ctx.fillText('↓ Collapse', x0, t + ph / 2 + 2);
+  ctx.fillText('↓ Collapse', x0, y0 + 2);
 
   // Axis titles
   ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
@@ -89,7 +86,6 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   return { l, t, pw, ph, xR, yR };
 }
 
-// Map physical (F_klbf, Δp_psi) → canvas pixel
 function _cdPt(p, g) {
   return {
     cx: g.l + ((p.x + g.xR) / (2 * g.xR)) * g.pw,
@@ -97,7 +93,6 @@ function _cdPt(p, g) {
   };
 }
 
-// Draw a curve in physical coords
 function _cdLine(ctx, pts, color, lw, g) {
   ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -108,7 +103,7 @@ function _cdLine(ctx, pts, color, lw, g) {
   ctx.stroke();
 }
 
-// ── Main draw function ────────────────────────────────────────────────────────
+// ── Main chart ────────────────────────────────────────────────────────────────
 function drawCasingTriaxial() {
   const CID = 'cdTriaxialCanvas';
   const c   = _chartSetup(CID);
@@ -119,6 +114,9 @@ function drawCasingTriaxial() {
   const mw      = fluidGet().mudWeight || 10;
   const BF      = 1 - mw / 65.5;
   const ppfgPts = _readPPFG();
+  const ratings = _readCDRatings();
+  const sfBurst    = +(document.getElementById('cdSFBurst')?.value    || 1.10);
+  const sfCollapse = +(document.getElementById('cdSFCollapse')?.value || 1.00);
 
   const casingRows = _readSchematicRows()
     .filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0)
@@ -129,74 +127,87 @@ function drawCasingTriaxial() {
     _noData(ctx, W, H, 'Select weight & grade in Well Schematic for triaxial'); return;
   }
 
+  // Selected section (default to first)
+  const selKey = _selectedCDKey() || _cdKey(withSpec[0]);
+  const secIdx = withSpec.findIndex(r => _cdKey(r) === selKey);
+  const i      = secIdx >= 0 ? secIdx : 0;
+  const row    = withSpec[i];
+
+  const od_in = +(row.size);
+  const id_in = +row.id_in;
+  const σy    = CASING_GRADE_YLD[row.grade] || 80000;
+  const A     = Math.PI / 4 * (od_in * od_in - id_in * id_in);
+  const r_o   = od_in / 2, r_i = id_in / 2;
+  const C_h   = (r_i * r_i + r_o * r_o) / (r_o * r_o - r_i * r_i);
+  const bodyYield_klbf = σy * A / 1000;
+
+  const shoeMD  = +(row.bot);
+  const topMD   = i === 0 ? 0 : +(withSpec[i - 1].bot);
+  const shoeTVD = _tvdAt(survey, shoeMD);
+  const topTVD  = _tvdAt(survey, topMD);
+  const nomWt   = row.nomWt_ppf || 0;
+
+  // Cumulative buoyant weight above this section
+  let F_above = 0;
+  for (let j = 0; j < i; j++) {
+    const rj  = withSpec[j];
+    const len = +(rj.bot) - (j === 0 ? 0 : +(withSpec[j - 1].bot));
+    F_above  += len * (rj.nomWt_ppf || 0) * BF / 1000;
+  }
+  const F_this    = (shoeMD - topMD) * nomWt * BF / 1000;
+  const F_topHang = F_above + F_this;
+
   // MASP from highest FG at any shoe
-  const maxMasp = casingRows.reduce((mx, row) => {
-    const shoeTVD = _tvdAt(survey, +(row.bot));
-    const fg      = _ppfgInterp(ppfgPts, shoeTVD, 'fg');
-    return Math.max(mx, Math.max(0, (fg - mw) * 0.052 * shoeTVD));
+  const maxMasp = casingRows.reduce((mx, r2) => {
+    const tvd = _tvdAt(survey, +(r2.bot));
+    const fg  = _ppfgInterp(ppfgPts, tvd, 'fg');
+    return Math.max(mx, Math.max(0, (fg - mw) * 0.052 * tvd));
   }, 0);
 
-  const COLORS = ['#2a7fa8', '#1a7a4a', '#e67e22', '#8e44ad', '#c0392b', '#16a085'];
+  const Δp_burst    = Math.max(0, maxMasp + GAS_GRAD * topTVD - mw * 0.052 * topTVD);
+  const Δp_collapse = -(mw * 0.052 * shoeTVD);
 
-  // Build section data and determine axis range
-  let xR = 50, yR = 500;
-  const sections = withSpec.map((row, i) => {
-    const od_in = +(row.size);
-    const id_in = +row.id_in;
-    const σy    = CASING_GRADE_YLD[row.grade] || 80000;
-    const A     = Math.PI / 4 * (od_in * od_in - id_in * id_in);
-    const r_o   = od_in / 2, r_i = id_in / 2;
-    const C_h   = (r_i * r_i + r_o * r_o) / (r_o * r_o - r_i * r_i);
-    const shoeMD  = +(row.bot);
-    const topMD   = i === 0 ? 0 : +(withSpec[i - 1].bot);
-    const shoeTVD = _tvdAt(survey, shoeMD);
-    const topTVD  = _tvdAt(survey, topMD);
-    const nomWt   = row.nomWt_ppf || 0;
-
-    // Cumulative buoyant weight of sections above this one
-    let F_above = 0;
-    for (let j = 0; j < i; j++) {
-      const rj  = withSpec[j];
-      const len = +(rj.bot) - (j === 0 ? 0 : +(withSpec[j - 1].bot));
-      F_above  += len * (rj.nomWt_ppf || 0) * BF / 1000;
+  // Overpull: POOH surface hookload if available, else 1.3× hanging weight
+  let F_overpull = F_topHang * 1.3;
+  if (qpState.tdResult) {
+    const poohSt = qpState.tdResult.modes?.pooh?.ffSensitivity?.mid?.stations || [];
+    if (poohSt.length) {
+      const surf = poohSt.reduce((mn, s) => s.md < mn.md ? s : mn, poohSt[0]);
+      F_overpull = Math.max(F_overpull, surf.axialLoad_lbf / 1000);
     }
-    const F_this    = (shoeMD - topMD) * nomWt * BF / 1000;
-    const F_topHang = F_above + F_this;   // tension at top when freely hanging
+  }
 
-    // Burst differential at top of section (gas-to-surface scenario)
-    const Δp_burst    = Math.max(0, maxMasp + GAS_GRAD * topTVD - mw * 0.052 * topTVD);
-    // Collapse at shoe (evacuated string — worst case)
-    const Δp_collapse = -(mw * 0.052 * shoeTVD);
+  // API design box from user-entered ratings / SF
+  const rr              = ratings[selKey] || {};
+  const burst_rating    = rr.burst    || row.burst    || 0;
+  const collapse_rating = rr.collapse || row.collapse || 0;
+  const hasBox          = burst_rating > 0 || collapse_rating > 0;
 
-    const loadPts = [
-      { x: F_topHang, y: 0,           label: 'Initial'  },
-      { x: F_topHang, y: Δp_burst,    label: 'Burst'    },
-      { x: F_above,   y: Δp_collapse, label: 'Collapse' },
-    ];
-
-    // Expand axis to fit ellipse extremes
-    xR = Math.max(xR, σy * A / 1000 * 1.15);
-    yR = Math.max(yR, σy / C_h * 1.15, Math.abs(Δp_collapse) * 1.15, Δp_burst * 1.15);
-
-    return {
-      ell10: _vmEllipse(od_in, id_in, σy, 1.0),
-      ell11: _vmEllipse(od_in, id_in, σy, 1.1),
-      loadPts,
-      color: COLORS[i % COLORS.length],
-      label: `${od_in}" ${row.grade}`,
-      σy, A, C_h,
-    };
-  });
-
-  // Round axis up to nice numbers
+  // Axis range — fit ellipse + load cases + box
+  let xR = Math.max(bodyYield_klbf * 1.15, F_overpull * 1.1, 50);
+  let yR = Math.max(
+    σy / C_h * 1.15,
+    Math.abs(Δp_collapse) * 1.15,
+    Δp_burst > 0 ? Δp_burst * 1.15 : 500,
+    hasBox ? burst_rating / sfBurst * 1.15 : 0,
+    hasBox ? collapse_rating / sfCollapse * 1.15 : 0,
+    500
+  );
   xR = Math.ceil(xR / 50)  * 50;
   yR = Math.ceil(yR / 500) * 500;
 
   const g = _cdGrid2D(ctx, W, H, xR, yR);
 
-  // CI storage — shift coords so 0 → left/bottom edge (CI assumes 0-based)
+  // Build ellipses
+  const ell10 = _vmEllipse(od_in, id_in, σy, 1.0);
+  const ell11 = _vmEllipse(od_in, id_in, σy, 1.1);
+
+  // CI storage (shift coords so left/bottom edge = 0)
   const shift = pts => pts.map(p => ({ x: p.x + xR, y: p.y + yR }));
-  CI.storeLive(CID, sections.map(s => ({ pts: shift(s.ell10), color: s.color, label: s.label })));
+  CI.storeLive(CID, [
+    { pts: shift(ell10), color: '#e67e22', label: 'DF 1.0' },
+    { pts: shift(ell11), color: '#1a7a4a', label: 'DF 1.1' },
+  ]);
   CI.register(CID, {
     pad: { l: g.l, t: g.t, pw: g.pw, ph: g.ph },
     xMax: 2 * xR, yMax: 2 * yR,
@@ -205,32 +216,75 @@ function drawCasingTriaxial() {
   });
   CI.drawFrozen(ctx, CID);
 
-  sections.forEach(sec => {
-    // DF = 1.0 ellipse — solid
-    _cdLine(ctx, sec.ell10, sec.color, 2, g);
-    // DF = 1.1 ellipse — dashed
-    ctx.setLineDash([5, 3]);
-    _cdLine(ctx, sec.ell11, sec.color, 1.2, g);
+  // ── API design box ──────────────────────────────────────────────────────────
+  if (hasBox) {
+    const bx = bodyYield_klbf / sfBurst;
+    const by = burst_rating    / sfBurst;
+    const cy_b = collapse_rating / sfCollapse;
+    const boxPts = [
+      { x: -bx, y:  by }, { x: bx, y:  by },
+      { x:  bx, y: -cy_b }, { x: -bx, y: -cy_b },
+      { x: -bx, y:  by },
+    ];
+    ctx.setLineDash([6, 3]);
+    _cdLine(ctx, boxPts, '#d35fb7', 1.5, g);
     ctx.setLineDash([]);
+    // Label bottom-right corner
+    const corner = _cdPt({ x: bx, y: -cy_b }, g);
+    ctx.fillStyle = '#d35fb7'; ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillText(`DF ${sfBurst.toFixed(2)} / ${sfCollapse.toFixed(2)}`, corner.cx - 3, corner.cy + 3);
+  }
 
-    // Load case markers
-    const MARKERS = { 'Initial': '●', 'Burst': '▲', 'Collapse': '▼' };
-    sec.loadPts.forEach(pt => {
-      const { cx, cy } = _cdPt(pt, g);
-      ctx.fillStyle = sec.color;
-      ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = _qpColors().text; ctx.font = '9px sans-serif';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-      ctx.fillText(pt.label, cx + 6, cy - 2);
-    });
+  // ── Von Mises ellipses ──────────────────────────────────────────────────────
+  // DF = 1.0 — gold/orange solid
+  _cdLine(ctx, ell10, '#e67e22', 2.5, g);
+  // DF = 1.1 — green dashed
+  ctx.setLineDash([6, 3]);
+  _cdLine(ctx, ell11, '#1a7a4a', 1.5, g);
+  ctx.setLineDash([]);
+
+  // ── Load case markers ───────────────────────────────────────────────────────
+  const loadPts = [
+    { x: F_topHang,  y: 0,           label: 'Initial',  color: '#2a7fa8' },
+    { x: F_topHang,  y: Δp_burst,    label: 'Burst',    color: '#c0392b' },
+    { x: F_above,    y: Δp_collapse, label: 'Collapse', color: '#7a4aa0' },
+    { x: F_overpull, y: 0,           label: 'Overpull', color: '#e07a1a' },
+  ];
+  loadPts.forEach(pt => {
+    const { cx, cy } = _cdPt(pt, g);
+    // Dot
+    ctx.fillStyle = pt.color;
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+    // Label
+    ctx.fillStyle = _qpColors().text; ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(pt.label, cx + 7, cy - 2);
   });
 
-  // Legend + DF note
-  _legend(ctx, W, g.t, sections.map(s => s.label), sections.map(s => s.color));
+  // ── Pipe spec heading ───────────────────────────────────────────────────────
   const C = _qpColors();
-  ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText('Solid = DF 1.0 · Dashed = DF 1.1', g.l + 4, g.t + 4);
+  ctx.fillStyle = C.text; ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  const specStr = [
+    `${od_in}" Casing`,
+    nomWt   ? `${nomWt} ppf` : null,
+    row.grade || null,
+    row.def !== 'Open Hole' ? row.def : null,
+  ].filter(Boolean).join('  ·  ');
+  ctx.fillText(specStr, g.l + g.pw / 2, g.t - 10);
 
+  ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
+  ctx.fillText(
+    `σ_y = ${(σy / 1000).toFixed(0)} kpsi  ·  Body Yield = ${bodyYield_klbf.toFixed(0)} klbf  ·  ID = ${id_in.toFixed(3)}"`,
+    g.l + g.pw / 2, g.t - 10 - 14
+  );
+
+  // ── Legend ──────────────────────────────────────────────────────────────────
+  const legendLabels = ['DF 1.0 (yield)', 'DF 1.1 (design)'];
+  const legendColors = ['#e67e22', '#1a7a4a'];
+  if (hasBox) { legendLabels.push('API box'); legendColors.push('#d35fb7'); }
+
+  _legend(ctx, W, g.t, legendLabels, legendColors);
   CI.drawAnnotations(ctx, CID);
 }
