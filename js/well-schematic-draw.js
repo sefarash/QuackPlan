@@ -160,18 +160,24 @@ function drawSchematic(survey) {
   // Sort by shoe depth (top to bottom) so we push downward
   labelData.sort((a, b) => a.yShoe - b.yShoe);
 
-  // Initial placement: anchor each label just above its shoe
+  // Initial placement: anchor each label just above its shoe (no canvas clamp yet)
   labelData.forEach(lb => {
-    lb.ly = Math.max(PAD_T + 2, Math.min(H - PAD_B - BLOCK - 2, lb.yShoe - LH));
+    lb.ly = Math.max(PAD_T + 2, lb.yShoe - LH);
   });
 
-  // Forward pass: push each block below the previous one if they overlap
+  // Forward pass: push each block below the previous — NO clamp here so
+  // labels near the bottom don't get collapsed back to the same y
   for (let i = 1; i < labelData.length; i++) {
-    const prev = labelData[i - 1];
-    const minY = prev.ly + BLOCK + GAP;
+    const minY = labelData[i - 1].ly + BLOCK + GAP;
     if (labelData[i].ly < minY) labelData[i].ly = minY;
-    // Hard clamp at canvas bottom
-    labelData[i].ly = Math.min(labelData[i].ly, H - PAD_B - BLOCK - 2);
+  }
+
+  // Backward pass: clamp to canvas bottom and pull earlier labels up to maintain gaps
+  const bottomLimit = H - PAD_B - BLOCK - 2;
+  for (let i = labelData.length - 1; i >= 0; i--) {
+    const maxY = i === labelData.length - 1 ? bottomLimit : labelData[i + 1].ly - BLOCK - GAP;
+    if (labelData[i].ly > maxY) labelData[i].ly = maxY;
+    labelData[i].ly = Math.max(PAD_T + 2, labelData[i].ly);
   }
 
   // Draw labels; add a small leader dot at the shoe when label moved far from it
