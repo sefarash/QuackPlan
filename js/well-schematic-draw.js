@@ -42,7 +42,7 @@ function drawSchematic(survey) {
   const maxDepth = Math.max(lastSurvey.md, ...schRows.map(r => +(r.bot || 0)), 1);
 
   // ── Layout ─────────────────────────────────────────────────────────────────
-  const PAD_T = 54, PAD_B = 24, PAD_L = 46, PAD_R = 8;
+  const PAD_T = 90, PAD_B = 24, PAD_L = 46, PAD_R = 8;
   const plotH  = H - PAD_T - PAD_B;
   const scaleY = plotH / maxDepth;
 
@@ -232,6 +232,9 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
 
   const yRKB = PAD_T;      // depth 0 = RKB
 
+  // ── RKB rig icon ──────────────────────────────────────────────────────────
+  _drawRigIcon(ctx, cx, yRKB);
+
   // ── Always draw RKB marker ────────────────────────────────────────────────
   ctx.strokeStyle = '#1a5f7a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.moveTo(X0, yRKB); ctx.lineTo(X1, yRKB); ctx.stroke();
@@ -274,6 +277,49 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
     // Bracket between GL and MSL with distance label
     if (yGL < yBot) _drawBracket(ctx, BRKT, yGL, yMSL, `${gl}'`, '#2a7a2a');
   }
+}
+
+function _drawRigIcon(ctx, cx, yFloor) {
+  const iH = 42;   // derrick height above rig floor
+  const iW = 13;   // half-width at base
+  const yApex = yFloor - iH;
+  const col = '#1a5f7a';
+
+  ctx.strokeStyle = col; ctx.setLineDash([]);
+
+  // Left and right derrick legs
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(cx - iW, yFloor); ctx.lineTo(cx, yApex); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + iW, yFloor); ctx.lineTo(cx, yApex); ctx.stroke();
+
+  // Cross braces (two levels)
+  ctx.lineWidth = 1;
+  [0.38, 0.65].forEach(t => {
+    const y  = yApex + t * iH;
+    const hw = iW * (1 - (1 - t)); // narrows toward apex
+    ctx.beginPath(); ctx.moveTo(cx - hw, y); ctx.lineTo(cx + hw, y); ctx.stroke();
+  });
+
+  // Crown block (small filled rect at apex)
+  ctx.fillStyle = col;
+  ctx.fillRect(cx - 3, yApex - 4, 6, 4);
+
+  // Rig floor bar
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(cx - iW - 3, yFloor); ctx.lineTo(cx + iW + 3, yFloor); ctx.stroke();
+
+  // Rotary table hole (circle centred on wellbore)
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = col;
+  ctx.beginPath(); ctx.arc(cx, yFloor, 3.5, 0, Math.PI * 2); ctx.stroke();
+
+  // Sub-structure legs below rig floor (short vertical posts)
+  ctx.lineWidth = 1;
+  const legH = 8;
+  [cx - iW, cx + iW].forEach(lx => {
+    ctx.beginPath(); ctx.moveTo(lx, yFloor); ctx.lineTo(lx, yFloor + legH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx - 3, yFloor + legH); ctx.lineTo(lx + 3, yFloor + legH); ctx.stroke();
+  });
 }
 
 function _drawBracket(ctx, x, y1, y2, label, color) {
