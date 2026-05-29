@@ -291,13 +291,34 @@ let _wellModalParentId = null;
 
 function _openWellModal(parentId) {
   _wellModalParentId = parentId;
-  const inputs = ['wellModalName', 'wellModalRKB', 'wellModalGL'];
+  const inputs = ['wellModalName', 'wellModalRKB', 'wellModalGL', 'wellModalSeaBed'];
   inputs.forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.value = ''; el.style.outline = ''; }
   });
+  const onshore = document.getElementById('wellModalEnvOnshore');
+  if (onshore) onshore.checked = true;
+  wellModalSetEnv('onshore');
   document.getElementById('wellModal').classList.add('open');
   setTimeout(() => document.getElementById('wellModalName').focus(), 50);
+}
+
+function wellModalSetEnv(env) {
+  const onRow  = document.getElementById('wellModalOnshoreRow');
+  const offRow = document.getElementById('wellModalOffshoreRow');
+  const rkbUnit = document.getElementById('wellModalRKBUnit');
+  const hint    = document.getElementById('wellModalHint');
+  if (env === 'offshore') {
+    if (onRow)  onRow.style.display  = 'none';
+    if (offRow) offRow.style.display = '';
+    if (rkbUnit) rkbUnit.textContent = 'ft above sea level';
+    if (hint) hint.textContent = 'RKB elevation above MSL = RKB above sea level';
+  } else {
+    if (onRow)  onRow.style.display  = '';
+    if (offRow) offRow.style.display = 'none';
+    if (rkbUnit) rkbUnit.textContent = 'ft above ground';
+    if (hint) hint.textContent = 'RKB elevation above MSL = GL + RKB above ground';
+  }
 }
 
 function closeWellModal() {
@@ -308,28 +329,30 @@ function closeWellModal() {
 function wellModalConfirm() {
   const nameEl = document.getElementById('wellModalName');
   const rkbEl  = document.getElementById('wellModalRKB');
-  const glEl   = document.getElementById('wellModalGL');
+  const env    = (document.querySelector('input[name="wellModalEnv"]:checked') || {}).value || 'onshore';
+  const depthEl = env === 'offshore'
+    ? document.getElementById('wellModalSeaBed')
+    : document.getElementById('wellModalGL');
 
-  const name = nameEl.value.trim();
-  const rkb  = rkbEl.value.trim();
-  const gl   = glEl.value.trim();
+  const name  = nameEl.value.trim();
+  const rkb   = rkbEl.value.trim();
+  const depth = depthEl ? depthEl.value.trim() : '';
 
-  // Validate — highlight missing fields and block
   let firstInvalid = null;
-  [[nameEl, name === ''], [rkbEl, rkb === ''], [glEl, gl === '']].forEach(([el, bad]) => {
+  [[nameEl, name === ''], [rkbEl, rkb === ''], [depthEl, depth === '']].forEach(([el, bad]) => {
+    if (!el) return;
     el.style.outline = bad ? '2px solid #c0392b' : '';
     if (bad && !firstInvalid) firstInvalid = el;
   });
   if (firstInvalid) { firstInvalid.focus(); return; }
 
+  const wellData = { environment: env, rkb: +rkb };
+  if (env === 'offshore') wellData.seaBedDepth = +depth;
+  else                    wellData.gl          = +depth;
+
   const parentId = _wellModalParentId;
   closeWellModal();
-  dbAdd({
-    parentId,
-    name,
-    type: 'well',
-    data: { rkb: +rkb, gl: +gl },
-  }).then(hierarchyRefresh);
+  dbAdd({ parentId, name, type: 'well', data: wellData }).then(hierarchyRefresh);
 }
 
 function _promptRename(node) {
