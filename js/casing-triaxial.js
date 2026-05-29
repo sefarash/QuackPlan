@@ -160,8 +160,23 @@ function drawCasingTriaxial() {
     return Math.max(mx, Math.max(0, (fg - mw) * 0.052 * tvd));
   }, 0);
 
-  const Δp_burst    = Math.max(0, maxMasp + GAS_GRAD * topTVD - mw * 0.052 * topTVD);
-  const Δp_collapse = -(mw * 0.052 * shoeTVD);
+  const Ai = Math.PI * r_i * r_i; // inner cross-section area (in²)
+  const ν  = 0.3;                 // Poisson ratio for steel
+
+  // Fixed Mud Drop Collapse: gas gradient (GAS_GRAD) inside, full MW outside at shoe
+  // Ballooning: internal pressure drops → pipe elongates (axial tension increases)
+  const Δp_fmd = -(mw * 0.052 - GAS_GRAD) * shoeTVD;
+  const F_fmd  = F_above + 2 * ν * Ai * (mw * 0.052 - GAS_GRAD) * shoeTVD / 1000;
+
+  // MASP Burst: surface pressure = (FG - MW) × 0.052 × TVD_shoe; uniform ΔP (same fluid gradients)
+  // Ballooning: internal pressure rises → pipe shortens (axial compression increases)
+  const Δp_masp = maxMasp;
+  const F_masp  = maxMasp > 0 ? F_topHang - 2 * ν * Ai * maxMasp / 1000 : null;
+
+  // Pressure Test: user-entered surface test pressure
+  const P_test   = +(document.getElementById('cdPtest')?.value || 0);
+  const Δp_ptest = P_test;
+  const F_ptest  = P_test > 0 ? F_topHang - 2 * ν * Ai * P_test / 1000 : null;
 
   // Overpull: POOH surface hookload if available, else 1.3× hanging weight
   let F_overpull = F_topHang * 1.3;
@@ -185,12 +200,15 @@ function drawCasingTriaxial() {
   const bx_pos = tension_rating > 0 ? tension_rating / sfTension     : bodyYield_klbf / sfTension;
   const bx_neg = comp_rating    > 0 ? comp_rating    / sfCompression : bodyYield_klbf / sfCompression;
 
-  // Axis range — fit ellipse + load cases + box
-  let xR = Math.max(bodyYield_klbf * 1.15, F_overpull * 1.1, 50);
+  // Axis range — fit ellipse + all load cases + API box
+  let xR = Math.max(bodyYield_klbf * 1.15, F_overpull * 1.1, Math.abs(F_fmd) * 1.1, 50);
+  if (F_masp  !== null) xR = Math.max(xR, Math.abs(F_masp)  * 1.1);
+  if (F_ptest !== null) xR = Math.max(xR, Math.abs(F_ptest) * 1.1);
   let yR = Math.max(
     σy / C_h * 1.15,
-    Math.abs(Δp_collapse) * 1.15,
-    Δp_burst > 0 ? Δp_burst * 1.15 : 500,
+    Math.abs(Δp_fmd) * 1.15,
+    Δp_masp  > 0 ? Δp_masp  * 1.15 : 500,
+    Δp_ptest > 0 ? Δp_ptest * 1.15 : 500,
     hasBox ? burst_rating    / sfBurst    * 1.15 : 0,
     hasBox ? collapse_rating / sfCollapse * 1.15 : 0,
     500
@@ -269,11 +287,12 @@ function drawCasingTriaxial() {
 
   // ── Load case markers ───────────────────────────────────────────────────────
   const loadPts = [
-    { x: F_topHang,  y: 0,           label: 'Initial',  color: '#2a7fa8' },
-    { x: F_topHang,  y: Δp_burst,    label: 'Burst',    color: '#c0392b' },
-    { x: F_above,    y: Δp_collapse, label: 'Collapse', color: '#7a4aa0' },
-    { x: F_overpull, y: 0,           label: 'Overpull', color: '#e07a1a' },
+    { x: F_topHang,  y: 0,       label: 'Initial',  color: '#2a7fa8' },
+    { x: F_overpull, y: 0,       label: 'Overpull', color: '#e07a1a' },
+    { x: F_fmd,      y: Δp_fmd,  label: 'FMD',      color: '#7a4aa0' },
   ];
+  if (F_masp  !== null) loadPts.push({ x: F_masp,  y: Δp_masp,  label: 'MASP',   color: '#c0392b' });
+  if (F_ptest !== null) loadPts.push({ x: F_ptest, y: Δp_ptest, label: 'P-Test', color: '#e0a020' });
   // Pre-compute canvas positions, then stagger overlapping labels above/below
   const cPts = loadPts.map(pt => ({ ...pt, ...(_cdPt(pt, g)), labelAbove: true }));
   for (let a = 0; a < cPts.length; a++) {
