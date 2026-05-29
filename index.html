@@ -539,16 +539,16 @@
       </div>
       <div class="chart-controls" style="margin-top:8px;margin-bottom:4px">
         <label style="display:flex;align-items:center;gap:6px;font-size:12px">
-          Trip In
-          <input type="number" id="ssMWin" step="0.1" min="5" max="25" placeholder="auto"
+          Min Speed
+          <input type="number" id="ssSpeedMin" value="20" step="5" min="5" max="500"
             style="width:64px" onchange="drawSurgeSwab()">
-          ppg
+          ft/min
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px">
-          Trip Out
-          <input type="number" id="ssMWout" step="0.1" min="5" max="25" placeholder="auto"
+          Max Speed
+          <input type="number" id="ssSpeedMax" value="100" step="5" min="5" max="500"
             style="width:64px" onchange="drawSurgeSwab()">
-          ppg
+          ft/min
         </label>
         <div class="header-sep" style="height:20px;margin:0 4px"></div>
         <label style="display:flex;align-items:center;gap:4px;font-size:12px">

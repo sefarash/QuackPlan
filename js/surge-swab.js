@@ -3,8 +3,8 @@
 // Chart: ECD at Bottom [ppg] vs MD (ft) — depth-down, five speed curves,
 //        surge fan (right) and swab fan (left) on the same axis
 
-const SS_SPEEDS = [20, 40, 60, 80, 100]; // ft/min
 const SS_COLORS = ['#e74c3c', '#27ae60', '#2980b9', '#8bc34a', '#f0c040'];
+let SS_SPEEDS = [20, 40, 60, 80, 100]; // updated by drawSurgeSwab() from speed inputs
 
 // ── Geometry helper ───────────────────────────────────────────────────────────
 
@@ -165,26 +165,23 @@ function drawSurgeSwab() {
   const maxTVD = survey[survey.length - 1].tvd;
 
   // ── Input values ─────────────────────────────────────────────────────────────
-  const mwIn  = +(document.getElementById('ssMWin')?.value  || 0) || g.mwFluid;
-  const mwOut = +(document.getElementById('ssMWout')?.value || 0) || g.mwFluid;
+  const vMin = Math.max(5,  +(document.getElementById('ssSpeedMin')?.value || 20));
+  const vMax = Math.max(vMin + 4, +(document.getElementById('ssSpeedMax')?.value || 100));
+  // 5 equal increments from vMin to vMax
+  SS_SPEEDS = Array.from({ length: 5 }, (_, i) => Math.round(vMin + i * (vMax - vMin) / 4));
+  const mwBase   = g.mwFluid;
   const showPP   = document.getElementById('ssShowPP')?.checked;
   const showFP   = document.getElementById('ssShowFP')?.checked;
   const showData = document.getElementById('ssShowData')?.checked;
 
-  // Update display labels in controls
-  const elIn  = document.getElementById('ssMWin');
-  const elOut = document.getElementById('ssMWout');
-  if (elIn  && !elIn.value)  elIn.placeholder  = g.mwFluid.toFixed(1);
-  if (elOut && !elOut.value) elOut.placeholder = g.mwFluid.toFixed(1);
-
   // ── Compute profiles ──────────────────────────────────────────────────────────
-  const surgeProfs = SS_SPEEDS.map(v => _ssProfile(mwIn,  v));
-  const swabProfs  = SS_SPEEDS.map(v => _ssProfile(mwOut, v));
+  const surgeProfs = SS_SPEEDS.map(v => _ssProfile(mwBase, v));
+  const swabProfs  = surgeProfs; // symmetric: same profiles for surge and swab
   if (!surgeProfs[0]) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
   // ── Axis range ────────────────────────────────────────────────────────────────
   const ppfgPts = (typeof _readPPFG === 'function') ? _readPPFG() : [];
-  let xMin = Math.min(mwIn, mwOut), xMax = Math.max(mwIn, mwOut);
+  let xMin = mwBase, xMax = mwBase;
 
   for (let si = 0; si < SS_SPEEDS.length; si++) {
     for (const pt of surgeProfs[si]) xMax = Math.max(xMax, pt.ecdSurge);
@@ -294,14 +291,10 @@ function drawSurgeSwab() {
     drawGradLine('fg', '#2aad6a', showFP);
   }
 
-  // ── MW reference lines ────────────────────────────────────────────────────────
-  ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
-  ctx.strokeStyle = '#2aad6a';
-  ctx.beginPath(); ctx.moveTo(cx(mwIn), T); ctx.lineTo(cx(mwIn), T + ph); ctx.stroke();
-  if (Math.abs(mwOut - mwIn) > 0.01) {
-    ctx.strokeStyle = '#e05555';
-    ctx.beginPath(); ctx.moveTo(cx(mwOut), T); ctx.lineTo(cx(mwOut), T + ph); ctx.stroke();
-  }
+  // ── MW reference line ─────────────────────────────────────────────────────────
+  ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = '#7a4aa0';
+  ctx.beginPath(); ctx.moveTo(cx(mwBase), T); ctx.lineTo(cx(mwBase), T + ph); ctx.stroke();
   ctx.setLineDash([]);
 
   // ── Speed curves ─────────────────────────────────────────────────────────────
