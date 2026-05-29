@@ -177,23 +177,30 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
   });
   CI.drawFrozen(ctx, 'ktCanvas');
 
+  // Extend PPFG points to fill chart from TVD=0 to chartMaxTVD
+  const extPts = [...ppfgPts];
+  if (extPts[0].tvd > 0)
+    extPts.unshift({ tvd: 0, pp: extPts[0].pp, fg: extPts[0].fg });
+  if (extPts[extPts.length - 1].tvd < chartMaxTVD)
+    extPts.push({ tvd: chartMaxTVD, pp: _ppfgInterp(ppfgPts, chartMaxTVD, 'pp'), fg: _ppfgInterp(ppfgPts, chartMaxTVD, 'fg') });
+
   // Shaded mud window (between PP and FG)
   ctx.fillStyle = 'rgba(42,127,168,0.07)';
   ctx.beginPath();
-  ppfgPts.forEach((p, i) => i === 0 ? ctx.moveTo(px(p.pp), py(p.tvd)) : ctx.lineTo(px(p.pp), py(p.tvd)));
-  for (let i = ppfgPts.length - 1; i >= 0; i--) ctx.lineTo(px(ppfgPts[i].fg), py(ppfgPts[i].tvd));
+  extPts.forEach((p, i) => i === 0 ? ctx.moveTo(px(p.pp), py(p.tvd)) : ctx.lineTo(px(p.pp), py(p.tvd)));
+  for (let i = extPts.length - 1; i >= 0; i--) ctx.lineTo(px(extPts[i].fg), py(extPts[i].tvd));
   ctx.closePath(); ctx.fill();
 
   // PP curve
   ctx.strokeStyle = '#1a7a4a'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
   ctx.beginPath();
-  ppfgPts.forEach((p, i) => i === 0 ? ctx.moveTo(px(p.pp), py(p.tvd)) : ctx.lineTo(px(p.pp), py(p.tvd)));
+  extPts.forEach((p, i) => i === 0 ? ctx.moveTo(px(p.pp), py(p.tvd)) : ctx.lineTo(px(p.pp), py(p.tvd)));
   ctx.stroke();
 
   // FG curve
   ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2;
   ctx.beginPath();
-  ppfgPts.forEach((p, i) => i === 0 ? ctx.moveTo(px(p.fg), py(p.tvd)) : ctx.lineTo(px(p.fg), py(p.tvd)));
+  extPts.forEach((p, i) => i === 0 ? ctx.moveTo(px(p.fg), py(p.tvd)) : ctx.lineTo(px(p.fg), py(p.tvd)));
   ctx.stroke();
 
   // MW vertical line
