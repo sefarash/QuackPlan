@@ -157,21 +157,22 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
   if (!c) return;
   const { ctx, W, H } = c;
 
+  const chartMaxTVD = (maxTVD || 1) + 200; // extend 200 ft past planned TD
   const maxGrad = Math.max(20, ...ppfgPts.map(p => p.fg), mw + 2) * 1.05;
 
-  const g = _chartGridDepthDown(ctx, W, H, maxGrad, maxTVD || 1, 'Gradient (ppg)', 'TVD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, maxGrad, chartMaxTVD, 'Gradient (ppg)', 'TVD (ft)');
 
   if (ppfgPts.length < 1) { _noData(ctx, W, H, 'Add PPFG points'); return; }
 
   const px = v => g.l + (v / maxGrad) * g.pw;
-  const py = d => g.t + (d / (maxTVD || 1)) * g.ph;
+  const py = d => g.t + (d / chartMaxTVD) * g.ph;
 
   CI.storeLive('ktCanvas', [
     { pts: ppfgPts.map(p => ({ x: p.pp, y: p.tvd })), color: '#1a7a4a', label: 'PP' },
     { pts: ppfgPts.map(p => ({ x: p.fg, y: p.tvd })), color: '#c0392b', label: 'FG' },
   ]);
   CI.register('ktCanvas', {
-    pad: g, xMax: maxGrad, yMax: maxTVD || 1,
+    pad: g, xMax: maxGrad, yMax: chartMaxTVD,
     xLabel: 'Gradient (ppg)', yLabel: 'TVD (ft)', depthDown: true,
   });
   CI.drawFrozen(ctx, 'ktCanvas');
@@ -205,7 +206,7 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
   // Casing shoe markers
   allRows.filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0).forEach(row => {
     const stvd = _tvdAt(survey, +(row.bot));
-    if (stvd <= 0 || stvd > maxTVD) return;
+    if (stvd <= 0 || stvd > chartMaxTVD) return;
     const y = py(stvd);
     ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.moveTo(g.l, y); ctx.lineTo(g.l + g.pw, y); ctx.stroke();
