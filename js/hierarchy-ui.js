@@ -219,8 +219,16 @@ function _selectNode(node) {
 
 function _applyWellDatums(wellNode) {
   const d = wellNode?.data || {};
-  qpState.wellDatums = (d.rkb != null && d.gl != null)
-    ? { rkb: +d.rkb, gl: +d.gl } : null;
+  if (d.rkb != null) {
+    qpState.wellDatums = {
+      environment:  d.environment  || 'onshore',
+      rkb:          +d.rkb,
+      gl:           d.gl           != null ? +d.gl           : 0,
+      seaBedDepth:  d.seaBedDepth  != null ? +d.seaBedDepth  : 0,
+    };
+  } else {
+    qpState.wellDatums = null;
+  }
   if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
 }
 

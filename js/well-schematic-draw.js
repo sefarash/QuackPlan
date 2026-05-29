@@ -245,37 +245,65 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
 
   if (!datums) return;                     // no well selected — stop here
 
-  const rkb = datums.rkb;                  // ft above ground
-  const gl  = datums.gl;                   // ft above MSL
+  const rkb = datums.rkb || 0;
+  const gl  = datums.gl  || 0;
+  const seaBed = datums.seaBedDepth || 0;
+  const env = datums.environment || 'onshore';
 
-  const yGL  = PAD_T + Math.min(rkb,          maxDepth) * scaleY;
-  const yMSL = PAD_T + Math.min(rkb + gl,     maxDepth) * scaleY;
   const yBot = H - PAD_B;
+  // Minimum pixel gap so datums are always readable even in deep wells
+  const MIN_GAP = 16;
 
-  // ── GL line ────────────────────────────────────────────────────────────────
-  if (yGL > yRKB + 4 && yGL < yBot) {
-    ctx.strokeStyle = '#2a7a2a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(X0, yGL); ctx.lineTo(X1, yGL); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#2a7a2a'; ctx.font = 'bold 9px sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText('GL', LBL, yGL - 1);
+  if (env === 'offshore') {
+    // Offshore: RKB → MSL → Sea Bed
+    const yMSL_sc = PAD_T + Math.min(rkb, maxDepth) * scaleY;
+    const ySB_sc  = PAD_T + Math.min(rkb + seaBed, maxDepth) * scaleY;
+    const yMSL = Math.max(yMSL_sc, yRKB + MIN_GAP);
+    const ySB  = Math.max(ySB_sc,  yMSL  + MIN_GAP);
 
-    // Bracket between RKB and GL with distance label
-    _drawBracket(ctx, BRKT, yRKB, yGL, `${rkb}'`, '#1a5f7a');
-  }
+    if (yMSL < yBot) {
+      ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(X0, yMSL); ctx.lineTo(X1, yMSL); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#0055aa'; ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.fillText('MSL', LBL, yMSL - 1);
+      _drawBracket(ctx, BRKT, yRKB, yMSL, `${rkb}'`, '#1a5f7a');
+    }
+    if (ySB < yBot && seaBed > 0) {
+      ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(X0, ySB); ctx.lineTo(X1, ySB); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#b8976a'; ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.fillText('SB', LBL, ySB - 1);
+      if (yMSL < yBot) _drawBracket(ctx, BRKT, yMSL, ySB, `${seaBed}'`, '#0055aa');
+    }
+  } else {
+    // Onshore: RKB → GL → MSL
+    const yGL_sc  = PAD_T + Math.min(rkb,      maxDepth) * scaleY;
+    const yMSL_sc = PAD_T + Math.min(rkb + gl, maxDepth) * scaleY;
+    const yGL  = Math.max(yGL_sc,  yRKB + MIN_GAP);
+    const yMSL = Math.max(yMSL_sc, yGL  + MIN_GAP);
 
-  // ── MSL line ───────────────────────────────────────────────────────────────
-  if (yMSL > yGL + 4 && yMSL < yBot) {
-    ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(X0, yMSL); ctx.lineTo(X1, yMSL); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#0055aa'; ctx.font = 'bold 9px sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText('MSL', LBL, yMSL - 1);
-
-    // Bracket between GL and MSL with distance label
-    if (yGL < yBot) _drawBracket(ctx, BRKT, yGL, yMSL, `${gl}'`, '#2a7a2a');
+    if (yGL < yBot) {
+      ctx.strokeStyle = '#2a7a2a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(X0, yGL); ctx.lineTo(X1, yGL); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#2a7a2a'; ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.fillText('GL', LBL, yGL - 1);
+      _drawBracket(ctx, BRKT, yRKB, yGL, `${rkb}'`, '#1a5f7a');
+    }
+    if (yMSL < yBot && gl > 0) {
+      ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(X0, yMSL); ctx.lineTo(X1, yMSL); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#0055aa'; ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.fillText('MSL', LBL, yMSL - 1);
+      if (yGL < yBot) _drawBracket(ctx, BRKT, yGL, yMSL, `${gl}'`, '#2a7a2a');
+    }
   }
 }
 
