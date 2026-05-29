@@ -184,6 +184,10 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
   if (extPts[extPts.length - 1].tvd < chartMaxTVD)
     extPts.push({ tvd: chartMaxTVD, pp: _ppfgInterp(ppfgPts, chartMaxTVD, 'pp'), fg: _ppfgInterp(ppfgPts, chartMaxTVD, 'fg') });
 
+  // Clip all curves to chart area
+  ctx.save();
+  ctx.beginPath(); ctx.rect(g.l, g.t, g.pw, g.ph); ctx.clip();
+
   // Shaded mud window (between PP and FG)
   ctx.fillStyle = 'rgba(42,127,168,0.07)';
   ctx.beginPath();
@@ -209,6 +213,8 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
   ctx.setLineDash([6, 3]);
   ctx.beginPath(); ctx.moveTo(mwX, g.t); ctx.lineTo(mwX, g.t + g.ph); ctx.stroke();
   ctx.setLineDash([]);
+
+  ctx.restore();
 
   // Casing shoe markers
   allRows.filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0).forEach(row => {
