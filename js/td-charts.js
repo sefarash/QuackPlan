@@ -201,13 +201,9 @@ function drawBuckling(r) {
   const slidePts = slideAllSt.map(s => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
 
   // Buckling limits on the compression (negative) side
-  const sinPts = bk.stations.filter(s => s.fSin_lbf != null)
-                             .map(s => ({ x: -s.fSin_lbf / 1000, y: s.md }));
-  const helPts = bk.stations.filter(s => s.fHel_lbf != null)
-                             .map(s => ({ x: -s.fHel_lbf / 1000, y: s.md }));
-  const lastBk = bk.stations[bk.stations.length - 1];
-  if (lastBk?.fSin_lbf != null) sinPts.push({ x: -lastBk.fSin_lbf / 1000, y: maxMD });
-  if (lastBk?.fHel_lbf != null) helPts.push({ x: -lastBk.fHel_lbf / 1000, y: maxMD });
+  // null fSin/fHel means vertical section where limit = 0 (any compression buckles)
+  const sinPts = bk.stations.map(s => ({ x: s.fSin_lbf != null ? -s.fSin_lbf / 1000 : 0, y: s.md }));
+  const helPts = bk.stations.map(s => ({ x: s.fHel_lbf != null ? -s.fHel_lbf / 1000 : 0, y: s.md }));
 
   const allX = [...rotPts, ...slidePts, ...sinPts, ...helPts].map(p => p.x);
   const xMin = Math.min(...allX, -1) * 1.1;
