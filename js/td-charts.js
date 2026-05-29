@@ -201,13 +201,19 @@ function drawBuckling(r) {
   const slidePts = slideAllSt.map(s => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
 
   // Buckling limits on the compression (negative) side
-  // null fSin/fHel means vertical section where limit = 0 (any compression buckles)
+  // null fSin/fHel = vertical section: limit is 0 (any compression buckles)
   const sinPts = bk.stations.map(s => ({ x: s.fSin_lbf != null ? -s.fSin_lbf / 1000 : 0, y: s.md }));
   const helPts = bk.stations.map(s => ({ x: s.fHel_lbf != null ? -s.fHel_lbf / 1000 : 0, y: s.md }));
+  // Extend final segment to actual TD (bk.stations uses el.md0, one interval short of maxMD)
+  const lastBk = bk.stations[bk.stations.length - 1];
+  sinPts.push({ x: lastBk?.fSin_lbf != null ? -lastBk.fSin_lbf / 1000 : 0, y: maxMD });
+  helPts.push({ x: lastBk?.fHel_lbf != null ? -lastBk.fHel_lbf / 1000 : 0, y: maxMD });
 
-  const allX = [...rotPts, ...slidePts, ...sinPts, ...helPts].map(p => p.x);
-  const xMin = Math.min(...allX, -1) * 1.1;
-  const xMax = Math.max(...allX,  1) * 1.1;
+  // Scale X axis from axial load curves only — extreme BHA-clearance limit values
+  // must not blow out the scale and hide the normal buildup/horizontal limits
+  const axX  = [...rotPts, ...slidePts].map(p => p.x);
+  const xMax = Math.max(...axX,  1) * 1.1;
+  const xMin = Math.min(...axX, ...helPts.map(p => p.x), -1) * 1.1;
   const xRange = xMax - xMin;
 
   const g = _chartGridDepthDownSigned(ctx, W, H, xMin, xMax, maxMD, 'Axial Load (klbs)', 'MD (ft)');
@@ -225,6 +231,10 @@ function drawBuckling(r) {
     xLabel: 'Axial Load (klbs)', yLabel: 'MD (ft)', depthDown: true, xOffset: xMin });
   CI.drawFrozen(ctx, CID);
 
+  // Clip all curves to chart area so extreme BHA-section values don't overflow
+  ctx.save();
+  ctx.beginPath(); ctx.rect(g.l, g.t, g.pw, g.ph); ctx.clip();
+
   // Sinusoidal limit — orange
   _chartLineDepthDownSigned(ctx, sinPts,   '#e67e22', 1.5, g, xMin, xMax, maxMD);
   // Helical limit — red
@@ -235,6 +245,8 @@ function drawBuckling(r) {
   ctx.setLineDash([]);
   // Rotating axial load — blue solid
   _chartLineDepthDownSigned(ctx, rotPts,   '#2a7fa8', 2,   g, xMin, xMax, maxMD);
+
+  ctx.restore();
 
   _legend(ctx, W, g.t,
     ['Sin. Limit', 'Hel. Limit', 'Axial — Rotating', 'Axial — Sliding (dashed)'],
