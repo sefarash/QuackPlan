@@ -303,6 +303,15 @@ function drawCasingTriaxial() {
       }
     }
   }
+  // Lines from Initial to each loaded state (drawn first, under dots)
+  const initPt = _cdPt({ x: F_topHang, y: 0 }, g);
+  cPts.forEach(pt => {
+    if (pt.label === 'Initial') return;
+    ctx.strokeStyle = pt.color; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(initPt.cx, initPt.cy); ctx.lineTo(pt.cx, pt.cy); ctx.stroke();
+  });
+
+  // Dots and labels on top of lines
   cPts.forEach(pt => {
     ctx.fillStyle = pt.color;
     ctx.beginPath(); ctx.arc(pt.cx, pt.cy, 5, 0, Math.PI * 2); ctx.fill();
