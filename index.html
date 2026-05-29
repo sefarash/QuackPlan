@@ -52,8 +52,12 @@
   <!-- LEFT — Project Hierarchy -->
   <div class="panel-hierarchy" id="hierarchyPanel">
     <div class="hierarchy-header">
-      Project Hierarchy
-      <button class="hierarchy-add-btn" title="New project" onclick="showNewProjectModal()">+</button>
+      <span class="hierarchy-title">Project Hierarchy</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="hierarchy-add-btn" title="New project" onclick="showNewProjectModal()">+</button>
+        <button class="hierarchy-collapse-btn" id="hierarchyCollapseBtn" title="Collapse panel" onclick="toggleHierarchy()">◀</button>
+      </div>
+      <span class="hierarchy-collapsed-label">Projects</span>
     </div>
     <div id="hierarchyTree">
       <div class="tree-empty">No projects yet.<br>Click + to create one.</div>
@@ -818,7 +822,23 @@
     makeRowsDraggable('servicesBody',    activityRecalc);
     makeRowsDraggable('casingCostBody',  casingCostRecalc);
     makeRowsDraggable('ppfgBody',        ppfgRecalc);
+
+    // Restore hierarchy collapsed state
+    if (localStorage.getItem('qp_hierarchy_collapsed') === '1') {
+      document.querySelector('.qp-app')?.classList.add('hierarchy-collapsed');
+      const btn = document.getElementById('hierarchyCollapseBtn');
+      if (btn) { btn.textContent = '▶'; btn.title = 'Expand panel'; }
+    }
   });
+
+  function toggleHierarchy() {
+    const app = document.querySelector('.qp-app');
+    const btn = document.getElementById('hierarchyCollapseBtn');
+    const collapsed = app.classList.toggle('hierarchy-collapsed');
+    btn.textContent = collapsed ? '▶' : '◀';
+    btn.title = collapsed ? 'Expand panel' : 'Collapse panel';
+    localStorage.setItem('qp_hierarchy_collapsed', collapsed ? '1' : '0');
+  }
 </script>
 </body>
 </html>

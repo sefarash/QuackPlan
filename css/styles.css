@@ -185,6 +185,55 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 
 .hierarchy-add-btn:hover { background: var(--accent); color: #fff; }
 
+.hierarchy-collapse-btn {
+  width: 20px; height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.hierarchy-collapse-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Collapsed hierarchy panel */
+.qp-app.hierarchy-collapsed {
+  grid-template-columns: 28px 1fr var(--panel-right);
+}
+.qp-app.hierarchy-collapsed .panel-hierarchy {
+  overflow: hidden;
+  padding: 0;
+}
+.qp-app.hierarchy-collapsed .hierarchy-header {
+  flex-direction: column;
+  padding: 6px 4px;
+  justify-content: flex-start;
+  border-bottom: none;
+  gap: 6px;
+}
+.qp-app.hierarchy-collapsed .hierarchy-title,
+.qp-app.hierarchy-collapsed .hierarchy-add-btn,
+.qp-app.hierarchy-collapsed #hierarchyTree {
+  display: none;
+}
+.hierarchy-collapsed-label {
+  display: none;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-top: 4px;
+  user-select: none;
+}
+.qp-app.hierarchy-collapsed .hierarchy-collapsed-label { display: block; }
+
 .tree-node {
   display: flex;
   align-items: center;
