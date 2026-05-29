@@ -33,15 +33,12 @@ function _ssGeom() {
 
 function _ssSegPsi(v_ftmin, dh, dpOD, pv, yp, L) {
   if (L <= 0 || dh <= dpOD + 0.1) return 0;
-  // Clamp-model annular velocity (closed-end pipe, factor 0.45)
-  const v_ann = (v_ftmin / 60) * (dpOD * dpOD) / (dh * dh - dpOD * dpOD) * 0.45; // ft/s
+  const ann = dh - dpOD; // annular clearance (in)
+  // Clamp-model annular velocity (ft/min, Burkhardt 0.45 factor)
+  const v_ann = v_ftmin * (dpOD * dpOD) / (dh * dh - dpOD * dpOD) * 0.45;
   if (v_ann <= 0) return 0;
-  // Bingham effective viscosity
-  const gap_in = (dh - dpOD) / 2;
-  const mu_eff = pv + yp * gap_in / (300 * Math.max(v_ann, 0.001));
-  // Laminar annular pressure gradient (psi/ft)
-  const dP_ft = (mu_eff * v_ann * 144) / (1000 * (dh - dpOD) * (dh - dpOD));
-  return Math.max(dP_ft * L, 0);
+  // Bingham plastic laminar pressure drop (psi) — Bourgoyne et al.
+  return Math.max(pv * v_ann * L / (144000 * ann * ann) + yp * L / (200 * ann), 0);
 }
 
 // ── Per-station ECD profile ───────────────────────────────────────────────────
