@@ -44,11 +44,12 @@ function drawKickTolerance() {
     const dh      = _holeSizeAt(allRows, shoeMD + 1);
     const annCap  = Math.max(0, 0.000971 * (dh * dh - dpOD * dpOD));
     const deltaPPg = pp - mw;
-    const kt      = deltaPPg > 0 && annCap > 0
+    const ob = deltaPPg <= 0; // overbalanced — PP at TD below MW, no kick influx possible
+    const kt = !ob && annCap > 0
       ? (maasp / (deltaPPg * 0.052)) * annCap : null;
     return { name: `${row.size}" ${row.def}`, shoeTVD: Math.round(shoeTVD),
              fg: fg.toFixed(2), pp: pp.toFixed(2), maasp: Math.round(maasp),
-             dh, kt: kt !== null ? Math.round(kt) : null };
+             dh, kt: kt !== null ? Math.round(kt) : null, ob };
   });
 
   _renderKTTable(results, mw);
@@ -241,11 +242,12 @@ function _renderKTTable(results, mw) {
   if (!div) return;
 
   const rows = results.map(r => {
-    const status = r.kt === null  ? { txt: '— no PP data', cls: 'color:var(--text-dim)' }
-      : r.kt >= 20 ? { txt: '✓ OK',      cls: 'color:#2aad6a;font-weight:bold' }
-      : r.kt >= 10 ? { txt: '⚠ Low',     cls: 'color:#e0a020;font-weight:bold' }
-                   : { txt: '✕ Critical', cls: 'color:#e05555;font-weight:bold' };
-    const ktTxt = r.kt !== null ? r.kt + ' bbl' : '—';
+    const status = r.ob              ? { txt: '✓ OB',       cls: 'color:#2aad6a;font-weight:bold' }
+      : r.kt === null               ? { txt: '— no data',  cls: 'color:var(--text-dim)' }
+      : r.kt >= 20                  ? { txt: '✓ OK',       cls: 'color:#2aad6a;font-weight:bold' }
+      : r.kt >= 10                  ? { txt: '⚠ Low',      cls: 'color:#e0a020;font-weight:bold' }
+                                    : { txt: '✕ Critical', cls: 'color:#e05555;font-weight:bold' };
+    const ktTxt = r.ob ? '∞' : r.kt !== null ? r.kt + ' bbl' : '—';
     return `<tr>
       <td>${r.name}</td>
       <td style="text-align:right">${r.shoeTVD.toLocaleString()}</td>
