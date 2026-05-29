@@ -538,17 +538,30 @@
         <canvas id="surgeSwabCanvas"></canvas>
       </div>
       <div class="chart-controls" style="margin-top:8px;margin-bottom:4px">
-        <label>Trip speed &nbsp;
-          <input type="number" id="ssSpeedMin" value="10" step="5" style="width:55px;text-align:right"
-            oninput="document.getElementById('ssSpeedSlider').min=this.value;drawSurgeSwab()">
-          <input type="range" id="ssSpeedSlider" min="10" max="200" step="5" value="60"
-            oninput="document.getElementById('ssSpeedVal').textContent=this.value;drawSurgeSwab()"
-            style="width:120px;vertical-align:middle">
-          <input type="number" id="ssSpeedMax" value="200" step="5" style="width:55px"
-            oninput="document.getElementById('ssSpeedSlider').max=this.value;drawSurgeSwab()">
-          &nbsp;<span id="ssSpeedVal">60</span> ft/min
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px">
+          Trip In
+          <input type="number" id="ssMWin" step="0.1" min="5" max="25" placeholder="auto"
+            style="width:64px" onchange="drawSurgeSwab()">
+          ppg
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px">
+          Trip Out
+          <input type="number" id="ssMWout" step="0.1" min="5" max="25" placeholder="auto"
+            style="width:64px" onchange="drawSurgeSwab()">
+          ppg
+        </label>
+        <div class="header-sep" style="height:20px;margin:0 4px"></div>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px">
+          <input type="checkbox" id="ssShowData" onchange="drawSurgeSwab()"> Show Data
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px">
+          <input type="checkbox" id="ssShowPP" onchange="drawSurgeSwab()"> Show PP
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px">
+          <input type="checkbox" id="ssShowFP" onchange="drawSurgeSwab()"> Show FP
         </label>
         <button class="hdr-btn" onclick="drawSurgeSwab()">Recompute</button>
+        <button class="hdr-btn" onclick="exportChartPNG('surgeSwabCanvas','surge_swab.png')">⬇ PNG</button>
       </div>
     </div>
 

@@ -1,84 +1,154 @@
 // ===== SURGE / SWAB =====
-// Clamp model: surge = pressure increase when running pipe in;
-//              swab  = pressure decrease when pulling pipe out.
-// Uses a simplified Burkhardt clamp model for a Bingham Plastic equivalent.
+// Burkhardt clamp model: surge = +ΔP tripping in, swab = −ΔP tripping out
+// Chart: ECD at Bottom [ppg] vs MD (ft) — depth-down, five speed curves,
+//        surge fan (right) and swab fan (left) on the same axis
 
-function _ssParams() {
+const SS_SPEEDS = [20, 40, 60, 80, 100]; // ft/min
+const SS_COLORS = ['#e74c3c', '#27ae60', '#2980b9', '#8bc34a', '#f0c040'];
+
+// ── Geometry helper ───────────────────────────────────────────────────────────
+
+function _ssGeom() {
   const survey = qpState.survey;
   if (!survey || survey.length < 2) return null;
-
-  const fluid  = fluidGet();
-  const bha    = bhaGet();
+  const fluid   = fluidGet();
+  const bha     = bhaGet();
   const schRows = typeof _readSchematicRows === 'function' ? _readSchematicRows() : [];
-
-  const mw    = +(document.getElementById('hydMWslider')?.value || fluid.mudWeight || 10);
-  const pv    = fluid.pv  || 16;
-  const yp    = fluid.yp  || 13;
-  const dpOD  = bha.topDpOD_in ?? 5.0;
-  const dpID  = bha.topDpID_in ?? 4.276;
-
-  // Determine annular geometry at each station — use largest casing ID or open-hole OD
-  // Fall back to a single open-hole segment if no schematic rows
-  let segments = [];
+  const pv  = fluid.pv  || 16;
+  const yp  = fluid.yp  || 13;
+  const dpOD = bha.topDpOD_in ?? 5.0;
+  let segs = [];
   if (schRows.length) {
     for (const row of schRows) {
-      const casingID = row.id_in ? +row.id_in : (+row.size * 0.88); // rough estimate if no spec
-      const mdTop    = +row.top || 0;
-      const mdBot    = +row.bot || survey[survey.length - 1].md;
-      segments.push({ mdTop, mdBot, dh: casingID });
+      const id = row.id_in ? +row.id_in : (+row.size * 0.88);
+      segs.push({ mdTop: +row.top || 0, mdBot: +row.bot || survey[survey.length - 1].md, dh: id });
     }
   } else {
-    segments.push({ mdTop: 0, mdBot: survey[survey.length - 1].md, dh: 8.5 });
+    segs.push({ mdTop: 0, mdBot: survey[survey.length - 1].md, dh: 8.5 });
   }
-
-  return { survey, mw, pv, yp, dpOD, dpID, segments };
+  return { survey, pv, yp, dpOD, segs, mwFluid: fluid.mudWeight || 10 };
 }
 
-// Burkhardt clamp-model: delta_P (psi) for one segment
-// v_pipe = trip speed (ft/min) → ft/s = v/60
-// dh = hole/casing ID (in), dp = pipe OD (in), L = length (ft)
-function _ssSegment(v_ftmin, dh, dpOD, mw, pv, yp, L) {
-  if (L <= 0 || dh <= dpOD) return 0;
-  const dh_ft  = dh  / 12;
-  const dp_ft  = dpOD / 12;
-  const ann_ft = (dh_ft - dp_ft) / 2;  // annular gap half-width (ft)
+// ── Segment pressure (psi) ────────────────────────────────────────────────────
 
-  // Annular velocity for closed-end pipe (clamp model factor ≈ 0.45)
+function _ssSegPsi(v_ftmin, dh, dpOD, pv, yp, L) {
+  if (L <= 0 || dh <= dpOD + 0.1) return 0;
+  // Clamp-model annular velocity (closed-end pipe, factor 0.45)
   const v_ann = (v_ftmin / 60) * (dpOD * dpOD) / (dh * dh - dpOD * dpOD) * 0.45; // ft/s
-
-  // Bingham equivalent: effective viscosity in annulus
-  const mu_eff_cp = pv + yp * (ann_ft * 2 * 12) / (144 * Math.max(v_ann, 0.01));
-  const mu_eff_pa_s = mu_eff_cp / 1000;
-
-  // Pressure gradient (psi/ft) — laminar annular flow approximation
-  const dP_psi_per_ft = (mu_eff_cp * v_ann * 144) / (1000 * (dh - dpOD) * (dh - dpOD));
-
-  return Math.max(dP_psi_per_ft * L, 0);
+  if (v_ann <= 0) return 0;
+  // Bingham effective viscosity
+  const gap_in = (dh - dpOD) / 2;
+  const mu_eff = pv + yp * gap_in / (300 * Math.max(v_ann, 0.001));
+  // Laminar annular pressure gradient (psi/ft)
+  const dP_ft = (mu_eff * v_ann * 144) / (1000 * (dh - dpOD) * (dh - dpOD));
+  return Math.max(dP_ft * L, 0);
 }
 
-function _computeSurgeSwab(speedFtMin) {
-  const p = _ssParams();
-  if (!p) return null;
+// ── Per-station ECD profile ───────────────────────────────────────────────────
 
-  const { survey, mw, pv, yp, dpOD, dpID, segments } = p;
-  const totalMD = survey[survey.length - 1].md;
-
-  let surgePsi = 0, swabPsi = 0;
-  for (const seg of segments) {
-    const L = Math.min(seg.mdBot, totalMD) - Math.max(seg.mdTop, 0);
-    if (L <= 0) continue;
-    const dp = _ssSegment(speedFtMin, seg.dh, dpOD, mw, pv, yp, L);
-    surgePsi += dp;
-    swabPsi  += dp; // symmetric for clamp model
+function _ssProfile(mwBase, speedFtMin) {
+  const g = _ssGeom();
+  if (!g) return null;
+  const { survey, pv, yp, dpOD, segs } = g;
+  const result = [];
+  for (const st of survey) {
+    if (st.tvd <= 0) {
+      result.push({ md: st.md, tvd: 0, ecdSurge: mwBase, ecdSwab: mwBase });
+      continue;
+    }
+    let psi = 0;
+    for (const seg of segs) {
+      const top = Math.max(seg.mdTop, 0);
+      const bot = Math.min(seg.mdBot, st.md);
+      if (bot > top) psi += _ssSegPsi(speedFtMin, seg.dh, dpOD, pv, yp, bot - top);
+    }
+    const delta = psi / (0.052 * st.tvd);
+    result.push({ md: st.md, tvd: st.tvd, ecdSurge: mwBase + delta, ecdSwab: mwBase - delta });
   }
-
-  const bitTVD = survey[survey.length - 1].tvd;
-  const emdSurge = mw + surgePsi / (0.052 * (bitTVD || 1));
-  const emdSwab  = mw - swabPsi  / (0.052 * (bitTVD || 1));
-
-  return { surgePsi: Math.round(surgePsi), swabPsi: Math.round(swabPsi),
-           emdSurge: +emdSurge.toFixed(2), emdSwab: +emdSwab.toFixed(2) };
+  return result;
 }
+
+// ── Speed-limit interval tables ───────────────────────────────────────────────
+
+function _ssIntervals(surgeProfs, swabProfs, ppfgPts, survey) {
+  if (!ppfgPts || !ppfgPts.length) return null;
+  const schRows = typeof _readSchematicRows === 'function' ? _readSchematicRows() : [];
+  const shoes   = schRows
+    .filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0)
+    .map(r => +(r.bot))
+    .filter(md => md > 0);
+  const tdMD = survey[survey.length - 1].md;
+  const bounds = [...new Set([0, ...shoes, tdMD])].sort((a, b) => a - b);
+
+  const inRows = [], outRows = [];
+  for (let k = 0; k < bounds.length - 1; k++) {
+    const fromMD = bounds[k], toMD = bounds[k + 1];
+    const tvd    = _tvdAt(survey, toMD);
+    if (tvd <= 0) continue;
+    const fg = _ppfgInterp(ppfgPts, tvd, 'fg');
+    const pp = _ppfgInterp(ppfgPts, tvd, 'pp');
+
+    // Max surge speed: highest speed where ECD_surge ≤ FG at deepest point
+    let maxIn = 'N.R.';
+    for (let si = SS_SPEEDS.length - 1; si >= 0; si--) {
+      const pt = surgeProfs[si].find(p => p.md >= toMD) || surgeProfs[si][surgeProfs[si].length - 1];
+      if (pt.ecdSurge > fg) { maxIn = si > 0 ? SS_SPEEDS[si - 1] : 0; break; }
+    }
+    // Max swab speed: highest speed where ECD_swab ≥ PP at deepest point
+    let maxOut = 'N.R.';
+    for (let si = SS_SPEEDS.length - 1; si >= 0; si--) {
+      const pt = swabProfs[si].find(p => p.md >= toMD) || swabProfs[si][swabProfs[si].length - 1];
+      if (pt.ecdSwab < pp) { maxOut = si > 0 ? SS_SPEEDS[si - 1] : 0; break; }
+    }
+    inRows.push({ from: fromMD, to: toMD, maxSpeed: maxIn });
+    outRows.push({ from: fromMD, to: toMD, maxSpeed: maxOut });
+  }
+  return { tripIn: inRows, tripOut: outRows };
+}
+
+// ── Draw one speed table on canvas ────────────────────────────────────────────
+
+function _ssDrawTable(ctx, C, rows, reverse, x, y, title) {
+  if (!rows || !rows.length) return;
+  const display = reverse ? [...rows].reverse() : rows;
+  const RH = 13, CW = [42, 42, 38];
+  const TW  = CW.reduce((s, w) => s + w, 0) + 8;
+  const TH  = RH * (display.length + 2) + 6;
+
+  ctx.fillStyle = 'rgba(20,30,45,0.82)';
+  ctx.fillRect(x, y, TW, TH);
+
+  ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = C.text;
+  ctx.fillText(title, x + TW / 2, y + 2);
+
+  ctx.font = '8px sans-serif';
+  const hdrY = y + RH + 2;
+  ctx.fillStyle = C.dim;
+  ctx.fillText('From ft', x + 4 + CW[0] / 2, hdrY);
+  ctx.fillText('To ft',   x + 4 + CW[0] + CW[1] / 2, hdrY);
+  ctx.fillText('ft/min',  x + 4 + CW[0] + CW[1] + CW[2] / 2, hdrY);
+
+  display.forEach((row, i) => {
+    const ry = hdrY + (i + 1) * RH;
+    ctx.fillStyle = C.text;
+    ctx.fillText(Math.round(row.from).toLocaleString(), x + 4 + CW[0] / 2, ry);
+    ctx.fillText(Math.round(row.to).toLocaleString(),   x + 4 + CW[0] + CW[1] / 2, ry);
+    if (row.maxSpeed === 'N.R.') {
+      ctx.fillStyle = '#8bc34a';
+      ctx.fillText('N.R.', x + 4 + CW[0] + CW[1] + CW[2] / 2, ry);
+    } else if (row.maxSpeed === 0) {
+      ctx.fillStyle = '#e05555';
+      ctx.fillText('STOP', x + 4 + CW[0] + CW[1] + CW[2] / 2, ry);
+    } else {
+      const ci = SS_SPEEDS.indexOf(row.maxSpeed);
+      ctx.fillStyle = ci >= 0 ? SS_COLORS[ci] : C.text;
+      ctx.fillText(row.maxSpeed, x + 4 + CW[0] + CW[1] + CW[2] / 2, ry);
+    }
+  });
+}
+
+// ── Main chart ────────────────────────────────────────────────────────────────
 
 function drawSurgeSwab() {
   const CID = 'surgeSwabCanvas';
@@ -87,62 +157,199 @@ function drawSurgeSwab() {
   const { ctx, W, H } = c;
   const C = _qpColors();
 
-  const speedMax = +(document.getElementById('ssSpeedSlider')?.max   || 200);
-  const speedCur = +(document.getElementById('ssSpeedSlider')?.value || 60);
+  const g = _ssGeom();
+  if (!g) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  const p = _ssParams();
-  if (!p || !p.survey || p.survey.length < 2) {
-    _noData(ctx, W, H, 'Run Compute first'); return;
+  const survey = g.survey;
+  const maxMD  = survey[survey.length - 1].md;
+  const maxTVD = survey[survey.length - 1].tvd;
+
+  // ── Input values ─────────────────────────────────────────────────────────────
+  const mwIn  = +(document.getElementById('ssMWin')?.value  || 0) || g.mwFluid;
+  const mwOut = +(document.getElementById('ssMWout')?.value || 0) || g.mwFluid;
+  const showPP   = document.getElementById('ssShowPP')?.checked;
+  const showFP   = document.getElementById('ssShowFP')?.checked;
+  const showData = document.getElementById('ssShowData')?.checked;
+
+  // Update display labels in controls
+  const elIn  = document.getElementById('ssMWin');
+  const elOut = document.getElementById('ssMWout');
+  if (elIn  && !elIn.value)  elIn.placeholder  = g.mwFluid.toFixed(1);
+  if (elOut && !elOut.value) elOut.placeholder = g.mwFluid.toFixed(1);
+
+  // ── Compute profiles ──────────────────────────────────────────────────────────
+  const surgeProfs = SS_SPEEDS.map(v => _ssProfile(mwIn,  v));
+  const swabProfs  = SS_SPEEDS.map(v => _ssProfile(mwOut, v));
+  if (!surgeProfs[0]) { _noData(ctx, W, H, 'Run Compute first'); return; }
+
+  // ── Axis range ────────────────────────────────────────────────────────────────
+  const ppfgPts = (typeof _readPPFG === 'function') ? _readPPFG() : [];
+  let xMin = Math.min(mwIn, mwOut), xMax = Math.max(mwIn, mwOut);
+
+  for (let si = 0; si < SS_SPEEDS.length; si++) {
+    for (const pt of surgeProfs[si]) xMax = Math.max(xMax, pt.ecdSurge);
+    for (const pt of swabProfs[si])  xMin = Math.min(xMin, pt.ecdSwab);
   }
-
-  // Build sweep: 10 points from 0 to speedMax
-  const steps = 20;
-  const surgePts = [], swabPts = [];
-  for (let i = 0; i <= steps; i++) {
-    const v = (i / steps) * speedMax;
-    const r = _computeSurgeSwab(v);
-    if (!r) continue;
-    surgePts.push({ x: v, y: r.surgePsi });
-    swabPts.push({ x: v, y: r.swabPsi });
+  if (showPP && ppfgPts.length) {
+    for (const pt of ppfgPts) xMin = Math.min(xMin, pt.pp - 0.1);
   }
+  if (showFP && ppfgPts.length) {
+    for (const pt of ppfgPts) xMax = Math.max(xMax, pt.fg + 0.1);
+  }
+  // Symmetric padding, round to 0.05 increments
+  const span = xMax - xMin;
+  xMin = Math.floor((xMin - span * 0.06) * 20) / 20;
+  xMax = Math.ceil( (xMax + span * 0.06) * 20) / 20;
 
-  const yMax = Math.max(...surgePts.map(p => p.y), ...swabPts.map(p => p.y), 200) * 1.15;
-  const g = _chartGrid(ctx, W, H, speedMax, yMax, 'Trip Speed (ft/min)', 'Pressure (psi)');
+  // ── Layout ───────────────────────────────────────────────────────────────────
+  const L = 62, T = 78, R = 22, B = 36;
+  const pw = W - L - R, ph = H - T - B;
 
-  CI.storeLive(CID, [
-    { pts: surgePts, color: '#c0392b', label: 'Surge' },
-    { pts: swabPts,  color: '#1a5f7a', label: 'Swab'  },
-  ]);
-  CI.register(CID, { pad: g, xMax: speedMax, yMax, xLabel: 'Trip Speed (ft/min)', yLabel: 'Pressure (psi)', depthDown: false });
+  // Coordinate mappers
+  const cx = ecd => L + (ecd - xMin) / (xMax - xMin) * pw;
+  const cy = md  => T + (md  / maxMD) * ph;
+
+  // ── Grid ──────────────────────────────────────────────────────────────────────
+  const N_X = 6, N_Y = 6;
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+  for (let i = 0; i <= N_X; i++) {
+    const ecd = xMin + (xMax - xMin) * i / N_X;
+    const gx  = cx(ecd);
+    ctx.beginPath(); ctx.moveTo(gx, T); ctx.lineTo(gx, T + ph); ctx.stroke();
+    ctx.fillStyle = C.dim; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(ecd.toFixed(2), gx, T + ph + 3);
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(ecd.toFixed(2), gx, T - 2);
+  }
+  for (let i = 0; i <= N_Y; i++) {
+    const md = maxMD * i / N_Y;
+    const gy = cy(md);
+    ctx.beginPath(); ctx.moveTo(L, gy); ctx.lineTo(L + pw, gy); ctx.stroke();
+    ctx.fillStyle = C.dim; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(Math.round(md).toLocaleString(), L - 4, gy);
+    // TVD labels on right
+    const tvd = _tvdAt(survey, md);
+    ctx.textAlign = 'left';
+    ctx.fillText(Math.round(tvd).toLocaleString(), L + pw + 4, gy);
+  }
+  ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
+  ctx.strokeRect(L, T, pw, ph);
+
+  // Axis titles
+  ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('ECD at Bottom [ppg]', L + pw / 2, T + ph + 20);
+
+  ctx.save();
+  ctx.translate(12, T + ph / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillStyle = C.text;
+  ctx.fillText('MD (ft)', 0, 0);
+  ctx.restore();
+
+  // Right axis label (TVD)
+  ctx.save();
+  ctx.translate(W - 10, T + ph / 2); ctx.rotate(Math.PI / 2);
+  ctx.font = '10px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillStyle = C.dim;
+  ctx.fillText('TVD (ft)', 0, 0);
+  ctx.restore();
+
+  // ── CI storage ────────────────────────────────────────────────────────────────
+  CI.storeLive(CID, SS_SPEEDS.map((v, i) => ({
+    pts: surgeProfs[i].map(pt => ({ x: pt.ecdSurge - xMin, y: pt.md })),
+    color: SS_COLORS[i], label: `${v} ft/min`,
+  })));
+  CI.register(CID, {
+    pad: { l: L, t: T, pw, ph },
+    xMax: xMax - xMin, yMax: maxMD,
+    xLabel: 'ECD (ppg)', yLabel: 'MD (ft)',
+    depthDown: true, xOffset: xMin,
+  });
   CI.drawFrozen(ctx, CID);
 
-  // Draw swab solid first, surge dashed on top — both visible even when values are equal
-  _chartLine(ctx, swabPts,  '#1a5f7a', 2.5, g.l, g.t, g.pw, g.ph, speedMax, yMax);
-  ctx.setLineDash([8, 4]);
-  _chartLine(ctx, surgePts, '#c0392b', 2.5, g.l, g.t, g.pw, g.ph, speedMax, yMax);
-  ctx.setLineDash([]);
+  // ── Clip to chart area ────────────────────────────────────────────────────────
+  ctx.save();
+  ctx.beginPath(); ctx.rect(L, T, pw, ph); ctx.clip();
 
-  // Operating point
-  const cur = _computeSurgeSwab(speedCur);
-  if (cur) {
-    [[cur.surgePsi, '#c0392b'], [cur.swabPsi, '#1a5f7a']].forEach(([val, col]) => {
-      const px = g.l + (speedCur / speedMax) * g.pw;
-      const py = g.t + (1 - val / yMax) * g.ph;
-      ctx.fillStyle = col;
-      ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
-    });
-
-    // Annotation box
-    ctx.fillStyle = C.text; ctx.font = '11px sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(
-      `@ ${speedCur} ft/min  Surge: ${cur.surgePsi} psi (EMW ${cur.emdSurge} ppg)  Swab: ${cur.swabPsi} psi (EMW ${cur.emdSwab} ppg)`,
-      g.l, g.t + 4
-    );
+  // ── PP / FG profiles ──────────────────────────────────────────────────────────
+  if (ppfgPts.length) {
+    const drawGradLine = (field, color, show) => {
+      if (!show) return;
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([6, 3]);
+      ctx.beginPath();
+      let first = true;
+      for (const st of survey) {
+        if (st.tvd <= 0) continue;
+        const ecd = _ppfgInterp(ppfgPts, st.tvd, field);
+        const x = cx(ecd), y = cy(st.md);
+        first ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        first = false;
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+    };
+    drawGradLine('pp', '#e05555', showPP);
+    drawGradLine('fg', '#2aad6a', showFP);
   }
 
-  // Legend
-  _legend(ctx, W, g.t, ['Surge (+ΔP)', 'Swab (−ΔP)'], ['#c0392b', '#1a5f7a']);
+  // ── MW reference lines ────────────────────────────────────────────────────────
+  ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = '#2aad6a';
+  ctx.beginPath(); ctx.moveTo(cx(mwIn), T); ctx.lineTo(cx(mwIn), T + ph); ctx.stroke();
+  if (Math.abs(mwOut - mwIn) > 0.01) {
+    ctx.strokeStyle = '#e05555';
+    ctx.beginPath(); ctx.moveTo(cx(mwOut), T); ctx.lineTo(cx(mwOut), T + ph); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // ── Speed curves ─────────────────────────────────────────────────────────────
+  for (let si = 0; si < SS_SPEEDS.length; si++) {
+    ctx.strokeStyle = SS_COLORS[si]; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+
+    const drawCurve = (pts, field) => {
+      ctx.beginPath();
+      let first = true;
+      for (const pt of pts) {
+        const x = cx(pt[field]), y = cy(pt.md);
+        first ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        first = false;
+      }
+      ctx.stroke();
+    };
+    drawCurve(surgeProfs[si], 'ecdSurge');
+    drawCurve(swabProfs[si],  'ecdSwab');
+  }
+
+  ctx.restore(); // end clip
+
+  // ── Speed tables (Show Data) ──────────────────────────────────────────────────
+  if (showData) {
+    const intervals = _ssIntervals(surgeProfs, swabProfs, ppfgPts, survey);
+    if (intervals) {
+      // Trip In: show deep-to-shallow (reverse)
+      _ssDrawTable(ctx, C, intervals.tripIn,  true,  L + 4,              T + 4, 'Trip In');
+      // Trip Out: show shallow-to-deep
+      _ssDrawTable(ctx, C, intervals.tripOut, false, L + pw - 136,       T + 4, 'Trip Out');
+    } else {
+      ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('Add PPFG data for speed tables', L + 6, T + 6);
+    }
+  }
+
+  // ── Legend ────────────────────────────────────────────────────────────────────
+  const lgW = SS_SPEEDS.length * 76;
+  let lx = L + (pw - lgW) / 2;
+  SS_SPEEDS.forEach((v, i) => {
+    ctx.fillStyle = SS_COLORS[i];
+    ctx.fillRect(lx, T - 22, 16, 4);
+    ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(`${v} ft/min`, lx + 20, T - 20);
+    lx += 76;
+  });
 
   CI.drawAnnotations(ctx, CID);
 }
