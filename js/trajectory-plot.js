@@ -85,13 +85,14 @@ function _drawVS(survey) {
     });
   });
 
-  // Sort top→bottom; assign preferred label-top Y (above dashed line), push down on collision
+  // Sort top→bottom; label-top anchors just BELOW the shoe dashed line, deconflict downward
   shoeItems.sort((a, b) => a.sy - b.sy);
   shoeItems.forEach((it, i) => {
-    it.ly = it.sy - LBL_H - 2;
+    it.ly = it.sy + 5;                      // preferred: just below the dashed line
     if (i > 0) {
       const prev = shoeItems[i - 1];
-      if (it.ly < prev.ly + LBL_H + 3) it.ly = prev.ly + LBL_H + 3;
+      const prevBottom = prev.ly + LBL_H;
+      if (it.ly < prevBottom + 4) it.ly = prevBottom + 4;
     }
   });
 
@@ -111,17 +112,14 @@ function _drawVS(survey) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   shoeItems.forEach(({ bx, sy, ly, lines }) => {
     const lx = bx + 9;
-    // Thin leader when label was pushed far from its shoe
-    if (ly > sy + 2 || ly + LBL_H < sy - 8) {
+    // Thin vertical leader when label has been pushed away from its shoe line
+    if (ly > sy + LBL_H) {
       ctx.strokeStyle = C.border; ctx.lineWidth = 0.5; ctx.setLineDash([2, 2]);
-      ctx.beginPath();
-      ctx.moveTo(lx - 2, sy + (ly > sy ? 4 : -4));
-      ctx.lineTo(lx - 2, ly > sy ? ly : ly + LBL_H);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lx - 2, sy + 5); ctx.lineTo(lx - 2, ly); ctx.stroke();
       ctx.setLineDash([]);
     }
     lines.forEach((line, li) => {
-      const y   = ly + li * LINE_H;
+      const y    = ly + li * LINE_H;
       const bold = li === 0;
       ctx.font = (bold ? 'bold ' : '') + '9px sans-serif';
       ctx.strokeStyle = 'rgba(248,251,253,0.92)'; ctx.lineWidth = 3;
