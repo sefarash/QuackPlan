@@ -56,6 +56,8 @@ function _drawVS(survey) {
   ctx.stroke();
 
   // ── Casing / liner shoe markers ──
+  // Collect first, then deconflict labels, then draw
+  const shoeItems = [];
   _readSchematicRows().forEach(row => {
     const md = +(row.bot || 0);
     if (!md) return;
@@ -64,23 +66,50 @@ function _drawVS(survey) {
     const sy  = g.t + (st.tvd / yMax) * g.ph;
     const bx  = g.l + (dep   / xMax)  * g.pw;
     if (sy < g.t - 2 || sy > g.t + g.ph + 2) return;
+    shoeItems.push({ row, sy, bx, txt: `${row.size}"  ${row.def}   ${Math.round(st.tvd)}'TVD` });
+  });
 
-    // Dashed horizontal line to shoe
+  // Sort top→bottom so deconfliction pushes downward
+  shoeItems.sort((a, b) => a.sy - b.sy);
+
+  // Assign label Y: prefer 14px above dashed line; push down if it collides with previous label
+  const LBL_H = 14;
+  shoeItems.forEach((it, i) => {
+    it.ly = it.sy - LBL_H;
+    if (i > 0) {
+      const prev = shoeItems[i - 1];
+      if (it.ly < prev.ly + LBL_H + 2) it.ly = prev.ly + LBL_H + 2;
+    }
+  });
+
+  // Draw dashes + triangles first (behind labels)
+  shoeItems.forEach(({ sy, bx }) => {
     ctx.strokeStyle = C.border; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
     ctx.beginPath(); ctx.moveTo(g.l, sy); ctx.lineTo(bx, sy); ctx.stroke();
     ctx.setLineDash([]);
-
-    // Shoe triangle (pointing down = casing shoe convention)
     ctx.fillStyle = '#2a7fa8';
     ctx.beginPath();
-    ctx.moveTo(bx - 6, sy - 6);
-    ctx.lineTo(bx + 6, sy - 6);
-    ctx.lineTo(bx, sy + 4);
+    ctx.moveTo(bx - 6, sy - 6); ctx.lineTo(bx + 6, sy - 6); ctx.lineTo(bx, sy + 4);
     ctx.closePath(); ctx.fill();
+  });
 
-    ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`${row.size}" ${row.def}  ${Math.round(st.tvd)}'TVD`, bx + 9, sy);
+  // Draw labels with halo so they're readable over any background
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+  ctx.lineJoin = 'round';
+  shoeItems.forEach(({ bx, sy, ly, txt }) => {
+    const lx = bx + 9;
+    // Leader dot when label moved far from shoe
+    if (Math.abs(ly - (sy - LBL_H)) > LBL_H * 2) {
+      ctx.strokeStyle = C.border; ctx.lineWidth = 0.5; ctx.setLineDash([2, 2]);
+      ctx.beginPath(); ctx.moveTo(lx - 2, sy - 4); ctx.lineTo(lx - 2, ly + LBL_H - 2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Halo (thick stroke in background colour for contrast)
+    ctx.strokeStyle = 'rgba(248,251,253,0.9)'; ctx.lineWidth = 3;
+    ctx.strokeText(txt, lx, ly + LBL_H - 2);
+    ctx.fillStyle = C.text;
+    ctx.fillText(txt, lx, ly + LBL_H - 2);
   });
 
   // ── MD tick labels ──
