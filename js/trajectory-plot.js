@@ -56,7 +56,9 @@ function _drawVS(survey) {
   ctx.stroke();
 
   // ── Casing / liner shoe markers ──
-  // Collect first, then deconflict labels, then draw
+  const LINE_H = 12;   // px per text line
+  const LBL_H  = LINE_H * 3 + 4;  // total label block height (3 lines)
+
   const shoeItems = [];
   _readSchematicRows().forEach(row => {
     const md = +(row.bot || 0);
@@ -66,19 +68,30 @@ function _drawVS(survey) {
     const sy  = g.t + (st.tvd / yMax) * g.ph;
     const bx  = g.l + (dep   / xMax)  * g.pw;
     if (sy < g.t - 2 || sy > g.t + g.ph + 2) return;
-    shoeItems.push({ row, sy, bx, txt: `${row.size}"  ${row.def}   ${Math.round(st.tvd)}'TVD` });
+
+    const grade = row.grade     || '';
+    const wt    = row.nomWt_ppf ? `${row.nomWt_ppf}ppf` : '';
+    const line1 = (grade || wt)
+      ? `${row.size}" ${grade}${wt ? ' ' + wt : ''}`.trim()
+      : `${row.size}" ${row.def}`;
+
+    shoeItems.push({
+      sy, bx,
+      lines: [
+        line1,
+        `TVD: ${Math.round(st.tvd).toLocaleString()}ft`,
+        `MD: ${Math.round(md).toLocaleString()}ft`,
+      ],
+    });
   });
 
-  // Sort top→bottom so deconfliction pushes downward
+  // Sort top→bottom; assign preferred label-top Y (above dashed line), push down on collision
   shoeItems.sort((a, b) => a.sy - b.sy);
-
-  // Assign label Y: prefer 14px above dashed line; push down if it collides with previous label
-  const LBL_H = 14;
   shoeItems.forEach((it, i) => {
-    it.ly = it.sy - LBL_H;
+    it.ly = it.sy - LBL_H - 2;
     if (i > 0) {
       const prev = shoeItems[i - 1];
-      if (it.ly < prev.ly + LBL_H + 2) it.ly = prev.ly + LBL_H + 2;
+      if (it.ly < prev.ly + LBL_H + 3) it.ly = prev.ly + LBL_H + 3;
     }
   });
 
@@ -93,23 +106,29 @@ function _drawVS(survey) {
     ctx.closePath(); ctx.fill();
   });
 
-  // Draw labels with halo so they're readable over any background
-  ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+  // Draw multi-line labels with halo for contrast
   ctx.lineJoin = 'round';
-  shoeItems.forEach(({ bx, sy, ly, txt }) => {
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  shoeItems.forEach(({ bx, sy, ly, lines }) => {
     const lx = bx + 9;
-    // Leader dot when label moved far from shoe
-    if (Math.abs(ly - (sy - LBL_H)) > LBL_H * 2) {
+    // Thin leader when label was pushed far from its shoe
+    if (ly > sy + 2 || ly + LBL_H < sy - 8) {
       ctx.strokeStyle = C.border; ctx.lineWidth = 0.5; ctx.setLineDash([2, 2]);
-      ctx.beginPath(); ctx.moveTo(lx - 2, sy - 4); ctx.lineTo(lx - 2, ly + LBL_H - 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(lx - 2, sy + (ly > sy ? 4 : -4));
+      ctx.lineTo(lx - 2, ly > sy ? ly : ly + LBL_H);
+      ctx.stroke();
       ctx.setLineDash([]);
     }
-    // Halo (thick stroke in background colour for contrast)
-    ctx.strokeStyle = 'rgba(248,251,253,0.9)'; ctx.lineWidth = 3;
-    ctx.strokeText(txt, lx, ly + LBL_H - 2);
-    ctx.fillStyle = C.text;
-    ctx.fillText(txt, lx, ly + LBL_H - 2);
+    lines.forEach((line, li) => {
+      const y   = ly + li * LINE_H;
+      const bold = li === 0;
+      ctx.font = (bold ? 'bold ' : '') + '9px sans-serif';
+      ctx.strokeStyle = 'rgba(248,251,253,0.92)'; ctx.lineWidth = 3;
+      ctx.strokeText(line, lx, y);
+      ctx.fillStyle = bold ? C.text : C.dim;
+      ctx.fillText(line, lx, y);
+    });
   });
 
   // ── MD tick labels ──
