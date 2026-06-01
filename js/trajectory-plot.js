@@ -77,13 +77,13 @@ function _drawVS(survey) {
   const xMax = Math.max(...pts.map(p => p.dep), 10)  * 1.18;
   const yMax = Math.max(...pts.map(p => p.tvd), 100) * 1.10;
 
-  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, 'Horizontal Departure (ft)', 'TVD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, '', 'TVD (ft)');
   const C = _qpColors();
 
   // Title
   ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('Vertical Section', g.l + g.pw / 2, g.t - 14);
+  ctx.fillText('Vertical View', g.l + g.pw / 2, g.t - 14);
 
   // Register with CI and draw frozen
   CI.storeLive(CID, [{ pts: pts.map(p => ({ x: p.dep, y: p.tvd })), color: '#1a5f7a', label: 'VS' }]);
