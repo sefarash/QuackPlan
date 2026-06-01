@@ -1,6 +1,48 @@
 // ===== TRAJECTORY PLOT =====
 // Two-panel view: Vertical Section (TVD vs departure) + Plan View (N vs E)
 
+// ── Draggable shoe labels (VS panel) ─────────────────────────────────────────
+const _vsDrag = { offsets: new Map(), areas: [], active: null };
+
+function _vsInitDrag(canvas) {
+  if (canvas._vsDragReady) return;
+  canvas._vsDragReady = true;
+
+  const hit = (mx, my) => _vsDrag.areas.find(
+    a => mx >= a.x && mx <= a.x + a.w && my >= a.y && my <= a.y + a.h
+  );
+
+  canvas.addEventListener('mousedown', e => {
+    const r = canvas.getBoundingClientRect();
+    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    if (!a) return;
+    const off = _vsDrag.offsets.get(a.key) || { dx: 0, dy: 0 };
+    _vsDrag.active = { key: a.key, startX: e.clientX - r.left, startY: e.clientY - r.top, origDX: off.dx, origDY: off.dy };
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    if (!_vsDrag.active) { canvas.style.cursor = hit(mx, my) ? 'grab' : ''; return; }
+    canvas.style.cursor = 'grabbing';
+    const { key, startX, startY, origDX, origDY } = _vsDrag.active;
+    _vsDrag.offsets.set(key, { dx: origDX + mx - startX, dy: origDY + my - startY });
+    _drawVS(qpState.survey);
+  });
+
+  canvas.addEventListener('mouseup',    () => { _vsDrag.active = null; canvas.style.cursor = ''; });
+  canvas.addEventListener('mouseleave', () => { _vsDrag.active = null; });
+
+  // Double-click resets label to default position
+  canvas.addEventListener('dblclick', e => {
+    const r = canvas.getBoundingClientRect();
+    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    if (!a) return;
+    _vsDrag.offsets.delete(a.key);
+    _drawVS(qpState.survey);
+  });
+}
+
 function drawTrajPlot() {
   const survey = qpState.survey;
   if (!survey || survey.length < 2) {
@@ -21,6 +63,9 @@ function _drawVS(survey) {
   const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
+
+  _vsInitDrag(document.getElementById(CID));
+  _vsDrag.areas = [];
 
   const dense = _densify(survey, 50);
   const pts = dense.map(s => ({
@@ -107,19 +152,25 @@ function _drawVS(survey) {
     ctx.closePath(); ctx.fill();
   });
 
-  // Draw multi-line labels with halo for contrast
+  // Draw multi-line labels with drag offset + halo for contrast
   ctx.lineJoin = 'round';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   shoeItems.forEach(({ bx, sy, ly, lines }) => {
-    const lx = bx + 9;
-    // Thin vertical leader when label has been pushed away from its shoe line
-    if (ly > sy + LBL_H) {
+    const key = lines[0];
+    const off = _vsDrag.offsets.get(key) || { dx: 0, dy: 0 };
+    const lx = bx + 9 + off.dx;
+    const fy = ly + off.dy;
+
+    // Thin vertical leader when label is displaced from its shoe line
+    const displaced = fy > sy + LBL_H || off.dx !== 0 || off.dy !== 0;
+    if (displaced) {
       ctx.strokeStyle = C.border; ctx.lineWidth = 0.5; ctx.setLineDash([2, 2]);
-      ctx.beginPath(); ctx.moveTo(lx - 2, sy + 5); ctx.lineTo(lx - 2, ly); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx + 2, sy + 4); ctx.lineTo(lx - 2, fy); ctx.stroke();
       ctx.setLineDash([]);
     }
+
     lines.forEach((line, li) => {
-      const y    = ly + li * LINE_H;
+      const y    = fy + li * LINE_H;
       const bold = li === 0;
       ctx.font = (bold ? 'bold ' : '') + '9px sans-serif';
       ctx.strokeStyle = 'rgba(248,251,253,0.92)'; ctx.lineWidth = 3;
@@ -127,6 +178,9 @@ function _drawVS(survey) {
       ctx.fillStyle = bold ? C.text : C.dim;
       ctx.fillText(line, lx, y);
     });
+
+    // Record hit area for drag detection
+    _vsDrag.areas.push({ key, x: lx - 2, y: fy - 2, w: 150, h: LBL_H + 4 });
   });
 
   // ── MD tick labels ──

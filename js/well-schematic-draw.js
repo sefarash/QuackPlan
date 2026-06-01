@@ -1,6 +1,48 @@
 // ===== WELL SCHEMATIC DRAW =====
 // Draws the always-visible right-panel schematic as a concentric casing diagram.
 
+// ── Draggable label state ─────────────────────────────────────────────────────
+const _schDrag = { offsets: new Map(), areas: [], active: null };
+
+function _schInitDrag(canvas) {
+  if (canvas._schDragReady) return;
+  canvas._schDragReady = true;
+
+  const hit = (mx, my) => _schDrag.areas.find(
+    a => mx >= a.x && mx <= a.x + a.w && my >= a.y && my <= a.y + a.h
+  );
+
+  canvas.addEventListener('mousedown', e => {
+    const r = canvas.getBoundingClientRect();
+    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    if (!a) return;
+    const off = _schDrag.offsets.get(a.key) || { dx: 0, dy: 0 };
+    _schDrag.active = { key: a.key, startX: e.clientX - r.left, startY: e.clientY - r.top, origDX: off.dx, origDY: off.dy };
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    if (!_schDrag.active) { canvas.style.cursor = hit(mx, my) ? 'grab' : ''; return; }
+    canvas.style.cursor = 'grabbing';
+    const { key, startX, startY, origDX, origDY } = _schDrag.active;
+    _schDrag.offsets.set(key, { dx: origDX + mx - startX, dy: origDY + my - startY });
+    if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
+  });
+
+  canvas.addEventListener('mouseup',    () => { _schDrag.active = null; canvas.style.cursor = ''; });
+  canvas.addEventListener('mouseleave', () => { _schDrag.active = null; });
+
+  // Double-click resets label to auto position
+  canvas.addEventListener('dblclick', e => {
+    const r = canvas.getBoundingClientRect();
+    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    if (!a) return;
+    _schDrag.offsets.delete(a.key);
+    if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
+  });
+}
+
 function _mdToTVD(survey, md) {
   if (!survey || survey.length === 0) return md;
   if (md <= survey[0].md) return survey[0].tvd;
@@ -23,6 +65,9 @@ function drawSchematic(survey) {
 
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
+
+  _schInitDrag(canvas);
+  _schDrag.areas = [];
 
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#f8fbfd';
@@ -181,22 +226,32 @@ function drawSchematic(survey) {
   // Final top clamp (in case the column is taller than available space)
   labelData.forEach(lb => { lb.ly = Math.max(topLimit, lb.ly); });
 
-  // Draw labels; add a small leader dot at the shoe when label moved far from it
-  ctx.font = '9px sans-serif';
+  // Draw labels with drag offset applied
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   labelData.forEach(lb => {
-    // Thin leader line when label is more than BLOCK away from its shoe
-    if (Math.abs(lb.ly - (lb.yShoe - LH)) > BLOCK + GAP) {
+    const key = lb.line1;
+    const off = _schDrag.offsets.get(key) || { dx: 0, dy: 0 };
+    const dlx = lb.lx + off.dx;
+    const dly = lb.ly + off.dy;
+
+    // Leader line when label is far from its shoe (auto deconfliction or manual drag)
+    const autoFar = Math.abs(lb.ly - (lb.yShoe - LH)) > BLOCK + GAP;
+    const dragged  = off.dx !== 0 || off.dy !== 0;
+    if (autoFar || dragged) {
       ctx.strokeStyle = lb.color; ctx.lineWidth = 0.5; ctx.setLineDash([2, 2]);
-      ctx.beginPath(); ctx.moveTo(lb.lx, lb.yShoe); ctx.lineTo(lb.lx, lb.ly + BLOCK); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lb.lx, lb.yShoe); ctx.lineTo(dlx, dly + BLOCK); ctx.stroke();
       ctx.setLineDash([]);
     }
+
     ctx.fillStyle = lb.color;
     ctx.font = 'bold 9px sans-serif';
-    ctx.fillText(lb.line1, lb.lx, lb.ly);
+    ctx.fillText(lb.line1, dlx, dly);
     ctx.font = '9px sans-serif';
-    ctx.fillText(lb.line2, lb.lx, lb.ly + LH);
-    ctx.fillText(lb.line3, lb.lx, lb.ly + LH * 2);
+    ctx.fillText(lb.line2, dlx, dly + LH);
+    ctx.fillText(lb.line3, dlx, dly + LH * 2);
+
+    // Record hit area for drag detection
+    _schDrag.areas.push({ key, x: dlx - 2, y: dly - 2, w: 130, h: BLOCK + 4 });
   });
 
 
