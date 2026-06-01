@@ -77,7 +77,7 @@ function _drawVS(survey) {
   const xMax = Math.max(...pts.map(p => p.dep), 10)  * 1.18;
   const yMax = Math.max(...pts.map(p => p.tvd), 100) * 1.10;
 
-  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, '', 'TVD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, '', 'TVD (ft)', { bottomX: true });
   const C = _qpColors();
 
   // Title

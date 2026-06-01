@@ -530,10 +530,11 @@ function drawBroomstick(r) {
   CI.drawAnnotations(ctx, CID);
 }
 
-function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel) {
+function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel, opts) {
   const { t, b, l, r } = CHART_PAD;
   const pw = W - l - r, ph = H - t - b;
   const C = _qpColors();
+  const bottomX = opts && opts.bottomX;
 
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
@@ -542,8 +543,13 @@ function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel) {
     ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, t + ph); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText((xMax * i / 5).toFixed(0), x, t - 14);
+    if (bottomX) {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText((xMax * i / 5).toFixed(0), x, t + ph + 4);
+    } else {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText((xMax * i / 5).toFixed(0), x, t - 14);
+    }
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillText((yMax * i / 5).toFixed(0), l - 5, y);
   }
