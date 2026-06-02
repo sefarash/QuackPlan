@@ -2,7 +2,26 @@
 // Two-panel view: Vertical Section (TVD vs departure) + Plan View (N vs E)
 
 // ── Draggable shoe labels (VS panel) ─────────────────────────────────────────
-const _vsDrag = { offsets: new Map(), areas: [], active: null };
+const _vsDrag = { offsets: new Map(), areas: [], active: null, _sid: null };
+
+function _vsStorageKey() { return `qp_vs_offsets_${qpState.currentScenarioId || 'none'}`; }
+
+function _vsSave() {
+  const obj = {};
+  _vsDrag.offsets.forEach((v, k) => { obj[k] = v; });
+  localStorage.setItem(_vsStorageKey(), JSON.stringify(obj));
+}
+
+function _vsLoad() {
+  const sid = qpState.currentScenarioId || 'none';
+  if (_vsDrag._sid === sid) return;
+  _vsDrag._sid = sid;
+  _vsDrag.offsets.clear();
+  try {
+    const raw = localStorage.getItem(_vsStorageKey());
+    if (raw) Object.entries(JSON.parse(raw)).forEach(([k, v]) => _vsDrag.offsets.set(k, v));
+  } catch (_) {}
+}
 
 function _vsInitDrag(canvas) {
   if (canvas._vsDragReady) return;
@@ -30,7 +49,11 @@ function _vsInitDrag(canvas) {
     _drawVS(qpState.survey);
   });
 
-  canvas.addEventListener('mouseup',    () => { _vsDrag.active = null; canvas.style.cursor = ''; });
+  canvas.addEventListener('mouseup', () => {
+    if (_vsDrag.active) _vsSave();
+    _vsDrag.active = null;
+    canvas.style.cursor = '';
+  });
   canvas.addEventListener('mouseleave', () => { _vsDrag.active = null; });
 
   // Double-click resets label to default position
@@ -39,6 +62,7 @@ function _vsInitDrag(canvas) {
     const a = hit(e.clientX - r.left, e.clientY - r.top);
     if (!a) return;
     _vsDrag.offsets.delete(a.key);
+    _vsSave();
     _drawVS(qpState.survey);
   });
 }
@@ -65,6 +89,7 @@ function _drawVS(survey) {
   const { ctx, W, H } = c;
 
   _vsInitDrag(document.getElementById(CID));
+  _vsLoad();
   _vsDrag.areas = [];
 
   const dense = _densify(survey, 50);

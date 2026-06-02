@@ -2,7 +2,26 @@
 // Draws the always-visible right-panel schematic as a concentric casing diagram.
 
 // ── Draggable label state ─────────────────────────────────────────────────────
-const _schDrag = { offsets: new Map(), areas: [], active: null };
+const _schDrag = { offsets: new Map(), areas: [], active: null, _sid: null };
+
+function _schStorageKey() { return `qp_sch_offsets_${qpState.currentScenarioId || 'none'}`; }
+
+function _schSave() {
+  const obj = {};
+  _schDrag.offsets.forEach((v, k) => { obj[k] = v; });
+  localStorage.setItem(_schStorageKey(), JSON.stringify(obj));
+}
+
+function _schLoad() {
+  const sid = qpState.currentScenarioId || 'none';
+  if (_schDrag._sid === sid) return;
+  _schDrag._sid = sid;
+  _schDrag.offsets.clear();
+  try {
+    const raw = localStorage.getItem(_schStorageKey());
+    if (raw) Object.entries(JSON.parse(raw)).forEach(([k, v]) => _schDrag.offsets.set(k, v));
+  } catch (_) {}
+}
 
 function _schInitDrag(canvas) {
   if (canvas._schDragReady) return;
@@ -30,7 +49,11 @@ function _schInitDrag(canvas) {
     if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
   });
 
-  canvas.addEventListener('mouseup',    () => { _schDrag.active = null; canvas.style.cursor = ''; });
+  canvas.addEventListener('mouseup', () => {
+    if (_schDrag.active) _schSave();
+    _schDrag.active = null;
+    canvas.style.cursor = '';
+  });
   canvas.addEventListener('mouseleave', () => { _schDrag.active = null; });
 
   // Double-click resets label to auto position
@@ -39,6 +62,7 @@ function _schInitDrag(canvas) {
     const a = hit(e.clientX - r.left, e.clientY - r.top);
     if (!a) return;
     _schDrag.offsets.delete(a.key);
+    _schSave();
     if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
   });
 }
@@ -67,6 +91,7 @@ function drawSchematic(survey) {
   const W = canvas.width, H = canvas.height;
 
   _schInitDrag(canvas);
+  _schLoad();
   _schDrag.areas = [];
 
   ctx.clearRect(0, 0, W, H);
