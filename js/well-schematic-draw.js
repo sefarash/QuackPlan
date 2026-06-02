@@ -116,6 +116,15 @@ function drawSchematic(survey) {
   const plotH  = H - PAD_T - PAD_B;
   const scaleY = plotH / maxDepth;
 
+  // For onshore wells, casings whose top=0 (RKB) are drawn starting at the GL line
+  const _d = qpState.wellDatums;
+  const _MIN_GAP = 16;
+  let y_GL_casing = PAD_T; // default: no adjustment (offshore / no datums)
+  if (_d && _d.environment !== 'offshore' && (_d.rkb || 0) > 0) {
+    const _yGL_sc = PAD_T + Math.min(_d.rkb, maxDepth) * scaleY;
+    y_GL_casing = Math.max(_yGL_sc, PAD_T + _MIN_GAP);
+  }
+
   // Wellbore axis centred at 35% of the plot width
   const cx = PAD_L + (W - PAD_L - PAD_R) * 0.35;
 
@@ -141,7 +150,7 @@ function drawSchematic(survey) {
     ctx.beginPath();
     ctx.moveTo(PAD_L - 3, y); ctx.lineTo(PAD_L, y);
     ctx.stroke();
-    ctx.fillText(Math.round(tvd) + "'", PAD_L - 5, y);
+    if (i > 0) ctx.fillText(Math.round(tvd) + "'", PAD_L - 5, y);
   }
 
   // ── Casing strings ─────────────────────────────────────────────────────────
@@ -174,7 +183,10 @@ function drawSchematic(survey) {
     const top   = +(row.top  || 0);
     const bot   = +(row.bot  || maxDepth);
     const halfW = (size / 2) * odScale;
-    const yTop  = PAD_T + Math.max(0, top)       * scaleY;
+    // Onshore: casings starting at RKB (top=0) are drawn from GL line down
+    const yTop  = (top === 0 && y_GL_casing > PAD_T)
+      ? y_GL_casing
+      : PAD_T + Math.max(0, top) * scaleY;
     const yBot  = PAD_T + Math.min(maxDepth, bot) * scaleY;
     const color = WALL[row.def] || '#2a7fa8';
     const isOH  = row.def === 'Open Hole';
@@ -311,9 +323,19 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   const BRKT = X0 + 14;    // x of the vertical bracket between labels
 
   const yRKB = PAD_T;      // depth 0 = RKB
+  const MIN_GAP = 16;
 
-  // ── RKB rig icon ──────────────────────────────────────────────────────────
-  _drawRigIcon(ctx, cx, yRKB);
+  // Pre-compute GL y-position so rig icon legs can extend to ground level
+  const rkb0 = datums?.rkb || 0;
+  const env0 = datums?.environment || 'onshore';
+  let yGLforRig = yRKB;
+  if (datums && env0 !== 'offshore' && rkb0 > 0) {
+    const yGL_sc0 = PAD_T + Math.min(rkb0, maxDepth) * scaleY;
+    yGLforRig = Math.max(yGL_sc0, yRKB + MIN_GAP);
+  }
+
+  // ── RKB rig icon (legs extend to GL for onshore) ──────────────────────────
+  _drawRigIcon(ctx, cx, yRKB, yGLforRig);
 
   // ── Always draw RKB marker ────────────────────────────────────────────────
   ctx.strokeStyle = '#1a5f7a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
@@ -331,8 +353,6 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   const env = datums.environment || 'onshore';
 
   const yBot = H - PAD_B;
-  // Minimum pixel gap so datums are always readable even in deep wells
-  const MIN_GAP = 16;
 
   if (env === 'offshore') {
     // Offshore: RKB → MSL → Sea Bed
@@ -387,7 +407,7 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   }
 }
 
-function _drawRigIcon(ctx, cx, yFloor) {
+function _drawRigIcon(ctx, cx, yFloor, yGround) {
   const iH = 42;   // derrick height above rig floor
   const iW = 13;   // half-width at base
   const yApex = yFloor - iH;
@@ -421,12 +441,12 @@ function _drawRigIcon(ctx, cx, yFloor) {
   ctx.strokeStyle = col;
   ctx.beginPath(); ctx.arc(cx, yFloor, 3.5, 0, Math.PI * 2); ctx.stroke();
 
-  // Sub-structure legs below rig floor (short vertical posts)
+  // Sub-structure legs below rig floor — extend to GL (yGround) when provided
   ctx.lineWidth = 1;
-  const legH = 8;
+  const legBottom = (yGround !== undefined && yGround > yFloor + 4) ? yGround : yFloor + 8;
   [cx - iW, cx + iW].forEach(lx => {
-    ctx.beginPath(); ctx.moveTo(lx, yFloor); ctx.lineTo(lx, yFloor + legH); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(lx - 3, yFloor + legH); ctx.lineTo(lx + 3, yFloor + legH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx, yFloor); ctx.lineTo(lx, legBottom); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx - 3, legBottom); ctx.lineTo(lx + 3, legBottom); ctx.stroke();
   });
 }
 
