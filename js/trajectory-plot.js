@@ -76,6 +76,20 @@ function drawTrajPlot() {
     });
     return;
   }
+  // Lock both canvases to the same height before drawing to prevent
+  // flex-reflow mismatch (setting canvas.width on the first triggers layout
+  // changes that alter the second canvas's getBoundingClientRect height).
+  const wrap = document.getElementById('trajVsCanvas')?.parentElement;
+  if (wrap) {
+    const h = wrap.clientHeight;
+    if (h > 0) {
+      ['trajVsCanvas', 'trajPlanCanvas'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.height = h + 'px';
+      });
+    }
+  }
+
   _drawVS(survey);
   _drawPlan(survey);
 }
