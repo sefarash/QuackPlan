@@ -143,6 +143,17 @@ function drawCasingTriaxial() {
   const topTVD  = _tvdAt(survey, topMD);
   const nomWt   = row.nomWt_ppf || 0;
 
+  // ── Bending stress from max DLS along this casing section ─────────────────
+  // σ_b = E × r_o_ft × DLS_rad/ft  (outer fibre, most stressed)
+  // F_bend = σ_b × A_s (converts to equivalent axial load, shifts op. points ±)
+  const E_STEEL = 30e6; // psi
+  const DLS_max_deg = survey
+    .filter(s => s.md >= topMD && s.md <= shoeMD && s.dls != null)
+    .reduce((mx, s) => Math.max(mx, s.dls || 0), 0);
+  const DLS_rad_ft = DLS_max_deg * Math.PI / (180 * 100); // rad/ft
+  const σ_bend     = DLS_rad_ft > 0 ? E_STEEL * (od_in / 24) * DLS_rad_ft : 0; // psi (r_o in ft)
+  const F_bend     = σ_bend * A / 1000; // klbf
+
   // Cumulative buoyant weight above this section
   let F_above = 0;
   for (let j = 0; j < i; j++) {
@@ -200,10 +211,10 @@ function drawCasingTriaxial() {
   const bx_pos = tension_rating > 0 ? tension_rating / sfTension     : bodyYield_klbf / sfTension;
   const bx_neg = comp_rating    > 0 ? comp_rating    / sfCompression : bodyYield_klbf / sfCompression;
 
-  // Axis range — fit ellipse + all load cases + API box
-  let xR = Math.max(bodyYield_klbf * 1.15, F_overpull * 1.1, Math.abs(F_fmd) * 1.1, 50);
-  if (F_masp  !== null) xR = Math.max(xR, Math.abs(F_masp)  * 1.1);
-  if (F_ptest !== null) xR = Math.max(xR, Math.abs(F_ptest) * 1.1);
+  // Axis range — fit ellipse + all load cases + API box + bending envelope
+  let xR = Math.max(bodyYield_klbf * 1.15, (F_overpull + F_bend) * 1.1, Math.abs(F_fmd + F_bend) * 1.1, 50);
+  if (F_masp  !== null) xR = Math.max(xR, Math.abs(F_masp  + F_bend) * 1.1);
+  if (F_ptest !== null) xR = Math.max(xR, Math.abs(F_ptest + F_bend) * 1.1);
   let yR = Math.max(
     σy / C_h * 1.15,
     Math.abs(Δp_fmd) * 1.15,
@@ -311,6 +322,22 @@ function drawCasingTriaxial() {
     ctx.beginPath(); ctx.moveTo(initPt.cx, initPt.cy); ctx.lineTo(pt.cx, pt.cy); ctx.stroke();
   });
 
+  // Bending envelope bars (horizontal, ±F_bend from each nominal point)
+  if (F_bend > 0.1) {
+    cPts.forEach(pt => {
+      const pL = _cdPt({ x: pt.x - F_bend, y: pt.y }, g);
+      const pR = _cdPt({ x: pt.x + F_bend, y: pt.y }, g);
+      ctx.strokeStyle = pt.color; ctx.lineWidth = 2.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(pL.cx, pL.cy); ctx.lineTo(pR.cx, pR.cy); ctx.stroke();
+      ctx.setLineDash([]);
+      // End tick marks
+      ctx.lineWidth = 1.5;
+      [pL, pR].forEach(p => {
+        ctx.beginPath(); ctx.moveTo(p.cx, p.cy - 5); ctx.lineTo(p.cx, p.cy + 5); ctx.stroke();
+      });
+    });
+  }
+
   // Dots and labels on top of lines
   cPts.forEach(pt => {
     ctx.fillStyle = pt.color;
@@ -338,9 +365,15 @@ function drawCasingTriaxial() {
 
   ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
   ctx.fillText(
-    `σ_y = ${(σy / 1000).toFixed(0)} kpsi  ·  Body Yield = ${bodyYield_klbf.toFixed(0)} klbf  ·  ID = ${id_in.toFixed(3)}"`,
+    `σ_y = ${(σy/1000).toFixed(0)} kpsi  ·  Body Yield = ${bodyYield_klbf.toFixed(0)} klbf  ·  ID = ${id_in.toFixed(3)}"`,
     g.l + g.pw / 2, g.t - 28
   );
+  if (F_bend > 0.1) {
+    ctx.fillText(
+      `Bending: Max DLS = ${DLS_max_deg.toFixed(2)}°/100ft  ·  σ_b = ${(σ_bend/1000).toFixed(1)} kpsi  ·  ±${F_bend.toFixed(1)} klbf (dashed bars)`,
+      g.l + g.pw / 2, g.t - 46
+    );
+  }
 
   // ── Legend ──────────────────────────────────────────────────────────────────
   const legendLabels = ['DF 1.0 (yield)', 'DF 1.1 (design)'];
