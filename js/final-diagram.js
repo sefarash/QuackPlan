@@ -109,7 +109,9 @@ function drawFinalDiagram() {
 
   const lPad = 58, rPad = 170, tPad = 44, bPad = 28;
   const pw = W - lPad - rPad, ph = H - tPad - bPad;
-  const toX = dep => lPad + (dep / xMax) * pw;
+  // xOff shifts the surface point 10% into the plot so wide conductor ODs don't clip left
+  const xOff = xMax * 0.10;
+  const toX = dep => lPad + ((dep + xOff) / (xMax + xOff)) * pw;
   const toY = tvd => tPad + (tvd / yMax) * ph;
 
   // ── Scale: inches → perpendicular half-pixels ───────────────────────────────
