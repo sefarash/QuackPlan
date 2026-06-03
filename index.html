@@ -185,6 +185,7 @@
         <tbody id="schematicBody"></tbody>
       </table>
       <button class="add-row-btn" onclick="schematicAddRow()">+ Add string / interval</button>
+      <button class="add-row-btn" style="margin-left:8px" onclick="exportSchematic()">⬇ CSV</button>
     </div>
 
     <!-- Casing / BHA -->
@@ -213,6 +214,7 @@
         <tbody id="bhaBody"></tbody>
       </table>
       <button class="add-row-btn" onclick="bhaAddRow()">+ Add component</button>
+      <button class="add-row-btn" style="margin-left:8px" onclick="exportBHA()">⬇ CSV</button>
 
       <div class="two-col mt12">
         <div>
@@ -395,6 +397,7 @@
           Import CSV
           <input type="file" accept=".csv,.txt" style="display:none" onchange="ppfgImportFile(this)">
         </label>
+        <button class="add-row-btn" onclick="exportPPFG()">⬇ Export CSV</button>
         <span class="text-dim" style="font-size:11px">Tip: copy TVD / PP / FG columns from Excel and paste into the table</span>
       </div>
       <table class="qp-table" id="ppfgTable">

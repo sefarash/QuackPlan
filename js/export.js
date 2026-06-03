@@ -214,6 +214,91 @@ function exportKT() {
   _csvDownload('kick_tolerance.csv', lines.join('\n'));
 }
 
+// ── BHA string ───────────────────────────────────────────────────────────────
+
+function exportBHA() {
+  const bha = bhaGet();
+  const comps = bha.components || [];
+  if (!comps.length) { alert('Add BHA components first.'); return; }
+
+  const nozzles = [];
+  for (const tr of document.getElementById('nozzleBody').rows) {
+    const inputs = tr.querySelectorAll('input[type=number]');
+    nozzles.push({ size: +(inputs[0]?.value || 0), qty: +(inputs[1]?.value || 1) });
+  }
+  const nozzStr = nozzles.map(n => `${n.qty}×${n.size}/32"`).join(', ') || '—';
+
+  // Cumulative length and weight running from bottom (index 0) to top
+  let cumLen = 0, cumWt = 0;
+  const compRows = comps.map(c => {
+    cumLen += c.lengthFt;
+    cumWt  += c.weightLbs;
+    return _row(
+      c.type, c.od.toFixed(3), c.id.toFixed(3),
+      c.lengthFt.toFixed(1), c.weightLbs.toFixed(0),
+      c.nomWt_ppf || '',
+      c.grade || '', c.conn || '',
+      cumLen.toFixed(1), cumWt.toFixed(0),
+    );
+  });
+
+  const lines = [
+    '# QuackPlan BHA String Export',
+    `# Total length: ${cumLen.toFixed(1)} ft    Total weight: ${cumWt.toFixed(0)} lbs`,
+    `# TFA: ${(bha.tfa_in2 || 0).toFixed(4)} in²    Nozzles: ${nozzStr}`,
+    '',
+    _row('Component', 'OD (in)', 'ID (in)', 'Length (ft)', 'Weight (lbs)',
+         'Nom Wt (ppf)', 'Grade', 'Connection',
+         'Cum Length (ft)', 'Cum Weight (lbs)'),
+    ...compRows,
+  ];
+  _csvDownload('BHA_string.csv', lines.join('\n'));
+}
+
+// ── Well schematic (casing strings) ──────────────────────────────────────────
+
+function exportSchematic() {
+  const survey = qpState.survey || [];
+  const rows   = _readSchematicRows();
+  if (!rows.length) { alert('Add casing strings in Well Schematic first.'); return; }
+
+  const lines = [
+    '# QuackPlan Well Schematic Export',
+    _row('Definition', 'OD (in)', 'ID (in)', 'Nom Wt (ppf)', 'Grade',
+         'MD Top (ft)', 'MD Bottom (ft)', 'TVD Shoe (ft)',
+         'Length (ft)', 'Burst (psi)', 'Collapse (psi)'),
+    ...rows.map(r => {
+      const od     = parseFloat(r.size || 0);
+      const id     = r.id_in ? +r.id_in : od * 0.87;
+      const topMD  = +(r.top || 0);
+      const botMD  = +(r.bot || 0);
+      const shoeTVD = survey.length ? Math.round(_tvdAt(survey, botMD)) : '';
+      return _row(
+        r.def, od.toFixed(3), id.toFixed(3),
+        r.nomWt_ppf || '', r.grade || '',
+        topMD, botMD, shoeTVD,
+        (botMD - topMD).toFixed(0),
+        r.burst    || '', r.collapse || '',
+      );
+    }),
+  ];
+  _csvDownload('well_schematic.csv', lines.join('\n'));
+}
+
+// ── PPFG gradient data ────────────────────────────────────────────────────────
+
+function exportPPFG() {
+  const pts = _readPPFG();
+  if (!pts.length) { alert('Add PPFG points first.'); return; }
+
+  const lines = [
+    '# QuackPlan PPFG Export',
+    _row('TVD (ft)', 'Pore Pressure (ppg)', 'Frac Gradient (ppg)'),
+    ...pts.map(p => _row(p.tvd, p.pp.toFixed(2), p.fg.toFixed(2))),
+  ];
+  _csvDownload('PPFG_gradients.csv', lines.join('\n'));
+}
+
 // ── PNG chart capture ─────────────────────────────────────────────────────────
 
 function exportChartPNG(canvasId, filename) {
