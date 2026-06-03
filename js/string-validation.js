@@ -22,38 +22,82 @@ function _schValidate() {
     const top = +(row.top || 0);
     if (!od || od <= 0) return;
 
-    // Find every casing whose interval reaches this row's top depth — regardless of OD.
-    // To run any casing to its setting depth, the casing string must pass through
-    // every casing whose shoe (bottom) is at or below the new casing's top depth.
-    // Note: includes adjacent casings (rBot === top) because to reach that depth
-    // the new casing's bottom must physically pass through that shoe.
-    const restrictions = rows
+    // Two independent checks:
+    //
+    // Check A — inner casing too large for its enclosing (larger-OD) casing:
+    //   Find the immediate outer casing: smallest OD that is still > od,
+    //   covering this casing's top depth.
+    //
+    // Check B — sequence violation (e.g. 20" casing below a 13 3/8"):
+    //   If a SMALLER-OD casing has its shoe strictly ABOVE this casing's top
+    //   (A_top < top AND A_bot >= top), the bore at this top depth is limited
+    //   by that casing's ID.  The shoe being at or above top means the bottom
+    //   of THIS casing had to physically pass through it.
+
+    // Check A: must fit inside the enclosing outer casing
+    const outerCandidates = rows
       .filter((r, j) => {
         if (j === idx) return false;
         if (r.def === 'Open Hole') return false;
+        const rOD  = parseFloat(r.size);
         const rTop = +(r.top || 0);
         const rBot = +(r.bot || 0);
-        return rTop <= top && rBot >= top; // covers or reaches this casing's top
+        return rOD > od && rTop <= top && rBot >= top;
       })
       .map(r => ({ row: r, id: _rowID(r) }))
       .filter(x => x.id > 0)
-      .sort((a, b) => a.id - b.id); // tightest ID first
+      .sort((a, b) => parseFloat(a.row.size) - parseFloat(b.row.size)); // nearest outer first
 
-    if (!restrictions.length) return; // no enclosing string found
+    const checkA = outerCandidates[0];
 
-    const tightest  = restrictions[0];
-    const tightID   = tightest.id;
-    const tightRow  = tightest.row;
+    // Check B: must fit through any smaller casing whose shoe is above this top
+    //   (only fires when top > 0; casings starting at surface have nothing above them)
+    const seqViolations = top > 0
+      ? rows
+          .filter((r, j) => {
+            if (j === idx) return false;
+            if (r.def === 'Open Hole') return false;
+            const rOD  = parseFloat(r.size);
+            const rTop = +(r.top || 0);
+            const rBot = +(r.bot || 0);
+            return rOD < od && rTop < top && rBot >= top;
+          })
+          .map(r => ({ row: r, id: _rowID(r) }))
+          .filter(x => x.id > 0)
+          .sort((a, b) => +(a.row.bot) - +(b.row.bot)) // shallowest shoe first
+      : [];
 
-    if (od >= tightID) {
-      const msg = `${row.size}" ${row.def} OD ${od}" ≥ ${tightRow.size}" ${tightRow.def} ID ${tightID.toFixed(3)}" — cannot pass through`;
-      warnings.push(msg);
-      if (trList[idx]) trList[idx].style.outline = '2px solid #e05555';
-    } else if (od > tightID * 0.97) {
-      const clearance = ((tightID - od) / tightID * 100).toFixed(1);
-      warnings.push(`${row.size}" ${row.def}: only ${clearance}% radial clearance inside ${tightRow.size}" ${tightRow.def} — tight fit`);
-      if (trList[idx]) trList[idx].style.outline = '2px solid #e0a020';
+    const checkB = seqViolations[0]; // tightest/shallowest obstruction
+
+    // Evaluate and emit at most one message per row (worst violation wins)
+    const violation = (() => {
+      const aFail = checkA && od >= checkA.id;
+      const aTight = checkA && !aFail && od > checkA.id * 0.97;
+      const bFail  = checkB && od >= checkB.id;
+      const bTight = checkB && !bFail && od > checkB.id * 0.97;
+
+      if (aFail)  return { sev: 'error',   ref: checkA, kind: 'inside' };
+      if (bFail)  return { sev: 'error',   ref: checkB, kind: 'below' };
+      if (aTight) return { sev: 'warning', ref: checkA, kind: 'inside' };
+      if (bTight) return { sev: 'warning', ref: checkB, kind: 'below' };
+      return null;
+    })();
+
+    if (!violation) return;
+
+    const { sev, ref } = violation;
+    const colour  = sev === 'error' ? '#e05555' : '#e0a020';
+    const icon    = sev === 'error' ? '✕' : '⚠';
+
+    let msg;
+    if (sev === 'error') {
+      msg = `${row.size}" ${row.def} OD ${od}" ≥ ${ref.row.size}" ${ref.row.def} ID ${ref.id.toFixed(3)}" — cannot pass through`;
+    } else {
+      const cl = ((ref.id - od) / ref.id * 100).toFixed(1);
+      msg = `${row.size}" ${row.def}: only ${cl}% radial clearance inside ${ref.row.size}" ${ref.row.def} — tight fit`;
     }
+    warnings.push(msg);
+    if (trList[idx]) trList[idx].style.outline = `2px solid ${colour}`;
   });
 
   _renderWarnings(warnDiv, warnings);
