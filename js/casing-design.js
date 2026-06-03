@@ -2,6 +2,21 @@
 
 const GAS_GRAD = 0.1; // psi/ft gas gradient
 
+// In-memory ratings store — survives redraws within a session and is
+// populated on scenario load / JSON import so ratings are never lost.
+let _cdRatingsLoaded = {};
+
+function cdRatingsLoadState(data) {
+  _cdRatingsLoaded = data || {};
+}
+
+function cdRatingsSave() {
+  if (!qpState.currentScenarioId) return;
+  const ratings = _readCDRatings();
+  _cdRatingsLoaded = ratings;
+  dbSaveScenarioData(qpState.currentScenarioId, 'cdRatings', ratings);
+}
+
 function drawCasingDesign() {
   const sfBurst       = +(document.getElementById('cdSFBurst')?.value       || 1.10);
   const sfCollapse    = +(document.getElementById('cdSFCollapse')?.value    || 1.00);
@@ -33,7 +48,7 @@ function _selectedCDKey() {
 
 function _readCDRatings() {
   const tbody = document.getElementById('cdRatingsBody');
-  if (!tbody) return {};
+  if (!tbody) return { ..._cdRatingsLoaded };
   const out = {};
   for (const tr of tbody.rows) {
     const key    = tr.dataset.key;
@@ -44,6 +59,10 @@ function _readCDRatings() {
       tension:     +(inputs[2]?.value || 0),
       compression: +(inputs[3]?.value || 0),
     };
+  }
+  // Merge any keys not yet in DOM (e.g. freshly loaded section not yet rendered)
+  for (const [k, v] of Object.entries(_cdRatingsLoaded)) {
+    if (!out[k]) out[k] = v;
   }
   return out;
 }
@@ -82,22 +101,22 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="100" value="${r.burst || ''}" placeholder="psi"
-          style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
+          style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
         ${bLim !== null ? `<div style="font-size:10px;color:#2aad6a">/ ${sfBurst} = ${bLim.toLocaleString()}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="100" value="${r.collapse || ''}" placeholder="psi"
-          style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
+          style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
         ${cLim !== null ? `<div style="font-size:10px;color:#b07ad0">/ ${sfCollapse} = ${cLim.toLocaleString()}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="10" value="${r.tension || ''}" placeholder="klbf"
-          style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
+          style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
         ${tLim !== null ? `<div style="font-size:10px;color:#3aafd8">/ ${sfTension} = ${tLim}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="10" value="${r.compression || ''}" placeholder="klbf"
-          style="width:72px" onchange="drawCasingDesign()" onclick="event.stopPropagation()">
+          style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
         ${compLim !== null ? `<div style="font-size:10px;color:#e0a020">/ ${sfCompression} = ${compLim}</div>` : ''}
       </td>
     </tr>`;

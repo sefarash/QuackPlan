@@ -267,6 +267,7 @@ function _loadScenario(id) {
     if (d.activity)  activityLoadState(d.activity);
                      handoverLoadState(d.handover);
     if (d.ppfg)      ppfgLoadState(d.ppfg);
+    cdRatingsLoadState(d.cdRatings);
 
     // Persist last-used scenario ID so reload restores it
     localStorage.setItem('qp_lastScenarioId', id);
