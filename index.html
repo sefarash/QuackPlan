@@ -122,6 +122,10 @@
           <tbody id="traj1Body"></tbody>
         </table>
         <button class="add-row-btn" onclick="traj1AddRow()">+ Add station</button>
+        <label class="add-row-btn" style="cursor:pointer;margin-left:8px" title="Import WITSML 1.3.1 / 1.4.1 / 2.0 trajectory XML file">
+          ⬆ Import WITSML
+          <input type="file" accept=".xml,.witsml" style="display:none" onchange="witsmlImportFile(this)">
+        </label>
         <span class="text-dim" style="margin-left:12px;">Tip: paste MD/Inc/Azi columns from Excel → the table auto-fills</span>
       </div>
 
@@ -795,6 +799,7 @@
 <script src="js/row-drag.js"></script>
 <script src="js/output-controls.js"></script>
 <script src="js/scenario-io.js"></script>
+<script src="js/witsml-import.js"></script>
 <script>
   // ── Theme toggle ──────────────────────────────────────────────────
   function toggleTheme() {
