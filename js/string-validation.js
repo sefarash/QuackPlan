@@ -22,36 +22,36 @@ function _schValidate() {
     const top = +(row.top || 0);
     if (!od || od <= 0) return;
 
-    const idRow = _rowID(row);
-
-    // Find every casing whose interval covers this row's top depth and has a larger OD
-    const outerCandidates = rows
+    // Find every casing whose interval reaches this row's top depth — regardless of OD.
+    // To run any casing to its setting depth, the casing string must pass through
+    // every casing whose shoe (bottom) is at or below the new casing's top depth.
+    // Note: includes adjacent casings (rBot === top) because to reach that depth
+    // the new casing's bottom must physically pass through that shoe.
+    const restrictions = rows
       .filter((r, j) => {
         if (j === idx) return false;
         if (r.def === 'Open Hole') return false;
-        const rOD  = parseFloat(r.size);
         const rTop = +(r.top || 0);
         const rBot = +(r.bot || 0);
-        return rOD > od && rTop <= top && rBot > top;
+        return rTop <= top && rBot >= top; // covers or reaches this casing's top
       })
-      .sort((a, b) => parseFloat(a.size) - parseFloat(b.size)); // tightest first
+      .map(r => ({ row: r, id: _rowID(r) }))
+      .filter(x => x.id > 0)
+      .sort((a, b) => a.id - b.id); // tightest ID first
 
-    if (!outerCandidates.length) return; // outermost string
+    if (!restrictions.length) return; // no enclosing string found
 
-    const outer   = outerCandidates[0];
-    const outerOD = parseFloat(outer.size);
-    const outerID = _rowID(outer);
+    const tightest  = restrictions[0];
+    const tightID   = tightest.id;
+    const tightRow  = tightest.row;
 
-    if (outerID <= 0) return; // can't check — no ID data
-
-    if (od >= outerID) {
-      const msg = `${row.size}" ${row.def} OD ${od}" ≥ ${outer.size}" ${outer.def} ID ${outerID.toFixed(3)}" — cannot pass through`;
+    if (od >= tightID) {
+      const msg = `${row.size}" ${row.def} OD ${od}" ≥ ${tightRow.size}" ${tightRow.def} ID ${tightID.toFixed(3)}" — cannot pass through`;
       warnings.push(msg);
       if (trList[idx]) trList[idx].style.outline = '2px solid #e05555';
-    } else if (od > outerID * 0.97) {
-      // < 3 % clearance — warn but don't block
-      const clearance = ((outerID - od) / outerID * 100).toFixed(1);
-      warnings.push(`${row.size}" ${row.def}: only ${clearance}% radial clearance inside ${outer.size}" ${outer.def} — tight fit`);
+    } else if (od > tightID * 0.97) {
+      const clearance = ((tightID - od) / tightID * 100).toFixed(1);
+      warnings.push(`${row.size}" ${row.def}: only ${clearance}% radial clearance inside ${tightRow.size}" ${tightRow.def} — tight fit`);
       if (trList[idx]) trList[idx].style.outline = '2px solid #e0a020';
     }
   });
