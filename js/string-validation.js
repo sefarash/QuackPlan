@@ -34,7 +34,9 @@ function _schValidate() {
     //   by that casing's ID.  The shoe being at or above top means the bottom
     //   of THIS casing had to physically pass through it.
 
-    // Check A: must fit inside the enclosing outer casing
+    // Check A: must fit inside the enclosing outer casing.
+    // Use >= (not >) so equal-OD casings are caught: a casing cannot run inside
+    // another with the same OD because its OD would exceed the other's ID.
     const outerCandidates = rows
       .filter((r, j) => {
         if (j === idx) return false;
@@ -42,7 +44,7 @@ function _schValidate() {
         const rOD  = parseFloat(r.size);
         const rTop = +(r.top || 0);
         const rBot = +(r.bot || 0);
-        return rOD > od && rTop <= top && rBot >= top;
+        return rOD >= od && rTop <= top && rBot >= top;
       })
       .map(r => ({ row: r, id: _rowID(r) }))
       .filter(x => x.id > 0)
