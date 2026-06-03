@@ -190,6 +190,7 @@
       </table>
       <button class="add-row-btn" onclick="schematicAddRow()">+ Add string / interval</button>
       <button class="add-row-btn" style="margin-left:8px" onclick="exportSchematic()">⬇ CSV</button>
+      <div id="schematicWarnings" style="margin-top:6px"></div>
     </div>
 
     <!-- Casing / BHA -->
@@ -219,6 +220,7 @@
       </table>
       <button class="add-row-btn" onclick="bhaAddRow()">+ Add component</button>
       <button class="add-row-btn" style="margin-left:8px" onclick="exportBHA()">⬇ CSV</button>
+      <div id="bhaWarnings" style="margin-top:6px"></div>
 
       <div class="two-col mt12">
         <div>
@@ -800,6 +802,7 @@
 <script src="js/output-controls.js"></script>
 <script src="js/scenario-io.js"></script>
 <script src="js/witsml-import.js"></script>
+<script src="js/string-validation.js"></script>
 <script>
   // ── Theme toggle ──────────────────────────────────────────────────
   function toggleTheme() {

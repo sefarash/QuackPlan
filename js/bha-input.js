@@ -567,6 +567,7 @@ function bhaSave() {
     });
   }
   dbSaveScenarioData(qpState.currentScenarioId, 'bha', rows);
+  if (typeof _bhaValidate === 'function') _bhaValidate();
 }
 
 // ── Build BHA summary object (used by compute-engine) ────────────────────────
