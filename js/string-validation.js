@@ -73,9 +73,9 @@ function _schValidate() {
 
     // Evaluate and emit at most one message per row (worst violation wins)
     const violation = (() => {
-      const aFail = checkA && od >= checkA.id;
+      const aFail = checkA && od > checkA.id;
       const aTight = checkA && !aFail && od > checkA.id * 0.97;
-      const bFail  = checkB && od >= checkB.id;
+      const bFail  = checkB && od > checkB.id;
       const bTight = checkB && !bFail && od > checkB.id * 0.97;
 
       if (aFail)  return { sev: 'error',   ref: checkA, kind: 'inside' };
@@ -93,7 +93,7 @@ function _schValidate() {
 
     let msg;
     if (sev === 'error') {
-      msg = `${row.size}" ${row.def} OD ${od}" ≥ ${ref.row.size}" ${ref.row.def} ID ${ref.id.toFixed(3)}" — cannot pass through`;
+      msg = `${row.size}" ${row.def} OD ${od}" > ${ref.row.size}" ${ref.row.def} ID ${ref.id.toFixed(3)}" — cannot pass through`;
     } else {
       const cl = ((ref.id - od) / ref.id * 100).toFixed(1);
       msg = `${row.size}" ${row.def}: only ${cl}% radial clearance inside ${ref.row.size}" ${ref.row.def} — tight fit`;
@@ -148,8 +148,8 @@ function _bhaValidate() {
     const tightID  = tightest.id;
     const tightRow = tightest.row;
 
-    if (compOD >= tightID) {
-      const msg = `${comp.type} OD ${compOD}" ≥ ${tightRow.size}" ${tightRow.def} ID ${tightID.toFixed(3)}" at ~${Math.round(midDepthMD).toLocaleString()}' MD — will not pass through`;
+    if (compOD > tightID) {
+      const msg = `${comp.type} OD ${compOD}" > ${tightRow.size}" ${tightRow.def} ID ${tightID.toFixed(3)}" at ~${Math.round(midDepthMD).toLocaleString()}' MD — will not pass through`;
       warnings.push(msg);
       if (trList[idx]) trList[idx].style.outline = '2px solid #e05555';
     } else if (compOD > tightID * 0.90) {
