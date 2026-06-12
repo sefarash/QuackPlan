@@ -518,7 +518,8 @@ function _readSchematicRows() {
         burst:     spec.burst,
       } : {
         grade:     isGrCustom ? (grTxt?.value || '') : '',
-        nomWt_ppf: isWtCustom ? (wtTxt?.value ? +wtTxt.value : null) : null,
+        nomWt_ppf: isWtCustom ? (wtTxt?.value ? +wtTxt.value : null)
+                               : (wtSel?.value ? +wtSel.value : null),
       }),
     });
   }
