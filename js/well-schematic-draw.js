@@ -316,26 +316,56 @@ function drawSchematic(survey) {
 function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   const datums = qpState.wellDatums;
 
-  // Horizontal lines run from left edge to just left of the wellbore centre
-  const X0   = 2;          // left start of datum lines
-  const X1   = cx - 4;     // right end (just left of pipe)
-  const LBL  = X0 + 1;     // label x
-  const BRKT = X0 + 14;    // x of the vertical bracket between labels
+  const X0   = 2;
+  const X1   = cx - 4;
+  const LBL  = X0 + 1;
+  const BRKT = X0 + 14;
 
-  const yRKB = PAD_T;      // depth 0 = RKB
+  const yRKB    = PAD_T;
   const MIN_GAP = 16;
+  const yBot    = H - PAD_B;
 
-  // Pre-compute GL y-position so rig icon legs can extend to ground level
-  const rkb0 = datums?.rkb || 0;
-  const env0 = datums?.environment || 'onshore';
-  let yGLforRig = yRKB;
-  if (datums && env0 !== 'offshore' && rkb0 > 0) {
-    const yGL_sc0 = PAD_T + Math.min(rkb0, maxDepth) * scaleY;
-    yGLforRig = Math.max(yGL_sc0, yRKB + MIN_GAP);
+  const rkb = datums?.rkb || 0;
+  const env = datums?.environment || 'onshore';
+
+  // ── Pre-compute offshore MSL / SB so water fill and rig legs can use them ─
+  let yMSL_off = null, ySB_off = null;
+  if (datums && env === 'offshore') {
+    const yMSL_sc = PAD_T + Math.min(rkb, maxDepth) * scaleY;
+    yMSL_off = Math.max(yMSL_sc, yRKB + MIN_GAP);
+    const seaBed = datums.seaBedDepth || 0;
+    if (seaBed > 0) {
+      const ySB_sc = PAD_T + Math.min(rkb + seaBed, maxDepth) * scaleY;
+      ySB_off = Math.max(ySB_sc, yMSL_off + MIN_GAP);
+    }
   }
 
-  // ── RKB rig icon (legs extend to GL for onshore) ──────────────────────────
-  _drawRigIcon(ctx, cx, yRKB, yGLforRig);
+  // ── Water column fill (offshore only, drawn before rig icon & casings) ─────
+  if (yMSL_off !== null && ySB_off !== null && yMSL_off < yBot) {
+    const waterBot = Math.min(ySB_off, yBot);
+    ctx.fillStyle = 'rgba(0, 100, 210, 0.11)';
+    ctx.fillRect(0, yMSL_off, W, waterBot - yMSL_off);
+    // Wave marks at MSL surface
+    ctx.strokeStyle = 'rgba(0, 100, 210, 0.40)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    for (let wx = 0; wx < W; wx += 10) {
+      ctx.beginPath();
+      ctx.moveTo(wx, yMSL_off);
+      ctx.quadraticCurveTo(wx + 5, yMSL_off - 3, wx + 10, yMSL_off);
+      ctx.stroke();
+    }
+  }
+
+  // ── Rig icon — legs reach MSL for offshore, GL for onshore ────────────────
+  let yLegBottom = yRKB;
+  if (yMSL_off !== null) {
+    yLegBottom = yMSL_off;                          // offshore: legs to waterline
+  } else if (datums && env !== 'offshore' && rkb > 0) {
+    const yGL_sc = PAD_T + Math.min(rkb, maxDepth) * scaleY;
+    yLegBottom = Math.max(yGL_sc, yRKB + MIN_GAP); // onshore: legs to ground level
+  }
+  _drawRigIcon(ctx, cx, yRKB, yLegBottom);
 
   // ── Always draw RKB marker ────────────────────────────────────────────────
   ctx.strokeStyle = '#1a5f7a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
@@ -345,23 +375,16 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
   ctx.fillText('RKB', LBL, yRKB - 1);
 
-  if (!datums) return;                     // no well selected — stop here
+  if (!datums) return;
 
-  const rkb = datums.rkb || 0;
-  const gl  = datums.gl  || 0;
+  const gl     = datums.gl  || 0;
   const seaBed = datums.seaBedDepth || 0;
-  const env = datums.environment || 'onshore';
-
-  const yBot = H - PAD_B;
 
   if (env === 'offshore') {
-    // Offshore: RKB → MSL → Sea Bed
-    const yMSL_sc = PAD_T + Math.min(rkb, maxDepth) * scaleY;
-    const ySB_sc  = PAD_T + Math.min(rkb + seaBed, maxDepth) * scaleY;
-    const yMSL = Math.max(yMSL_sc, yRKB + MIN_GAP);
-    const ySB  = Math.max(ySB_sc,  yMSL  + MIN_GAP);
+    const yMSL = yMSL_off;
+    const ySB  = ySB_off;
 
-    if (yMSL < yBot) {
+    if (yMSL !== null && yMSL < yBot) {
       ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
       ctx.beginPath(); ctx.moveTo(X0, yMSL); ctx.lineTo(X1, yMSL); ctx.stroke();
       ctx.setLineDash([]);
@@ -370,14 +393,14 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
       ctx.fillText('MSL', LBL, yMSL - 1);
       _drawBracket(ctx, BRKT, yRKB, yMSL, `${rkb}'`, '#1a5f7a');
     }
-    if (ySB < yBot && seaBed > 0) {
+    if (ySB !== null && ySB < yBot && seaBed > 0) {
       ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
       ctx.beginPath(); ctx.moveTo(X0, ySB); ctx.lineTo(X1, ySB); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = '#b8976a'; ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       ctx.fillText('SB', LBL, ySB - 1);
-      if (yMSL < yBot) _drawBracket(ctx, BRKT, yMSL, ySB, `${seaBed}'`, '#0055aa');
+      if (yMSL !== null && yMSL < yBot) _drawBracket(ctx, BRKT, yMSL, ySB, `${seaBed}'`, '#0055aa');
     }
   } else {
     // Onshore: RKB → GL → MSL
