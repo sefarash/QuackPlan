@@ -119,8 +119,13 @@ function drawSchematic(survey) {
   // For onshore wells, casings whose top=0 (RKB) are drawn starting at the GL line
   const _d = qpState.wellDatums;
   const _MIN_GAP = 16;
-  let y_GL_casing = PAD_T; // default: no adjustment (offshore / no datums)
-  if (_d && _d.environment !== 'offshore' && (_d.rkb || 0) > 0) {
+  let y_GL_casing = PAD_T; // default: no adjustment
+  if (_d && _d.environment === 'offshore' && (_d.seaBedDepth || 0) > 0) {
+    // Offshore: top=0 casings (Conductor etc.) start at seabed, not RKB
+    const seabedMD  = (_d.rkb || 0) + (_d.seaBedDepth || 0);
+    const _ySB_sc   = PAD_T + Math.min(seabedMD, maxDepth) * scaleY;
+    y_GL_casing = Math.max(_ySB_sc, PAD_T + _MIN_GAP);
+  } else if (_d && _d.environment !== 'offshore' && (_d.rkb || 0) > 0) {
     const _yGL_sc = PAD_T + Math.min(_d.rkb, maxDepth) * scaleY;
     y_GL_casing = Math.max(_yGL_sc, PAD_T + _MIN_GAP);
   }
@@ -183,7 +188,7 @@ function drawSchematic(survey) {
     const top   = +(row.top  || 0);
     const bot   = +(row.bot  || maxDepth);
     const halfW = (size / 2) * odScale;
-    // Onshore: casings starting at RKB (top=0) are drawn from GL line down
+    // top=0 casings start at GL (onshore) or seabed (offshore), not at RKB
     const yTop  = (top === 0 && y_GL_casing > PAD_T)
       ? y_GL_casing
       : PAD_T + Math.max(0, top) * scaleY;
