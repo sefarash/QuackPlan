@@ -596,6 +596,10 @@ function schematicLoadRows(data) {
       try { _schStoreCatalogueSpec(tr, JSON.parse(row.casingSpec)); } catch (_) {}
     }
   });
+  // Re-save and re-validate with the fully-configured DOM (each schematicAddRow
+  // above fires schematicSave while the definition select is still at its default
+  // "Conductor", producing spurious warnings and corrupt DB state for the last row).
+  if (typeof schematicSave === 'function') schematicSave();
   if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
 }
 
