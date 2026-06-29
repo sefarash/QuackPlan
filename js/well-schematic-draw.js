@@ -120,8 +120,8 @@ function drawSchematic(survey) {
   const _d = qpState.wellDatums;
   const _MIN_GAP = 16;
   let y_GL_casing = PAD_T; // default: no adjustment
-  if (_d && _d.environment === 'offshore' && (_d.seaBedDepth || 0) > 0) {
-    // Offshore: top=0 casings (Conductor etc.) start at seabed, not RKB
+  if (_d && _d.environment === 'offshore') {
+    // Offshore: top=0 casings start at seabed (or at MSL if no water depth set)
     const seabedMD  = (_d.rkb || 0) + (_d.seaBedDepth || 0);
     const _ySB_sc   = PAD_T + Math.min(seabedMD, maxDepth) * scaleY;
     y_GL_casing = Math.max(_ySB_sc, PAD_T + _MIN_GAP);
@@ -196,14 +196,21 @@ function drawSchematic(survey) {
     const color = WALL[row.def] || '#2a7fa8';
     const isOH  = row.def === 'Open Hole';
 
-    // Interior fill
+    // Bore fill — casing: ID span; open hole: full OD span
+    const idVal  = isOH ? size : (typeof _rowID === 'function' ? _rowID(row) : size * 0.87);
+    const halfID = Math.min((idVal / 2) * odScale, halfW - 0.5);
     ctx.fillStyle = FILL[row.def] || 'rgba(100,150,200,0.08)';
-    ctx.fillRect(cx - halfW, yTop, halfW * 2, yBot - yTop);
+    ctx.fillRect(cx - halfID, yTop, halfID * 2, yBot - yTop);
 
-    // Walls (skip open hole)
+    // Steel wall fill + outer stroke (skip open hole)
     if (!isOH) {
+      ctx.fillStyle   = color;
+      ctx.globalAlpha = 0.72;
+      ctx.fillRect(cx - halfW,  yTop, halfW - halfID, yBot - yTop); // left wall
+      ctx.fillRect(cx + halfID, yTop, halfW - halfID, yBot - yTop); // right wall
+      ctx.globalAlpha = 1;
       ctx.strokeStyle = color;
-      ctx.lineWidth   = 2;
+      ctx.lineWidth   = 1;
       ctx.beginPath(); ctx.moveTo(cx - halfW, yTop); ctx.lineTo(cx - halfW, yBot); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(cx + halfW, yTop); ctx.lineTo(cx + halfW, yBot); ctx.stroke();
     }
@@ -268,7 +275,10 @@ function drawSchematic(survey) {
   // Final top clamp (in case the column is taller than available space)
   labelData.forEach(lb => { lb.ly = Math.max(topLimit, lb.ly); });
 
-  // Draw labels with drag offset applied
+  // ── RKB / GL / MSL datum lines — drawn before labels so labels render on top ─
+  _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth);
+
+  // Draw labels with drag offset applied (after datum lines so nothing overwrites them)
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   labelData.forEach(lb => {
     const key = lb.line1;
@@ -295,10 +305,6 @@ function drawSchematic(survey) {
     // Record hit area for drag detection
     _schDrag.areas.push({ key, x: dlx - 2, y: dly - 2, w: 130, h: BLOCK + 4 });
   });
-
-
-  // ── RKB / GL / MSL datum lines ────────────────────────────────────────────
-  _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth);
 
   // ── TD marker ─────────────────────────────────────────────────────────────
   const tdY = Math.min(PAD_T + lastSurvey.md * scaleY, H - PAD_B - 4);
