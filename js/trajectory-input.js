@@ -633,4 +633,5 @@ function schematicSave() {
   dbSaveScenarioData(qpState.currentScenarioId, 'schematic', rows);
   if (typeof drawSchematic === 'function') drawSchematic(qpState.survey);
   if (typeof _schValidate === 'function') _schValidate();
+  if (typeof syncCasingFromSchematic === 'function') syncCasingFromSchematic();
 }

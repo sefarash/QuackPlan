@@ -363,14 +363,13 @@
           </table>
           <button class="add-row-btn" onclick="servicesAddRow()">+ Add service</button>
 
-          <div class="section-label mt12">Casing Costs</div>
+          <div class="section-label mt12">Casing Costs <span style="font-size:9px;font-weight:normal;color:#5a7a8e">(size &amp; length from Well Schematic)</span></div>
           <table class="qp-table" id="casingCostTable">
             <thead>
-              <tr><th class="drag-col"></th><th>Casing Size</th><th>$/ft</th><th>Length (ft)</th><th>Cement ($)</th><th>Total ($)</th><th class="row-act"></th></tr>
+              <tr><th>Casing Size</th><th>$/ft</th><th>Length (ft)</th><th>Cement ($)</th><th>Total ($)</th></tr>
             </thead>
             <tbody id="casingCostBody"></tbody>
           </table>
-          <button class="add-row-btn" onclick="casingCostAddRow()">+ Add casing</button>
         </div>
       </div>
     </div>
@@ -836,7 +835,7 @@
     makeRowsDraggable('handoverBody',    handoverSave);
     makeRowsDraggable('activityBody',    activityRecalc);
     makeRowsDraggable('servicesBody',    activityRecalc);
-    makeRowsDraggable('casingCostBody',  casingCostRecalc);
+    // casingCostBody rows are auto-generated from schematic — no drag
     makeRowsDraggable('ppfgBody',        ppfgRecalc);
 
     // Restore hierarchy collapsed state

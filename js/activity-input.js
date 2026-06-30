@@ -64,30 +64,54 @@ function _servicesDayRate() {
   return rate;
 }
 
-// ── Casing Cost table ─────────────────────────────────────────────────────────
+// ── Casing Cost table — rows auto-generated from Well Schematic ───────────────
 
-function casingCostAddRow(vals) {
+// Rebuild the casing cost table from the current schematic rows.
+// Preserves any $/ft and Cement values already entered, matched by size+def key.
+function syncCasingFromSchematic() {
   const body = document.getElementById('casingCostBody');
-  const tr   = document.createElement('tr');
-  tr.innerHTML = `
-    <td class="drag-handle">⠿</td>
-    <td class="editable"><input type="text"   value="${vals?.size   ?? ''}"    placeholder='e.g. 9.625"' onchange="casingCostRecalc()"></td>
-    <td class="editable"><input type="number" step="0.5"  value="${vals?.rate   ?? 30}"   onchange="casingCostRecalc()"></td>
-    <td class="editable"><input type="number" step="100"  value="${vals?.length ?? 5000}" onchange="casingCostRecalc()"></td>
-    <td class="editable"><input type="number" step="1000" value="${vals?.cement ?? 0}"    onchange="casingCostRecalc()"></td>
-    <td class="calc-cell" data-col="castotal">—</td>
-    <td class="row-act"><button onclick="this.closest('tr').remove();casingCostRecalc()">✕</button></td>`;
-  body.appendChild(tr);
+  if (!body || typeof _readSchematicRows !== 'function') return;
+
+  // Snapshot existing manual values (keyed by "size|def")
+  const saved = {};
+  for (const tr of body.rows) {
+    const key    = tr.dataset.casingKey;
+    const inputs = tr.querySelectorAll('input[type=number]');
+    if (key) saved[key] = { rate: +(inputs[0]?.value || 0), cement: +(inputs[1]?.value || 0) };
+  }
+
+  body.innerHTML = '';
+
+  const schRows = _readSchematicRows().filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0);
+  schRows.forEach(row => {
+    const label  = `${row.size}" ${row.def}`;
+    const length = Math.round(+(row.bot || 0) - +(row.top || 0));
+    const key    = `${row.size}|${row.def}`;
+    const rate   = saved[key]?.rate   ?? 30;
+    const cement = saved[key]?.cement ?? 0;
+
+    const tr = document.createElement('tr');
+    tr.dataset.casingKey    = key;
+    tr.dataset.casingLength = length;
+    tr.innerHTML = `
+      <td style="padding:3px 6px;font-size:11px;color:#9ecce3">${label}</td>
+      <td class="editable"><input type="number" step="0.5"  value="${rate}"   onchange="casingCostRecalc();activitySave()"></td>
+      <td style="padding:3px 6px;text-align:right;font-size:11px;color:#ccd8e0">${length.toLocaleString()}</td>
+      <td class="editable"><input type="number" step="1000" value="${cement}" onchange="casingCostRecalc();activitySave()"></td>
+      <td class="calc-cell" data-col="castotal">—</td>`;
+    body.appendChild(tr);
+  });
+
   casingCostRecalc();
 }
 
 function casingCostRecalc() {
   for (const tr of document.getElementById('casingCostBody').rows) {
-    const num   = tr.querySelectorAll('input[type=number]');
-    const rate   = +(num[0]?.value || 0);
-    const length = +(num[1]?.value || 0);
-    const cement = +(num[2]?.value || 0);
-    const cell = tr.querySelector('[data-col="castotal"]');
+    const inputs = tr.querySelectorAll('input[type=number]');
+    const rate   = +(inputs[0]?.value || 0);
+    const length = +(tr.dataset.casingLength || 0);
+    const cement = +(inputs[1]?.value || 0);
+    const cell   = tr.querySelector('[data-col="castotal"]');
     if (cell) cell.textContent = '$' + Math.round(rate * length + cement).toLocaleString();
   }
   activityRecalc();
@@ -96,8 +120,8 @@ function casingCostRecalc() {
 function _casingCostTotal() {
   let total = 0;
   for (const tr of document.getElementById('casingCostBody').rows) {
-    const num = tr.querySelectorAll('input[type=number]');
-    total += +(num[0]?.value || 0) * +(num[1]?.value || 0) + +(num[2]?.value || 0);
+    const inputs = tr.querySelectorAll('input[type=number]');
+    total += +(inputs[0]?.value || 0) * +(tr.dataset.casingLength || 0) + +(inputs[1]?.value || 0);
   }
   return total;
 }
@@ -126,14 +150,14 @@ function activityGet() {
 
   const casingCosts = [];
   for (const tr of document.getElementById('casingCostBody').rows) {
-    const txt = tr.querySelectorAll('input[type=text]');
-    const num = tr.querySelectorAll('input[type=number]');
-    const rate   = +(num[0]?.value || 0);
-    const length = +(num[1]?.value || 0);
-    const cement = +(num[2]?.value || 0);
+    const inputs = tr.querySelectorAll('input[type=number]');
+    const rate   = +(inputs[0]?.value || 0);
+    const cement = +(inputs[1]?.value || 0);
+    const length = +(tr.dataset.casingLength || 0);
     casingCosts.push({
-      size: txt[0]?.value || '',
-      rate, length, cement,
+      key: tr.dataset.casingKey || '',
+      rate, cement,
+      // length not saved — derived from schematic at sync time
       total: rate * length + cement,
     });
   }
@@ -172,12 +196,22 @@ function activityLoadState(data) {
     if (inputs[2]) inputs[2].value = s.lumpSum ?? 0;
   });
 
-  const casBody = document.getElementById('casingCostBody');
-  casBody.innerHTML = '';
+  // Restore saved $/ft and cement into existing synced rows (matched by key)
+  const savedRates = {};
   (data.casingCosts || []).forEach(c => {
-    casingCostAddRow(c);
-    // value is already set via vals param in casingCostAddRow
+    // Support old format (size+def key) and new format (key field)
+    const k = c.key || (c.size && c.def ? `${c.size}|${c.def}` : null);
+    if (k) savedRates[k] = { rate: c.rate ?? 30, cement: c.cement ?? 0 };
   });
+  for (const tr of document.getElementById('casingCostBody').rows) {
+    const k = tr.dataset.casingKey;
+    if (k && savedRates[k]) {
+      const inputs = tr.querySelectorAll('input[type=number]');
+      if (inputs[0]) inputs[0].value = savedRates[k].rate;
+      if (inputs[1]) inputs[1].value = savedRates[k].cement;
+    }
+  }
+  casingCostRecalc();
 
   activityRecalc();
 }
@@ -196,5 +230,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('servicesBody').rows.length) {
     servicesAddRow();
   }
+  syncCasingFromSchematic();
   activityRecalc();
 });
