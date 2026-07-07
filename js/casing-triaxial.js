@@ -12,11 +12,22 @@
 //   σ_a(θ) = R · (cos θ − sin θ / √3)
 //   σ_θ(θ) = R · (cos θ + sin θ / √3),   R = σ_y / DF
 
+// Minimum yield strength (psi) per grade — covers every grade string in
+// casing-catalogue.js. The trailing number of an API/proprietary grade is the
+// minimum yield in ksi (e.g. P-110 → 110,000 psi). Any grade missing here would
+// fall back to 80,000 and size the Von Mises ellipse badly wrong (V-150 would be
+// 88% too small, P-110 27% too small).
 const CASING_GRADE_YLD = {
-  'J-55': 55000, 'K-55': 55000, 'LS-65': 65000,
-  'L-80': 80000, 'N-80': 80000, 'HCL-80': 80000, 'HCN-80': 80000,
-  'C-90': 90000, 'R-95': 95000, 'T-95': 95000, 'HC-95': 95000,
-  'P-110': 110000, 'Q-125': 125000,
+  'H-40':  40000,
+  'J-55':  55000, 'K-55':  55000, 'HCK-55': 55000,
+  'LS-65': 65000,
+  'L-80':  80000, 'N-80':  80000, 'HCL-80': 80000, 'HCN-80': 80000,
+  'C-90':  90000, 'H2S-90': 90000,
+  'C-95':  95000, 'S-95':  95000, 'T-95':  95000, 'H2S-95': 95000,
+  'P-110': 110000, 'HCP-110': 110000,
+  'Q-125': 125000, 'HCQ-125': 125000,
+  'LS-140': 140000,
+  'V-150': 150000,
 };
 
 function _vmEllipse(od_in, id_in, σy, DF) {
@@ -207,9 +218,16 @@ function drawCasingTriaxial() {
   const comp_rating     = rr.compression || 0;
   const hasBox          = burst_rating > 0 || collapse_rating > 0 || tension_rating > 0 || comp_rating > 0;
 
-  // API box x-extents: use user-entered ratings if available, else body yield
-  const bx_pos = tension_rating > 0 ? tension_rating / sfTension     : bodyYield_klbf / sfTension;
-  const bx_neg = comp_rating    > 0 ? comp_rating    / sfCompression : bodyYield_klbf / sfCompression;
+  // Tension capacity = min(pipe body yield, joint strength). A threaded
+  // connection can fail in tension before the pipe body, so the catalogue joint
+  // yield (weakest available connection) caps the tensile design limit.
+  const tensionCap_klbf = (row.jointYield != null && +row.jointYield > 0)
+    ? Math.min(bodyYield_klbf, +row.jointYield)
+    : bodyYield_klbf;
+
+  // API box x-extents: use user-entered ratings if available, else the capacity above
+  const bx_pos = tension_rating > 0 ? tension_rating / sfTension     : tensionCap_klbf / sfTension;
+  const bx_neg = comp_rating    > 0 ? comp_rating    / sfCompression : bodyYield_klbf  / sfCompression;
 
   // Axis range — fit ellipse + all load cases + API box + bending envelope
   let xR = Math.max(bodyYield_klbf * 1.15, (F_overpull + F_bend) * 1.1, Math.abs(F_fmd + F_bend) * 1.1, 50);
@@ -364,8 +382,11 @@ function drawCasingTriaxial() {
   ctx.fillText(specStr, g.l + g.pw / 2, g.t - 10);
 
   ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
+  const jointStr = (row.jointYield != null && +row.jointYield > 0 && +row.jointYield < bodyYield_klbf)
+    ? `  ·  Joint Yield = ${(+row.jointYield).toFixed(0)} klbf`
+    : '';
   ctx.fillText(
-    `σ_y = ${(σy/1000).toFixed(0)} kpsi  ·  Body Yield = ${bodyYield_klbf.toFixed(0)} klbf  ·  ID = ${id_in.toFixed(3)}"`,
+    `σ_y = ${(σy/1000).toFixed(0)} kpsi  ·  Body Yield = ${bodyYield_klbf.toFixed(0)} klbf${jointStr}  ·  ID = ${id_in.toFixed(3)}"`,
     g.l + g.pw / 2, g.t - 28
   );
   if (F_bend > 0.1) {

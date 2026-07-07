@@ -107,8 +107,41 @@ function _solveForMD(prevStation, inc2, az2, targetTVD) {
 // ── Tortuosity application ────────────────────────────────────────────────────
 // intervals: [{startMD, endMD, tort, mode}]  mode: 'random' | 'sinusoidal'
 // baseSurvey: [{md, inc, az}] from Option 1 or Option 2
+
+// Deterministic PRNG (mulberry32) — a fixed seed makes the tortured survey
+// reproducible across recompute cycles instead of changing on every keystroke.
+function _tortRng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const _TORT_WAVELEN_FT = 150;   // spatial period of the sinusoidal mode (ft/cycle)
+
 function applyTortuosity(baseSurvey, intervals) {
   if (!baseSurvey.length || !intervals.length) return baseSurvey;
+  const DEG = Math.PI / 180;
+
+  // Seed from the interval definition so identical inputs reproduce identical
+  // output — deterministic, no Math.random().
+  let seed = 0x9E3779B9 >>> 0;
+  intervals.forEach(iv => {
+    const k = Math.round((+(iv.startMD || 0)) + (+(iv.endMD || 0)) * 7 + (+(iv.tort || 0)) * 1000);
+    seed = (Math.imul(seed, 31) + k) >>> 0;
+  });
+  const rng = _tortRng(seed);
+
+  // Accumulated offset from the planned path (deg). Each station adds an
+  // incremental dogleg of magnitude dlAdd, so the realized added DLS matches the
+  // nominal `tort`, and the offset persists station-to-station (correlated
+  // wander, not white noise). Random mode uses AR(1) mean-reversion so the walk
+  // stays bounded around the plan instead of drifting away.
+  let offInc = 0, offAz = 0;
+  let toolface = rng() * 2 * Math.PI;
 
   return baseSurvey.map((st, idx) => {
     if (idx === 0) return st;
@@ -116,13 +149,33 @@ function applyTortuosity(baseSurvey, intervals) {
       st.md >= +(iv.startMD || 0) && st.md <= +(iv.endMD || 0));
     if (!iv) return st;
 
-    const tort    = +(iv.tort || 0);           // °/100ft
-    const dMD     = st.md - baseSurvey[idx - 1].md;
-    const dlAdd   = tort * dMD / 100;          // additional dogleg degrees
-    const delta   = iv.mode === 'sinusoidal'
-                    ? dlAdd * Math.sin((idx / baseSurvey.length) * Math.PI)
-                    : dlAdd * (Math.random() * 2 - 1);
+    const tort  = +(iv.tort || 0);            // °/100ft
+    const dMD   = st.md - baseSurvey[idx - 1].md;
+    const dlAdd = tort * dMD / 100;           // incremental dogleg per step (deg)
 
-    return { md: st.md, inc: Math.max(0, st.inc + delta * 0.5), az: st.az + delta * 0.5 };
+    let tf, decay;
+    if (iv.mode === 'sinusoidal') {
+      // Toolface rotates with MD (station-spacing independent) → smooth helical
+      // wander with a fixed spatial wavelength, not an index-dependent frequency.
+      tf    = 2 * Math.PI * st.md / _TORT_WAVELEN_FT;
+      decay = 1.0;                            // pure oscillation, bounded by the sine
+    } else {
+      toolface += (rng() * 2 - 1) * 0.8;      // rad; drift sets the correlation length
+      tf    = toolface;
+      // Mean-reversion factor. There is a physical tradeoff: persistent dogleg in
+      // one direction necessarily drifts the hole off plan, so higher fidelity to
+      // the nominal DLS means more drift. 0.85 balances realized DLS (~1.5°/100ft
+      // for tort=2) against bounded drift (<~7° over a 3000 ft interval).
+      decay = 0.85;
+    }
+
+    // Add the step as a pure rotation of magnitude dlAdd at toolface `tf`.
+    // Decomposing a rotation this way makes the incremental dogleg equal exactly
+    // dlAdd — the old 50/50 inc+az split gave only ~0.6–0.71× the intended value.
+    const sinI = Math.max(Math.sin(st.inc * DEG), 1e-3);
+    offInc = offInc * decay + dlAdd * Math.cos(tf);
+    offAz  = offAz  * decay + dlAdd * Math.sin(tf) / sinI;
+
+    return { md: st.md, inc: Math.max(0, st.inc + offInc), az: st.az + offAz };
   });
 }

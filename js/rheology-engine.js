@@ -46,10 +46,11 @@ function _pl_annular(n, K, mudWeight, dh, dp, length_ft, flowRate_gpm) {
   if (gap <= 0 || v <= 0) return 0;
   const shearRate = 144 * v / gap;
   const mu_e      = K * Math.pow(shearRate, n - 1);
-  // Reynolds number check
-  const Re = 109 * mudWeight * v * gap / mu_e;
+  // Reynolds number check — power-law transition Re_c = 3470 − 1370n (Bourgoyne)
+  const Re  = 109 * mudWeight * v * gap / mu_e;
+  const Rec = 3470 - 1370 * n;
   let dPper100;
-  if (Re < 3470) {
+  if (Re < Rec) {
     // Laminar
     dPper100 = (K * Math.pow(144 * v, n) * 144)
                / (300 * Math.pow(gap, n + 1))
@@ -73,8 +74,9 @@ function _hb_annular(tauY, K, n, mudWeight, dh, dp, length_ft, flowRate_gpm) {
   const tau    = tauY + K * Math.pow(gamma, n);
   const mu_e   = tau / gamma;
   const Re     = 109 * mudWeight * v * gap / mu_e;
+  const Rec    = 3470 - 1370 * n;   // power-law transition Re (Bourgoyne)
   let dPper100;
-  if (Re < 3470) {
+  if (Re < Rec) {
     // Laminar — effective-viscosity method: mu_e = tau/gamma already contains
     // the yield contribution (tauY is in the numerator of mu_e), so it must NOT
     // be added again as a separate BP yield term. Treat as equivalent Newtonian.
@@ -110,14 +112,14 @@ function computeRheology(model, params, geometry) {
     pressureLoss_psi    = _pl_annular(n, K, mudWeight, dh, dp, length_ft, flowRate);
     const gap           = Math.max(dh - dp, 0.01);
     effectiveViscosity_cP = K * Math.pow(144 * v / gap, n - 1);
-    flowRegime          = 109 * mudWeight * v * gap / effectiveViscosity_cP > 3470
+    flowRegime          = 109 * mudWeight * v * gap / effectiveViscosity_cP > (3470 - 1370 * n)
                           ? 'turbulent' : 'laminar';
   } else {
     pressureLoss_psi    = _hb_annular(tauY, kHB, nHB, mudWeight, dh, dp, length_ft, flowRate);  // kHB=K, nHB=n
     const gap           = Math.max(dh - dp, 0.01);
     const gamma         = Math.max(144 * v / gap, 0.01);
     effectiveViscosity_cP = (tauY + kHB * Math.pow(gamma, nHB)) / gamma;
-    flowRegime          = 109 * mudWeight * v * gap / effectiveViscosity_cP > 3470
+    flowRegime          = 109 * mudWeight * v * gap / effectiveViscosity_cP > (3470 - 1370 * nHB)
                           ? 'turbulent' : 'laminar';
   }
 

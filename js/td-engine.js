@@ -168,18 +168,25 @@ function _buckling(elements, rotOnStations) {
     const T   = (rotOnStations[i] || {}).axialLoad_lbf || 0;
     const Fc  = Math.max(-T, 0);
     const sinA = Math.sin(el.aAvg);
+    const w_in = el.W_bl / 12;   // buoyed weight, lbf/in
 
-    let fSin = null, fHel = null;
-    if (sinA > 1e-4) {
-      const sq = _K.E * el.I * (el.W_bl / 12) * sinA / el.rCl_in;
-      fSin = 2 * Math.sqrt(Math.max(sq, 0));
-      fHel = Math.SQRT2 * fSin;   // ratio = √2 per Chen et al.
-    }
+    // Inclined Dawson-Paslay sinusoidal limit — degenerates to 0 as α→0.
+    const fSinIncl = (sinA > 1e-4 && el.rCl_in > 0)
+      ? 2 * Math.sqrt(Math.max(_K.E * el.I * w_in * sinA / el.rCl_in, 0))
+      : 0;
+    // Vertical buckling floor (Wu/Paslay ~2.55·(EI·w²)^⅓): bending stiffness and
+    // the string's own weight resist buckling even at α=0, so the limit never
+    // truly reaches zero. Using max() keeps inclined behaviour unchanged (there
+    // the inclined term dominates) while giving near-vertical sections a real,
+    // nonzero threshold instead of a false 'OK'.
+    const fSinVert = 2.55 * Math.cbrt(Math.max(_K.E * el.I * w_in * w_in, 0));
+    const fSin = Math.max(fSinIncl, fSinVert);
+    const fHel = Math.SQRT2 * fSin;   // ratio = √2 per Chen et al.
 
     const status =
-      fSin === null || Fc < fSin ? 'OK'
-      : Fc < fHel               ? 'SINUSOIDAL'
-                                : 'HELICAL';
+      Fc < fSin ? 'OK'
+      : Fc < fHel ? 'SINUSOIDAL'
+                  : 'HELICAL';
 
     if (status !== 'OK'     && firstSin === null) firstSin = el.md0;
     if (status === 'HELICAL' && firstHel === null) firstHel = el.md0;
@@ -225,23 +232,35 @@ function _overpull(elements, poohMid, required) {
   };
 }
 
-// ----- von Mises stress (POOH tension + RotOn torque combined) -----
-function _stress(elements, poohSt, rotOnSt, mud_ppg) {
+// ----- von Mises stress (back-reaming: pull-up tension + torque combined) -----
+// Back-reaming is the worst realistic case carrying BOTH high axial tension
+// (pulling up) and torque (rotating) at the same time; POOH and rot-on are
+// mutually exclusive and never coexist. During tripping the pipe is mud-filled
+// and the annulus holds the same mud (balanced column), so internal = external
+// hydrostatic — the pressure state is isotropic −P, not the large spurious hoop
+// term that assuming an empty pipe (P_int = 0) produced. Lamé stresses and the
+// torsional shear are both evaluated at the outer wall (where shear peaks).
+function _stress(elements, combinedSt, mud_ppg) {
   const stList = [];
   let maxRatio = 0, critDepth = 0;
 
   for (let i = 0; i < elements.length; i++) {
     const el  = elements[i];
-    const pst = poohSt[i], rst = rotOnSt[i];
-    if (!pst || !rst) continue;
+    const cst = combinedSt[i];
+    if (!cst) continue;
 
-    const T_axial = pst.axialLoad_lbf;
-    const tau_in  = rst.torque_ftlbs * 12;
+    const T_axial = cst.axialLoad_lbf;
+    const tau_in  = cst.torque_ftlbs * 12;
     const rExt    = el.pOD / 2, rInt = el.pID / 2;
-    const P_ext   = mud_ppg * 0.052 * el.tvdMid;
+    const ro2 = rExt * rExt, ri2 = rInt * rInt, dr = ro2 - ri2;
+
+    // Balanced mud column: internal = external hydrostatic
+    const P     = mud_ppg * 0.052 * el.tvdMid;
+    const P_int = P, P_ext = P;
 
     const sA  = T_axial / el.A;
-    const sH  = (0 - P_ext * rExt * rExt) / (rExt * rExt - rInt * rInt);
+    // Lamé hoop/radial at the OUTER wall (balanced mud → both reduce to −P)
+    const sH  = dr > 0 ? (2 * P_int * ri2 - P_ext * (ro2 + ri2)) / dr : 0;
     const sR  = -P_ext;
     const tS  = el.J > 0 ? tau_in * rExt / el.J : 0;
 
@@ -267,7 +286,7 @@ function _tdLockupWalk(elements, rotOnStations, bucklingStations, wob_lbf, avail
   let requiredPush = wob_lbf;
   let lockupMd = null, lockupReason = null;
 
-  for (let i = elements.length - 1; i > 0; i--) {
+  for (let i = elements.length - 1; i >= 0; i--) {
     const el   = elements[i];
     const st   = rotOnStations[i];
     const bkSt = bucklingStations[i];
@@ -366,8 +385,9 @@ function tdCompute(survey, bha, casingDesign, mudWeight_ppg, inputs) {
     }
   }
 
-  const midPooh  = modes.pooh.ffSensitivity.mid;
-  const midRotOn = modes.rotOn.ffSensitivity.mid;
+  const midPooh     = modes.pooh.ffSensitivity.mid;
+  const midRotOn    = modes.rotOn.ffSensitivity.mid;
+  const midBackream = modes.backream.ffSensitivity.mid;
   const buckling = _buckling(elements, midRotOn.stations);
 
   // Pipe yield capacity for available push limit
@@ -396,7 +416,7 @@ function tdCompute(survey, bha, casingDesign, mudWeight_ppg, inputs) {
     buckling,
     overpull,
     lockup,
-    stress:   _stress(elements, midPooh.stations, midRotOn.stations, mw),
+    stress:   _stress(elements, midBackream.stations, mw),
     calibration: {
       blockWeight_lbf,
       dpWeight_ppf:          dpWtCalib_ppf,

@@ -522,11 +522,12 @@ function _readSchematicRows() {
       top:  inputs[1]?.value  || 0,
       bot:  inputs[2]?.value  || 5000,
       ...(spec ? {
-        nomWt_ppf: spec.nomWt_ppf,
-        grade:     spec.grade,
-        id_in:     spec.id_in,
-        collapse:  spec.collapse,
-        burst:     spec.burst,
+        nomWt_ppf:  spec.nomWt_ppf,
+        grade:      spec.grade,
+        id_in:      spec.id_in,
+        collapse:   spec.collapse,
+        burst:      spec.burst,
+        jointYield: spec.jointYield,
       } : {
         grade:     isGrCustom ? (grTxt?.value || '') : '',
         nomWt_ppf: isWtCustom ? (wtTxt?.value ? +wtTxt.value : null)

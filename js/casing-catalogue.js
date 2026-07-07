@@ -755,6 +755,11 @@ function _bestBurst(r) {
 
 // Build a spec object from a RAW row
 function catalogueSpec(r) {
+  // Joint strengths JS_STC/JS_LTC/JS_BTC (cols 8-10, klbf) — often partially
+  // null. The schematic stores no connection selection, so expose the weakest
+  // available joint as the conservative tension cap (a threaded connection can
+  // fail in tension before the pipe body does).
+  const joints = [r[8], r[9], r[10]].filter(v => v != null && +v > 0);
   return {
     od:         r[0],
     od_in:      _odToDecimal(r[0]),
@@ -763,6 +768,7 @@ function catalogueSpec(r) {
     collapse:   r[3],
     burst:      _bestBurst(r),
     bodyYield:  r[11],
+    jointYield: joints.length ? Math.min(...joints) : null,
     wall_in:    r[12],
     id_in:      r[13],
     drift_in:   r[14],
