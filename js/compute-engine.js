@@ -35,6 +35,21 @@ function qpCompute() {
   setStatus('Ready');
 }
 
+// Derive Power-Law n and K from the Bingham PV/YP (standard API RP 13D).
+// The 600/300 rpm Fann dial readings are recovered from PV/YP:
+//   θ600 = 2·PV + YP,   θ300 = PV + YP
+//   n = 3.32·log10(θ600/θ300)     (flow-behaviour index, dimensionless)
+//   K = 5.11·θ600 / 1022^n        (consistency index)
+function _plFromPVYP(pv, yp) {
+  const t600 = 2 * pv + yp;
+  const t300 = pv + yp;
+  if (t300 <= 0 || t600 <= 0) return { n: 0.65, K: 180 };
+  let n = 3.32 * Math.log10(t600 / t300);
+  n = Math.min(1.0, Math.max(0.3, n));         // physical bounds for drilling muds
+  const K = 5.11 * t600 / Math.pow(1022, n);
+  return { n, K };
+}
+
 // ── Simplified hydraulics (field units, feet canonical) ──────────────────────
 function _computeHyd(survey, fluid, bha) {
   const { model = 'HB', mudWeight = 10, pv = 16, yp = 13,
@@ -52,7 +67,8 @@ function _computeHyd(survey, fluid, bha) {
   const totalMD_ft = survey[survey.length - 1].md;
   const bitTVD_ft  = survey[survey.length - 1].tvd;
 
-  const rheolParams = { pv, yp, n: 0.65, K: 180, tauY, nHB, kHB,
+  const { n: plN, K: plK } = _plFromPVYP(pv, yp);
+  const rheolParams = { pv, yp, n: plN, K: plK, tauY, nHB, kHB,
                         mudWeight: activeMW };
 
   // Annular sections — use schematic rows if available, else 3-section fallback
@@ -72,7 +88,8 @@ function _computeHyd(survey, fluid, bha) {
         { dh, dp: dpOD, length: length / 3.28084, flowRate: activeFlow });
       const tvdShoe = _tvdAt(survey, bot);
       const ecd = activeMW + (cumAnn + r.pressureLoss_psi) / (0.052 * (tvdShoe || 1));
-      sections.push({ name: row.def, dh, annPressLoss: Math.round(r.pressureLoss_psi),
+      sections.push({ name: row.def, dh, lenM: length / 3.28084,
+                      annPressLoss: Math.round(r.pressureLoss_psi),
                       annVel_fpm: Math.round(r.annularVelocity_fpm),
                       ecdAtShoe: +ecd.toFixed(2), flowRegime: r.flowRegime });
       cumAnn += r.pressureLoss_psi;
@@ -93,7 +110,7 @@ function _computeHyd(survey, fluid, bha) {
         { dh: seg.dh, dp: dpOD, length: len / 3.28084, flowRate: activeFlow });
       const tvdShoe = _tvdAt(survey, seg.mdBot);
       const ecd = activeMW + (cumAnn + r.pressureLoss_psi) / (0.052 * (tvdShoe || 1));
-      sections.push({ name: seg.name, dh: seg.dh,
+      sections.push({ name: seg.name, dh: seg.dh, lenM: len / 3.28084,
                       annPressLoss: Math.round(r.pressureLoss_psi),
                       annVel_fpm: Math.round(r.annularVelocity_fpm),
                       ecdAtShoe: +ecd.toFixed(2), flowRegime: r.flowRegime });
@@ -137,13 +154,14 @@ function _computeHyd(survey, fluid, bha) {
     const pL  = fP * activeMW * vP * vP * totalMD_ft / (25.8 * dpID);
     const nV  = tfa > 0 ? q / (3.117 * tfa) : 0;
     const bD  = activeMW * nV * nV / 1120;
-    let ann   = 0;
+    // Recompute each annular section's actual pressure loss at flow rate q,
+    // using its real length — no power-law scaling shortcut.
+    let ann = 0;
     sections.forEach(s => {
       const rh = computeRheology(model, rheolParams,
-        { dh: s.dh, dp: dpOD, length: 100 / 3.28084, flowRate: q });
-      ann += rh.pressureLoss_psi * (s.annPressLoss / Math.max(cumAnn, 1));
+        { dh: s.dh, dp: dpOD, length: s.lenM, flowRate: q });
+      ann += rh.pressureLoss_psi;
     });
-    ann = cumAnn * (q / activeFlow) ** 1.75;  // simplified scaling
     return { q, spp: Math.round(pL + bD + ann + 50 + mwdDrop) };
   });
 

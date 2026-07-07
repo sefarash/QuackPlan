@@ -28,10 +28,13 @@ function _bp_annular(pv, yp, mudWeight, dh, dp, length_ft, flowRate_gpm) {
     // Laminar
     dPper100 = (pv * v) / (300 * gap * gap) + yp / (200 * gap);
   } else {
-    // Turbulent (API RP 13D simplified)
-    const Re = 109 * mudWeight * v * gap / pv;
-    const f  = 0.0791 / Math.pow(Re, 0.25);
-    dPper100 = f * mudWeight * v * v / (21.1 * gap * 100);
+    // Turbulent (API RP 13D / Bourgoyne eq. 4.53, Fanning).
+    // Annular gradient = f·ρ·v_fs²/(21.1·gap) [psi/ft], v in ft/s.
+    // annularVelocity_fpm() returns ft/min, so convert v→ft/s before use.
+    const v_fs = v / 60;
+    const Re   = 109 * mudWeight * v * gap / pv;
+    const f    = 0.0791 / Math.pow(Re, 0.25);
+    dPper100 = f * mudWeight * v_fs * v_fs * 100 / (21.1 * gap);
   }
   return dPper100 * length_ft / 100;
 }
@@ -52,9 +55,10 @@ function _pl_annular(n, K, mudWeight, dh, dp, length_ft, flowRate_gpm) {
                / (300 * Math.pow(gap, n + 1))
                * Math.pow((2 + 1 / n) / 0.0208, n);
   } else {
-    // Turbulent
-    const f  = 0.0791 / Math.pow(Re, 0.25);
-    dPper100 = f * mudWeight * v * v / (21.1 * gap * 100);
+    // Turbulent — v converted ft/min → ft/s for the 21.1 annular constant
+    const v_fs = v / 60;
+    const f    = 0.0791 / Math.pow(Re, 0.25);
+    dPper100 = f * mudWeight * v_fs * v_fs * 100 / (21.1 * gap);
   }
   return dPper100 * length_ft / 100;
 }
@@ -71,11 +75,15 @@ function _hb_annular(tauY, K, n, mudWeight, dh, dp, length_ft, flowRate_gpm) {
   const Re     = 109 * mudWeight * v * gap / mu_e;
   let dPper100;
   if (Re < 3470) {
-    // Laminar: use effective viscosity in BP formula
-    dPper100 = (mu_e * v) / (300 * gap * gap) + tauY / (200 * gap);
+    // Laminar — effective-viscosity method: mu_e = tau/gamma already contains
+    // the yield contribution (tauY is in the numerator of mu_e), so it must NOT
+    // be added again as a separate BP yield term. Treat as equivalent Newtonian.
+    dPper100 = (mu_e * v) / (300 * gap * gap);
   } else {
-    const f  = 0.0791 / Math.pow(Re, 0.25);
-    dPper100 = f * mudWeight * v * v / (21.1 * gap * 100);
+    // Turbulent — v converted ft/min → ft/s for the 21.1 annular constant
+    const v_fs = v / 60;
+    const f    = 0.0791 / Math.pow(Re, 0.25);
+    dPper100 = f * mudWeight * v_fs * v_fs * 100 / (21.1 * gap);
   }
   return dPper100 * length_ft / 100;
 }

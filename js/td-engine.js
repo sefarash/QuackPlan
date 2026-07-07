@@ -65,7 +65,11 @@ function _buildElements(survey, bha, casingDesign, BF, dpWtOverride) {
     const a1  = (s1.az  || s1.azimuth || 0) * _K.D2R;
     const aAvg = (i0 + i1) / 2;
     const dA   = i1 - i0;
-    const dZ   = a1 - a0;
+    // Wrap azimuth change to [-π, π] so wells crossing 0°/360° (due North)
+    // don't produce a spurious ~2π jump in the azimuthal contact-force term.
+    let dZ = a1 - a0;
+    if (dZ >  Math.PI) dZ -= 2 * Math.PI;
+    if (dZ < -Math.PI) dZ += 2 * Math.PI;
     const mdMid  = (md0 + md1) / 2;
     const tvdMid = ((s0.tvd || 0) + (s1.tvd || 0)) / 2;  // tvd already in feet
 
@@ -343,7 +347,7 @@ function tdCompute(survey, bha, casingDesign, mudWeight_ppg, inputs) {
     rotOff:   [ 0, true,    0,      0      ],
     rotOn:    [ 0, true,   -WOB,    tauBit ],  // WellPlan rotary: no axial friction, torque only
     slideOn:  [-1, false,  -WOB,    0      ],  // sliding while drilling: axial friction, WOB at bit
-    backream: [ 0, true,    0,      tauBit ],
+    backream: [+1, true,    0,      tauBit ],  // rotate while pulling out: upward pull friction (like POOH) + torque
   };
 
   const modes = {};

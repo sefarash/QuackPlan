@@ -37,8 +37,11 @@ function _ssSegPsi(v_ftmin, dh, dpOD, pv, yp, L) {
   // Clamp-model annular velocity (ft/min, Burkhardt 0.45 factor)
   const v_ann = v_ftmin * (dpOD * dpOD) / (dh * dh - dpOD * dpOD) * 0.45;
   if (v_ann <= 0) return 0;
-  // Bingham plastic laminar pressure drop (psi) — Bourgoyne et al.
-  return Math.max(pv * v_ann * L / (144000 * ann * ann) + yp * L / (200 * ann), 0);
+  // Bingham plastic laminar annular pressure drop (psi) — Bourgoyne et al. eq. 4.44:
+  //   dP/dL = μ_p·v/(1000·(d2−d1)²) + τ_y/(200·(d2−d1))   [psi/ft, v in ft/min]
+  // The viscous denominator was 144000 (an erroneous ×144 factor) which made the
+  // viscous term negligible and understated surge/swab — trip limits too permissive.
+  return Math.max(pv * v_ann * L / (1000 * ann * ann) + yp * L / (200 * ann), 0);
 }
 
 // ── Per-station ECD profile ───────────────────────────────────────────────────

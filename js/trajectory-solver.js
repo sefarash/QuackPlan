@@ -12,9 +12,11 @@ function traj2BuildStations(rows) {
 
   const stations = [];
 
-  // First row is always the surface station
+  // First row is always the surface station. Track accumulated TVD on each
+  // station so later inc_azi_tvd rows can solve against the real previous TVD.
   const first = rows[0];
-  stations.push({ md: +(first.md || 0), inc: +(first.inc || 0), az: +(first.azi || 0) });
+  stations.push({ md: +(first.md || 0), inc: +(first.inc || 0),
+                  az: +(first.azi || 0), tvd: +(first.tvd || 0) });
 
   for (let i = 1; i < rows.length; i++) {
     const r    = rows[i];
@@ -22,7 +24,9 @@ function traj2BuildStations(rows) {
 
     if (r.define === 'hold') {
       // Hold: keep previous inc and az, user supplies only MD
-      stations.push({ md: +(r.md || 0), inc: prev.inc, az: prev.az || 0 });
+      const md = +(r.md || 0);
+      const tvdInc = _mcTVDinc(prev.inc, prev.az || 0, prev.inc, prev.az || 0, md - prev.md);
+      stations.push({ md, inc: prev.inc, az: prev.az || 0, tvd: prev.tvd + tvdInc });
 
     } else if (r.define === 'inc_azi_tvd') {
       // Solve for MD that produces the target TVD, given Inc/Azi
@@ -30,7 +34,8 @@ function traj2BuildStations(rows) {
       const inc2 = +(r.inc || 0);
       const az2  = +(r.azi || 0);
       const md   = _solveForMD(prev, inc2, az2, targetTVD);
-      stations.push({ md, inc: inc2, az: az2 });
+      // TVD at this station is the target by construction
+      stations.push({ md, inc: inc2, az: az2, tvd: targetTVD });
 
     } else if (r.define === 'inc_azi_dls') {
       // Solve for MD from Inc2, Azi2, DLS using min curvature dogleg angle
@@ -39,11 +44,16 @@ function traj2BuildStations(rows) {
       const dls  = +(r.dls || 0);   // °/100ft (display)
       const dl   = _computeDL(prev.inc, prev.az || 0, inc2, az2);  // degrees
       const dMD  = dls > 0 ? dl * 100 / dls : 0;
-      stations.push({ md: prev.md + dMD, inc: inc2, az: az2 });
+      const tvdInc = _mcTVDinc(prev.inc, prev.az || 0, inc2, az2, dMD);
+      stations.push({ md: prev.md + dMD, inc: inc2, az: az2, tvd: prev.tvd + tvdInc });
 
     } else {
       // Default: md_inc_azi — use directly
-      stations.push({ md: +(r.md || 0), inc: +(r.inc || 0), az: +(r.azi || 0) });
+      const md   = +(r.md || 0);
+      const inc2 = +(r.inc || 0);
+      const az2  = +(r.azi || 0);
+      const tvdInc = _mcTVDinc(prev.inc, prev.az || 0, inc2, az2, md - prev.md);
+      stations.push({ md, inc: inc2, az: az2, tvd: prev.tvd + tvdInc });
     }
   }
 
@@ -58,7 +68,20 @@ function _computeDL(inc1, az1, inc2, az2) {
   return Math.acos(Math.max(-1, Math.min(1, cosDL))) / DEG;
 }
 
-// Binary-search MD that gives targetTVD, given known Inc2/Az2
+// Minimum-curvature TVD increment (ft) between two stations
+function _mcTVDinc(inc1deg, az1deg, inc2deg, az2deg, dMD) {
+  if (!(dMD > 0)) return 0;
+  const DEG = Math.PI / 180;
+  const i1 = inc1deg * DEG, i2 = inc2deg * DEG;
+  const a1 = az1deg  * DEG, a2 = az2deg * DEG;
+  const cosDL = Math.cos(i2 - i1) - Math.sin(i1) * Math.sin(i2) * (1 - Math.cos(a2 - a1));
+  const DL = Math.acos(Math.max(-1, Math.min(1, cosDL)));
+  const RF = DL < 1e-10 ? 1 : (2 / DL) * Math.tan(DL / 2);
+  return 0.5 * (Math.cos(i1) + Math.cos(i2)) * RF * dMD;
+}
+
+// Closed-form MD that gives targetTVD, given known Inc2/Az2 and the previous
+// station's accumulated TVD (prevStation.tvd).
 function _solveForMD(prevStation, inc2, az2, targetTVD) {
   const DEG = Math.PI / 180;
   const inc1 = prevStation.inc * DEG;
@@ -73,9 +96,8 @@ function _solveForMD(prevStation, inc2, az2, targetTVD) {
   const RF = DL < 1e-10 ? 1 : (2 / DL) * Math.tan(DL / 2);
   const tvdPerFt = 0.5 * (Math.cos(inc1) + Math.cos(inc2r)) * RF;
 
-  const prevSurvey = computeSurvey([prevStation]);
-  const prevTVD    = prevSurvey[0]?.tvd ?? 0;
-  const dTVD       = targetTVD - prevTVD;
+  const prevTVD = prevStation.tvd ?? 0;
+  const dTVD    = targetTVD - prevTVD;
 
   if (Math.abs(tvdPerFt) < 1e-10) return prevStation.md + Math.abs(dTVD);
   const dMD = dTVD / tvdPerFt;
