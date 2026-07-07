@@ -9,30 +9,37 @@ function qpCompute() {
 
   setStatus('Computing…');
 
-  const fluid = fluidGet();
-  const bha   = bhaGet();
+  // Guard the whole pipeline: a throw in T&D, hydraulics or a draw function must
+  // not leave the status stuck on "Computing…" with stale panels and no message.
+  try {
+    const fluid = fluidGet();
+    const bha   = bhaGet();
 
-  // ── Torque & Drag ────────────────────────────────────────────────────────────
-  const torqWOB  = +(document.getElementById('torqWOB')?.value  || 15);
-  const ffLo     = +(document.getElementById('torqFFlo')?.value || 0.20);
-  const ffMid    = +(document.getElementById('torqFFmid')?.value|| 0.30);
-  const ffHi     = +(document.getElementById('torqFFhi')?.value || 0.40);
+    // ── Torque & Drag ──────────────────────────────────────────────────────────
+    const torqWOB  = +(document.getElementById('torqWOB')?.value  || 15);
+    const ffLo     = +(document.getElementById('torqFFlo')?.value || 0.20);
+    const ffMid    = +(document.getElementById('torqFFmid')?.value|| 0.30);
+    const ffHi     = +(document.getElementById('torqFFhi')?.value || 0.40);
 
-  const tdResult = tdCompute(survey, bha, null, fluid.mudWeight, {
-    ffCased: ffMid, ffOpen: ffMid,
-    wob_klbs: torqWOB,
-    overpullMargin_lbf: 100000,
-  });
-  qpState.tdResult = tdResult;
+    const tdResult = tdCompute(survey, bha, null, fluid.mudWeight, {
+      ffCased: ffMid, ffOpen: ffMid,
+      wob_klbs: torqWOB,
+      overpullMargin_lbf: 100000,
+    });
+    qpState.tdResult = tdResult;
 
-  // ── Hydraulics ───────────────────────────────────────────────────────────────
-  const hydResult = _computeHyd(survey, fluid, bha);
-  qpState.hydResult = hydResult;
+    // ── Hydraulics ─────────────────────────────────────────────────────────────
+    const hydResult = _computeHyd(survey, fluid, bha);
+    qpState.hydResult = hydResult;
 
-  // ── Redraw active output panel ────────────────────────────────────────────────
-  if (qpState.activeOutputTab) redrawOutputPanel(qpState.activeOutputTab);
+    // ── Redraw active output panel ──────────────────────────────────────────────
+    if (qpState.activeOutputTab) redrawOutputPanel(qpState.activeOutputTab);
 
-  setStatus('Ready');
+    setStatus('Ready');
+  } catch (err) {
+    console.error('qpCompute failed:', err);
+    setStatus('Compute error — check inputs (details in console)', true);
+  }
 }
 
 // Derive Power-Law n and K from the Bingham PV/YP (standard API RP 13D).
@@ -195,7 +202,10 @@ function _tvdAt(survey, md) {
   return best.tvd;
 }
 
-function setStatus(msg) {
+function setStatus(msg, isError) {
   const el = document.getElementById('footerStatus');
-  if (el) el.textContent = msg;
+  if (el) {
+    el.textContent = msg;
+    el.style.color = isError ? '#e05555' : '';   // red on error, default otherwise
+  }
 }

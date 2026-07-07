@@ -82,17 +82,26 @@ function switchTrajOption(opt, el) {
 function redrawOutputPanel(name) {
   const r = qpState.tdResult;
   const h = qpState.hydResult;
-  if      (name === 'trajplot')                  drawTrajPlot();
-  else if (name === 'torque'     && r)           drawTorque(r);
-  else if (name === 'buckling'   && r)           drawBuckling(r);
-  else if (name === 'overpull'   && r)           drawOverpull(r);
-  else if (name === 'broomstick' && r)           drawBroomstick(r);
-  else if (name === 'hydraulics' && h)           { drawHydSweep(h); drawHydPie(h); }
-  else if (name === 'surgeswab')                 drawSurgeSwab();
-  else if (name === 'afe')                       drawAFE();
-  else if (name === 'finaldiagram')              drawFinalDiagram();
-  else if (name === 'cd')                        drawCasingDesign();
-  else if (name === 'kt')                        drawKickTolerance();
+  // A throw in any single draw function must not break tab switching or the
+  // sliders that call this directly — contain it and surface a message.
+  try {
+    if      (name === 'trajplot')                  drawTrajPlot();
+    else if (name === 'torque'     && r)           drawTorque(r);
+    else if (name === 'buckling'   && r)           drawBuckling(r);
+    else if (name === 'overpull'   && r)           drawOverpull(r);
+    else if (name === 'broomstick' && r)           drawBroomstick(r);
+    else if (name === 'hydraulics' && h)           { drawHydSweep(h); drawHydPie(h); }
+    else if (name === 'surgeswab')                 drawSurgeSwab();
+    else if (name === 'afe')                       drawAFE();
+    else if (name === 'finaldiagram')              drawFinalDiagram();
+    else if (name === 'cd')                        drawCasingDesign();
+    else if (name === 'kt')                        drawKickTolerance();
+  } catch (err) {
+    console.error(`redrawOutputPanel('${name}') failed:`, err);
+    if (typeof setStatus === 'function') {
+      setStatus(`Draw error in ${name} panel (details in console)`, true);
+    }
+  }
 }
 
 // ── Header context label ─────────────────────────────────────────────────────
