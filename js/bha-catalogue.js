@@ -709,10 +709,7 @@ function dpSpec(od, conn) {
 }
 
 
-// Drill Pipe
-function dpODs() {
-  return [...new Set(DP_CATALOGUE.map(r => r[0]))];
-}
+// Drill Pipe (continued) — dpODs() defined above
 function dpNomWtsByOD(od) {
   const seen = new Set();
   return DP_CATALOGUE
