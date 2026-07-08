@@ -273,6 +273,10 @@ function _loadScenario(id) {
     if (d.ppfg)      ppfgLoadState(d.ppfg);
     cdRatingsLoadState(d.cdRatings);
 
+    // Restore this scenario's output-panel control values (FF sliders, WOB,
+    // MW/flow, casing SFs); resets to defaults when the scenario has none saved
+    if (typeof loadOutputControls === 'function') loadOutputControls(d.outputControls);
+
     // Persist last-used scenario ID so reload restores it
     localStorage.setItem('qp_lastScenarioId', id);
 

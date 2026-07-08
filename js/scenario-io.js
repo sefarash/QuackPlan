@@ -21,9 +21,8 @@ async function exportScenario() {
   const d = scenarioNode?.data || {};
   const w = wellNode?.data     || {};
 
-  // Output controls from localStorage
-  let outputControls = {};
-  try { outputControls = JSON.parse(localStorage.getItem('qp_output_controls') || '{}'); } catch (_) {}
+  // Output controls — now stored per-scenario in the node data
+  const outputControls = d.outputControls || {};
 
   // Casing ratings — prefer IndexedDB copy; fall back to live DOM
   const casingRatings = d.cdRatings || _readCDRatings();
@@ -134,10 +133,10 @@ async function _importScenarioDoc(doc) {
                            handoverLoadState(inp.handover);
   if (inp.ppfg)            ppfgLoadState(inp.ppfg);
 
-  // Restore output controls
+  // Restore output controls into the DOM and persist to the target scenario
   if (doc.outputControls && Object.keys(doc.outputControls).length) {
-    localStorage.setItem('qp_output_controls', JSON.stringify(doc.outputControls));
-    loadOutputControls();
+    if (typeof loadOutputControls === 'function') loadOutputControls(doc.outputControls);
+    dbSaveScenarioData(sid, 'outputControls', doc.outputControls);
   }
 
   // Restore casing ratings
