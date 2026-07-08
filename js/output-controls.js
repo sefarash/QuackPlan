@@ -22,6 +22,8 @@ const _OC_IDS = [
   'hydMWmin', 'hydMWslider', 'hydMWmax', 'hydFlowMin', 'hydFlowSlider', 'hydFlowMax',
   // Casing design
   'cdSFBurst', 'cdSFCollapse',
+  // Kick tolerance (real-gas model)
+  'ktSafety', 'ktSurfTemp', 'ktGeoGrad', 'ktInflux', 'ktInfluxGrad',
 ];
 
 const _OC_ID_SET = new Set(_OC_IDS);
