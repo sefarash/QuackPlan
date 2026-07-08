@@ -114,13 +114,32 @@ function dbRoots() {
 
 // ── Scenario data helpers ─────────────────────────────────────────────────────
 
+// Per-scenario write serialization. dbSaveScenarioData is a read-modify-write
+// (get node → set node.data[key] → put node). Two saves to the SAME scenario
+// firing concurrently would both read the same snapshot and the second put would
+// clobber the first key (lost update). We chain all writes for a given scenarioId
+// so each get→mutate→put completes before the next begins. Writes to different
+// scenarios still run in parallel. A failed write (e.g. IndexedDB quota) is no
+// longer silent — it surfaces via setStatus instead of an unhandled rejection.
+const _dbWriteChains = {};
 function dbSaveScenarioData(scenarioId, key, value) {
-  return dbGet(scenarioId).then(node => {
+  const run = () => dbGet(scenarioId).then(node => {
     if (!node) return;
     node.data = node.data || {};
     node.data[key] = value;
     return dbUpdate(node);
   });
+  const prev = _dbWriteChains[scenarioId] || Promise.resolve();
+  const next = prev.then(run).catch(err => {
+    console.error('dbSaveScenarioData failed:', err);
+    if (typeof setStatus === 'function') {
+      setStatus('Save failed — browser storage may be full (details in console)', true);
+    }
+  });
+  _dbWriteChains[scenarioId] = next;
+  // Drop the chain entry once it settles, unless a newer write has replaced it.
+  next.then(() => { if (_dbWriteChains[scenarioId] === next) delete _dbWriteChains[scenarioId]; });
+  return next;
 }
 
 function dbLoadScenarioData(scenarioId, key) {

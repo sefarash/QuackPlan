@@ -330,17 +330,19 @@ function tdCompute(survey, bha, casingDesign, mudWeight_ppg, inputs) {
   if (!survey || survey.length < 2) return null;
 
   // --- Calibration inputs ---
-  const blockWeight_lbf  = (+document.getElementById('tdBlockWeight')?.value || 50) * 1000;
-  const dpWtCalib_ppf    = +(inputs.dpWt_ppf) || +document.getElementById('tdDpWeight')?.value
+  // Resolved entirely from the caller-supplied `inputs` (and the mudWeight_ppg
+  // argument) so the engine stays DOM-free — this is what lets tdCompute run in
+  // a Web Worker or a Node test harness. Every field has a default, so callers
+  // that don't override get the historical behaviour unchanged.
+  const blockWeight_lbf  = (+inputs.blockWeight_klbs || 50) * 1000;
+  const dpWtCalib_ppf    = +(inputs.dpWt_ppf)
                          || (bha?.dpNomWt_ppf > 1 ? bha.dpNomWt_ppf : 0) || 19.5;
 
-  // MW: linked to hydraulics or override?
-  const overrideEl       = document.getElementById('tdMwOverride');
+  // MW: linked to hydraulics (the mudWeight_ppg argument) unless the caller
+  // passes an explicit override via inputs.mwOverride_ppg.
   const linkedMw         = mudWeight_ppg || 9.5;
-  const mwLinked         = !overrideEl || overrideEl.dataset.linked !== 'false';
-  const tdMudWeight_ppg  = mwLinked
-    ? linkedMw
-    : +document.getElementById('tdMudWeight')?.value || linkedMw;
+  const mwLinked         = !(inputs.mwOverride_ppg != null && inputs.mwOverride_ppg !== '');
+  const tdMudWeight_ppg  = mwLinked ? linkedMw : +inputs.mwOverride_ppg;
 
   const mw   = tdMudWeight_ppg;
   const BF   = 1 - mw / _K.PPG;
