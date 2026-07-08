@@ -12,6 +12,10 @@ function drawAFE() {
   const act = activityGet();
   if (!act.activities?.length) { _noData(ctx, W, H, 'Add activities first'); return; }
 
+  // Depth axis shows display units (positions stay imperial); cost/days unchanged
+  const toD = v => QP_UNITS.toDisplay('depth', v);
+  const uD  = QP_UNITS.label('depth');
+
   // Accumulate days and cost vs depth
   const pts = [{ depth: 0, days: 0, cost: 0 }];
   const dayRate = act.services.reduce((s, sv) => s + (sv.dayRate || 0), 0);
@@ -70,7 +74,7 @@ function drawAFE() {
     // Left axis — Depth, 0 at top, maxDepth at bottom
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText((maxDepth * i / 5).toFixed(0), l - 5, y);
+    ctx.fillText(Math.round(toD(maxDepth * i / 5)).toLocaleString(), l - 5, y);
 
     // Top axis — Cum. Days, 0 at left, maxDays at right
     ctx.fillStyle = '#2a7fa8';
@@ -97,7 +101,7 @@ function drawAFE() {
   ctx.fillStyle = C.dim;
   ctx.save(); ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  ctx.fillText('Depth (ft)', 0, 0); ctx.restore();
+  ctx.fillText(`Depth (${uD})`, 0, 0); ctx.restore();
 
   ctx.fillStyle = '#1a7a4a';
   ctx.save(); ctx.translate(W - 10, t + ph / 2); ctx.rotate(-Math.PI / 2);
@@ -110,8 +114,8 @@ function drawAFE() {
   ]);
   CI.register('afeCanvas', {
     pad: { l, t, pw, ph },
-    xMax: maxDays, yMax: maxDepth,
-    xLabel: 'Cum. Days', yLabel: 'Depth (ft)',
+    xMax: maxDays, yMax: toD(maxDepth),
+    xLabel: 'Cum. Days', yLabel: `Depth (${uD})`,
     depthDown: true,
   });
   CI.drawFrozen(ctx, 'afeCanvas');

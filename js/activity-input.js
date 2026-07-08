@@ -133,7 +133,7 @@ function activityGet() {
     activities.push({
       name:  inputs[0]?.value || '',
       days:  +(inputs[1]?.value || 0),
-      depth: +(inputs[2]?.value || 0),
+      depth: QP_UNITS.fromDisplay('depth', +(inputs[2]?.value || 0)),   // display → imperial
       cost:  +(inputs[3]?.value || 0),
     });
   }
@@ -181,7 +181,7 @@ function activityLoadState(data) {
     const inputs = tr.querySelectorAll('input');
     if (inputs[0]) inputs[0].value = a.name  ?? '';
     if (inputs[1]) inputs[1].value = a.days  ?? 0;
-    if (inputs[2]) inputs[2].value = a.depth ?? 0;
+    if (inputs[2]) inputs[2].value = +QP_UNITS.toDisplay('depth', a.depth ?? 0).toFixed(1);   // imperial → display
     if (inputs[3]) inputs[3].value = a.cost  ?? 0;
   });
 
@@ -224,12 +224,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputs = row.querySelectorAll('input');
     inputs[0].value = 'Spud to TD';
     inputs[1].value = 15;
-    inputs[2].value = 5000;
+    inputs[2].value = +QP_UNITS.toDisplay('depth', 5000).toFixed(1);   // 5000 ft canonical → display
     inputs[3].value = 0;
   }
   if (!document.getElementById('servicesBody').rows.length) {
     servicesAddRow();
   }
   syncCasingFromSchematic();
+  _actUpdateHeader();
+  activityRecalc();
+});
+
+// ── Unit-system wiring (Activity depth column) ─────────────────────────────────
+function _actUpdateHeader() {
+  const el = document.getElementById('hdrActDepth');
+  if (el) el.textContent = `Depth (${QP_UNITS.label('depth')})`;
+}
+
+QP_UNITS.onChange((newSys, oldSys) => {
+  for (const tr of document.getElementById('activityBody').rows) {
+    const depthInp = tr.querySelectorAll('input')[2];   // name, days, DEPTH, cost
+    if (depthInp && depthInp.value !== '') {
+      depthInp.value = +QP_UNITS.convert('depth', +depthInp.value, oldSys, newSys).toFixed(1);
+    }
+  }
+  _actUpdateHeader();
   activityRecalc();
 });
