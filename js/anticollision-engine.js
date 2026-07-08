@@ -20,7 +20,7 @@
 //   SF < 1.5  → common minimum-clearance caution threshold
 //   SF ≥ 1.5  → acceptable separation
 
-// Minimum distance from point p to segment a→b in 3-D. Returns {dist, t}.
+// Minimum distance from point p to segment a→b in 3-D. Returns {dist, t, foot}.
 function _acPointSeg(p, a, b) {
   const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
   const ab2 = abx * abx + aby * aby + abz * abz;
@@ -28,41 +28,78 @@ function _acPointSeg(p, a, b) {
   if (t < 0) t = 0; else if (t > 1) t = 1;
   const fx = a.x + t * abx, fy = a.y + t * aby, fz = a.z + t * abz;
   const dx = p.x - fx, dy = p.y - fy, dz = p.z - fz;
-  return { dist: Math.sqrt(dx * dx + dy * dy + dz * dz), t };
+  return { dist: Math.sqrt(dx * dx + dy * dy + dz * dz), t, foot: { x: fx, y: fy, z: fz } };
+}
+
+// Nearest offset-station index to a given offset MD (for covariance lookup).
+function _acNearestIdx(offSurvey, md) {
+  let best = 0, bestD = Infinity;
+  for (let j = 0; j < offSurvey.length; j++) {
+    const d = Math.abs(offSurvey[j].md - md);
+    if (d < bestD) { bestD = d; best = j; }
+  }
+  return best;
 }
 
 // refSurvey / offSurvey: [{md, north, east, tvd, ...}] (feet, from computeSurvey)
-// opts: { wellheadN, wellheadE, wellheadTVD, errBase_ft, errGrad, kSigma }
+// opts: { wellheadN, wellheadE, wellheadTVD, kSigma,
+//         refCov, offCov,           ← per-station (N,E,V) covariances (error-model.js)
+//         errBase_ft, errGrad }     ← isotropic fallback when covariances absent
+//
+// Separation factor (ISCWSA): SF = distance / (radius_ref + radius_off), where each
+// radius is the uncertainty projected onto the centre-to-centre direction at
+// confidence k. With covariances that projection is direction-dependent (proper
+// ellipsoid); without them it falls back to an isotropic base+gradient radius.
 function acCompute(refSurvey, offSurvey, opts) {
   if (!refSurvey || refSurvey.length < 1 || !offSurvey || offSurvey.length < 2) return null;
   const o = opts || {};
   const dN   = +o.wellheadN   || 0;
   const dE   = +o.wellheadE   || 0;
   const dTVD = +o.wellheadTVD || 0;
+  const k    = +o.kSigma      || 2.795;
   const errBase = +o.errBase_ft || 0;
   const errGrad = +o.errGrad    || 0;
-  const k       = +o.kSigma     || 2.795;
+
+  const useCov = o.refCov && o.offCov && typeof emProject === 'function'
+              && o.refCov.length === refSurvey.length && o.offCov.length === offSurvey.length;
 
   // Offset polyline in the reference coordinate frame (x=East, y=North, z=TVD↓).
   const off = offSurvey.map(s => ({ x: s.east + dE, y: s.north + dN, z: s.tvd + dTVD, md: s.md }));
 
-  // Isotropic positional-uncertainty radius at confidence k (simplified model).
-  const radius = md => k * Math.sqrt(errBase * errBase + (errGrad * md) * (errGrad * md));
+  // Isotropic fallback radius at confidence k.
+  const isoR = md => k * Math.sqrt(errBase * errBase + (errGrad * md) * (errGrad * md));
 
   const stations = [];
   let minDist = Infinity, minSF = Infinity, minAt = null;
 
-  for (const rs of refSurvey) {
+  for (let ri = 0; ri < refSurvey.length; ri++) {
+    const rs = refSurvey[ri];
     const p = { x: rs.east, y: rs.north, z: rs.tvd };
-    let bestDist = Infinity, bestOffMd = off[0].md;
+    let bestDist = Infinity, bestOffMd = off[0].md, bestFoot = null, bestSeg = 0;
     for (let i = 1; i < off.length; i++) {
       const seg = _acPointSeg(p, off[i - 1], off[i]);
       if (seg.dist < bestDist) {
         bestDist  = seg.dist;
         bestOffMd = off[i - 1].md + seg.t * (off[i].md - off[i - 1].md);
+        bestFoot  = seg.foot;
+        bestSeg   = i;
       }
     }
-    const rRef = radius(rs.md), rOff = radius(bestOffMd);
+
+    let rRef, rOff;
+    if (useCov && bestDist > 1e-9 && bestFoot) {
+      // Unit centre-to-centre direction in (N, E, V).
+      const uE = (bestFoot.x - p.x) / bestDist;
+      const uN = (bestFoot.y - p.y) / bestDist;
+      const uV = (bestFoot.z - p.z) / bestDist;
+      const jStar = _acNearestIdx(offSurvey, bestOffMd);
+      rRef = k * Math.sqrt(Math.max(0, emProject(o.refCov[ri],    uN, uE, uV)));
+      rOff = k * Math.sqrt(Math.max(0, emProject(o.offCov[jStar], uN, uE, uV)));
+    } else {
+      rRef = isoR(rs.md);
+      rOff = isoR(bestOffMd);
+    }
+
     const sumR = rRef + rOff;
     const sf   = sumR > 0 ? bestDist / sumR : Infinity;
 
@@ -79,7 +116,8 @@ function acCompute(refSurvey, offSurvey, opts) {
     minDist,
     minSF: isFinite(minSF) ? minSF : null,
     minAt,
-    params: { dN, dE, dTVD, errBase, errGrad, k },
+    model: useCov ? 'covariance' : 'isotropic',
+    params: { dN, dE, dTVD, k, errBase, errGrad },
   };
 }
 

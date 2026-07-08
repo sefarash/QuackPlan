@@ -158,6 +158,8 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | `js/output-controls.js` | Output panel control persistence (localStorage) |
 | `js/hierarchy-ui.js` | Project/well/scenario tree — collapsible, persists collapse state |
 | `js/bha-catalogue.js` | Drill pipe, drill collar, HWDP catalogue data + lookup helpers |
+| `js/anticollision-engine.js` | Min-distance + separation-factor vs offset well — `acCompute()` |
+| `js/error-model.js` | Reduced ISCWSA-style positional covariance — `emCovariance()` / `emProject()` |
 
 ---
 

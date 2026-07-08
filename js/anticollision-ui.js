@@ -73,22 +73,31 @@ function drawAntiCollision() {
 
   // Densify both wellbores to ~100 ft so the closest approach between survey
   // stations is captured (a sparse planned survey can hide a mid-segment crossing).
-  const refDense = computeSurvey(_acDensify(ref.map(s => ({ md: s.md, inc: s.inc, az: s.az }))));
-  const offSurvey = computeSurvey(_acDensify(offStations));
+  const refStations = _acDensify(ref.map(s => ({ md: s.md, inc: s.inc, az: s.az })));
+  const offStationsDense = _acDensify(offStations);
+  const refDense  = computeSurvey(refStations);
+  const offSurvey = computeSurvey(offStationsDense);
 
-  // Params: slot/datum offsets + err-base are depths (display → imperial);
-  // err-gradient and k-sigma are dimensionless.
+  // Slot/datum offsets are depths (display → imperial); the σ terms are the
+  // reduced ISCWSA error-model parameters (dimensionless / degrees).
   const d2i = (id, def) => {
     const v = document.getElementById(id)?.value;
     return (v === '' || v == null) ? def : QP_UNITS.fromDisplay('depth', +v);
+  };
+  const emParams = {
+    sigD:       +(document.getElementById('acSigD')?.value || 0.0005),
+    sigI_deg:   +(document.getElementById('acSigI')?.value || 0.1),
+    sigA_deg:   +(document.getElementById('acSigA')?.value || 0.5),
+    sigBase_ft: d2i('acSigBase', QP_UNITS.fromDisplay('depth', 1.5)),
   };
   const opts = {
     wellheadN:   d2i('acWhN', 0),
     wellheadE:   d2i('acWhE', QP_UNITS.fromDisplay('depth', 50)),
     wellheadTVD: d2i('acWhTVD', 0),
-    errBase_ft:  d2i('acErrBase', QP_UNITS.fromDisplay('depth', 3)),
-    errGrad:     +(document.getElementById('acErrGrad')?.value || 0.0015),
-    kSigma:      +(document.getElementById('acKSigma')?.value  || 2.795),
+    kSigma:      +(document.getElementById('acKSigma')?.value || 2.795),
+    // Per-station (N,E,V) covariances → direction-projected ellipsoid radii.
+    refCov: (typeof emCovariance === 'function') ? emCovariance(refStations, emParams) : null,
+    offCov: (typeof emCovariance === 'function') ? emCovariance(offStationsDense, emParams) : null,
   };
 
   const res = acCompute(refDense, offSurvey, opts);
@@ -128,10 +137,11 @@ function drawAntiCollision() {
 
   const sf = res.minSF;
   const status = sf == null ? '—' : (sf < 1 ? '⚠ COLLISION RISK' : (sf < 1.5 ? 'CAUTION (SF < 1.5)' : 'OK'));
+  const modelTag = res.model === 'covariance' ? 'ISCWSA-style ellipsoid' : 'isotropic';
   _acSetSummary(
     `Min distance ${n1(toD(res.minDist))} ${uD}` +
     (res.minAt ? ` @ ref MD ${Math.round(toD(res.minAt.md))} ${uD} (offset MD ${Math.round(toD(res.minAt.offMd))} ${uD})` : '') +
-    `  ·  Min SF ${sf == null ? '—' : sf.toFixed(2)}  ·  ${status}`
+    `  ·  Min SF ${sf == null ? '—' : sf.toFixed(2)}  ·  ${status}  ·  ${modelTag}`
   );
 }
 
@@ -139,14 +149,39 @@ function n1(v) { return (v == null || isNaN(v)) ? '—' : (+v).toFixed(1); }
 
 // Relabel the depth-unit spans on the anti-collision controls when units change.
 function _acUpdateLabels() {
-  ['uAcWhN', 'uAcWhE', 'uAcWhTVD', 'uAcErrBase'].forEach(id => {
+  ['uAcWhN', 'uAcWhE', 'uAcWhTVD', 'uAcSigBase'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = QP_UNITS.label('depth');
   });
 }
+
+// Convert the depth-valued inputs (slot offsets, base σ) and the MD column of the
+// offset-survey paste on a unit change, so the physical scenario is preserved
+// rather than reinterpreted — consistent with the rest of the app.
+function _acConvertInputs(oldSys, newSys) {
+  ['acWhN', 'acWhE', 'acWhTVD', 'acSigBase'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value !== '') el.value = +QP_UNITS.convert('depth', +el.value, oldSys, newSys).toFixed(2);
+  });
+  const ta = document.getElementById('acOffsetPaste');
+  if (ta && ta.value.trim()) {
+    ta.value = ta.value.split(/\r?\n/).map(line => {
+      const t = line.trim();
+      if (!t) return line;
+      const p = t.split(/[\s,\t]+/);
+      if (p.length >= 3 && !isNaN(+p[0])) {
+        p[0] = String(+QP_UNITS.convert('depth', +p[0], oldSys, newSys).toFixed(1));
+        return p.join(' ');
+      }
+      return line;
+    }).join('\n');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', _acUpdateLabels);
 if (typeof QP_UNITS !== 'undefined') {
-  QP_UNITS.onChange(() => {
+  QP_UNITS.onChange((newSys, oldSys) => {
+    _acConvertInputs(oldSys, newSys);
     _acUpdateLabels();
     if (qpState.activeOutputTab === 'anticollision') drawAntiCollision();
   });
