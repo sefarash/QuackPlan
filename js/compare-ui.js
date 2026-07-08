@@ -75,15 +75,29 @@ function _cmpBuildPath(node, all) {
 
 // ── Per-scenario compute ──────────────────────────────────────────────────────
 
+// Build the planned survey for a scenario, mirroring the app's load precedence:
+// Option 2 (mixed criteria) overrides Option 1 when it has data, because on
+// scenario load traj2Recalc runs after traj1Recalc and wins. Tortuosity is
+// intentionally NOT applied — the comparison normalizes on the clean planned
+// trajectory (and fixed FF) for a fair side-by-side.
+function _cmpBuildSurvey(d) {
+  if (Array.isArray(d.traj2) && d.traj2.length) {
+    const stations = traj2BuildStations(d.traj2);
+    if (stations.length >= 2) return computeSurvey(stations);
+  }
+  const stations1 = (d.traj1 || []).map(r => ({ md: +r.md, inc: +r.inc, az: +r.azi }));
+  if (stations1.length >= 2) return computeSurvey(stations1);
+  return null;
+}
+
 async function _cmpLoadMetrics(id) {
   const node = await dbGet(id);
   if (!node?.data) return null;
   const d = node.data;
 
-  // Build survey
-  const stations = (d.traj1 || []).map(r => ({ md: +r.md, inc: +r.inc, az: +r.azi }));
-  if (stations.length < 2) return null;
-  const survey = computeSurvey(stations);
+  // Build survey (Option 2 preferred when present — see _cmpBuildSurvey)
+  const survey = _cmpBuildSurvey(d);
+  if (!survey || survey.length < 2) return null;
   const last   = survey[survey.length - 1];
 
   // Build BHA object from saved rows
