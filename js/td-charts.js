@@ -4,6 +4,20 @@
 const CHART_COLORS = { lo: '#2a7fa8', mid: '#f0a500', hi: '#c0392b' };
 const CHART_PAD = { t: 62, b: 22, l: 70, r: 20 };
 
+// Relabel the T&D control-input unit spans for the active system. Called on unit
+// change (from output-controls' onChange) and once on DOMContentLoaded.
+const _TD_CONTROL_UNITS = {
+  uTorqWOB: 'force', uTorqMaxTq: 'torque_k', uBuckWOB: 'force',
+  uOvpBlock: 'force', uOvpDPwt: 'linwt', uOvpMW: 'mw',
+  uBsBlock: 'force', uBsDPwt: 'linwt', uBsMW: 'mw', uBsMaxHL: 'force',
+};
+function _tdUpdateControlLabels() {
+  Object.keys(_TD_CONTROL_UNITS).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = QP_UNITS.label(_TD_CONTROL_UNITS[id]);
+  });
+}
+
 function _chartSetup(canvasId) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return null;
@@ -87,13 +101,20 @@ function drawTorque(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
+  // Display converters (compute stays imperial: kft·lb, klbf, ft)
+  const toTq = v => QP_UNITS.toDisplay('torque_k', v);   // kft·lb → display
+  const toD  = v => QP_UNITS.toDisplay('depth', v);
+  const uTq = QP_UNITS.label('torque_k'), uD = QP_UNITS.label('depth');
+
   const ffLo   = +(document.getElementById('torqFFlo')?.value  || 0.20);
   const ffMid  = +(document.getElementById('torqFFmid')?.value || 0.30);
   const ffHi   = +(document.getElementById('torqFFhi')?.value  || 0.40);
   const _wobRaw = document.getElementById('torqWOB')?.value;
-  const wob    = (_wobRaw === '' || _wobRaw == null ? 15 : +_wobRaw) * 1000;
+  // WOB field is display force (klbf/kN) → imperial klbf, then ×1000 → lbf
+  const wob    = (_wobRaw === '' || _wobRaw == null ? 15 : QP_UNITS.fromDisplay('force', +_wobRaw)) * 1000;
   const mutPct = +(document.getElementById('torqMUTpct')?.value || 100) / 100;
-  const maxTq  = +(document.getElementById('torqMaxTq')?.value || 0);   // rig torque limit (kft·lb)
+  // Rig torque limit field is display (kft·lb/kN·m) → imperial kft·lb
+  const maxTq  = QP_UNITS.fromDisplay('torque_k', +(document.getElementById('torqMaxTq')?.value || 0));
 
   const modes  = r.modes?.rotOn?.ffSensitivity;
   if (!modes) { _noData(ctx, W, H, 'Run Compute first'); return; }
@@ -129,36 +150,37 @@ function drawTorque(r) {
   }
 
   const mutMax = mutSegs.length ? Math.max(...mutSegs.map(s => s.mutK)) : 0;
-  const xMax   = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), mutMax, maxTq, 1) * 1.1;
+  const xMaxImp = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), mutMax, maxTq, 1) * 1.1;
+  const xMax = toTq(xMaxImp), yMax = toD(maxMD);   // display axes
 
-  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Torque (ft·lbs ×1000)', 'MD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, `Torque (${uTq})`, `MD (${uD})`);
 
-  const toLine = sts => sts.map(s => ({ x: s.torque_ftlbs / 1000, y: s.md }));
+  const toLine = sts => sts.map(s => ({ x: toTq(s.torque_ftlbs / 1000), y: toD(s.md) }));
   const liveCurves = [
     { pts: toLine(stLo),  color: CHART_COLORS.lo,  label: 'FF ' + ffLo  },
     { pts: toLine(stMid), color: CHART_COLORS.mid, label: 'FF ' + ffMid },
     { pts: toLine(stHi),  color: CHART_COLORS.hi,  label: 'FF ' + ffHi  },
   ];
   CI.storeLive(CID, liveCurves);
-  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Torque (kft·lb)', yLabel: 'MD (ft)', depthDown: true });
+  CI.register(CID, { pad: g, xMax, yMax, xLabel: `Torque (${uTq})`, yLabel: `MD (${uD})`, depthDown: true });
   CI.drawFrozen(ctx, CID);
 
-  _chartLineDepthDown(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g, xMax, maxMD);
-  _chartLineDepthDown(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g, xMax, maxMD);
-  _chartLineDepthDown(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[0].pts, CHART_COLORS.lo,  1.5, g, xMax, yMax);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, CHART_COLORS.mid, 2,   g, xMax, yMax);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, CHART_COLORS.hi,  1.5, g, xMax, yMax);
 
-  // MUT limit step-function: one vertical segment per DP section + horizontal connectors
+  // MUT limit step-function (mutK is imperial kft·lb, MD imperial → display for plot)
   if (mutSegs.length) {
     ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 3]);
     for (let i = 0; i < mutSegs.length; i++) {
       const seg = mutSegs[i];
-      const x  = g.l + Math.min(seg.mutK / xMax, 1) * g.pw;
-      const y0 = g.t + (seg.topMD / maxMD) * g.ph;
-      const y1 = g.t + (seg.botMD / maxMD) * g.ph;
+      const x  = g.l + Math.min(toTq(seg.mutK) / xMax, 1) * g.pw;
+      const y0 = g.t + (toD(seg.topMD) / yMax) * g.ph;
+      const y1 = g.t + (toD(seg.botMD) / yMax) * g.ph;
       ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
       if (i + 1 < mutSegs.length) {
-        const xNext = g.l + Math.min(mutSegs[i + 1].mutK / xMax, 1) * g.pw;
+        const xNext = g.l + Math.min(toTq(mutSegs[i + 1].mutK) / xMax, 1) * g.pw;
         ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(xNext, y1); ctx.stroke();
       }
     }
@@ -169,16 +191,16 @@ function drawTorque(r) {
       const key = seg.mutK.toFixed(1);
       if (seen.has(key)) return;
       seen.add(key);
-      const x = g.l + Math.min(seg.mutK / xMax, 1) * g.pw;
-      const y = g.t + (seg.topMD / maxMD) * g.ph + 4;
+      const x = g.l + Math.min(toTq(seg.mutK) / xMax, 1) * g.pw;
+      const y = g.t + (toD(seg.topMD) / yMax) * g.ph + 4;
       ctx.fillStyle = '#c0392b'; ctx.font = '9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText(`${seg.label}: ${seg.mutK.toFixed(1)} k`, x + 3, y);
+      ctx.fillText(`${seg.label}: ${toTq(seg.mutK).toFixed(1)} ${uTq}`, x + 3, y);
     });
   }
 
-  // Rig torque limit — vertical red line
-  _rigLimitLine(ctx, g, maxTq, xMax, `Max Tq ${maxTq}k`);
+  // Rig torque limit — vertical red line (maxTq imperial kft·lb → display)
+  _rigLimitLine(ctx, g, toTq(maxTq), xMax, `Max Tq ${toTq(maxTq).toFixed(0)} ${uTq}`);
 
   const legendLabels  = ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi];
   const legendColors  = [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi];
@@ -201,8 +223,12 @@ function drawBuckling(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
+  const toF = v => QP_UNITS.toDisplay('force', v);   // klbf → display
+  const toD = v => QP_UNITS.toDisplay('depth', v);
+  const uF = QP_UNITS.label('force'), uD = QP_UNITS.label('depth');
+
   const _wobRaw  = document.getElementById('buckWOB')?.value;
-  const wob_klbs = (_wobRaw === '' || _wobRaw == null ? 15 : +_wobRaw);
+  const wob_klbs = (_wobRaw === '' || _wobRaw == null ? 15 : QP_UNITS.fromDisplay('force', +_wobRaw));
   const ffMid    = +(document.getElementById('buckFFmid')?.value || 0.30);
   const mw       = fluidGet().mudWeight;
 
@@ -218,18 +244,19 @@ function drawBuckling(r) {
   const slideAllSt = res.modes?.slideOn?.ffSensitivity?.mid?.stations || [];
   const maxMD      = qpState.survey[qpState.survey.length - 1].md;
 
-  // Effective axial load — signed (+ tension, − compression)
-  const rotPts   = rotAllSt.map(s   => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
-  const slidePts = slideAllSt.map(s => ({ x: s.axialLoad_lbf / 1000, y: s.md }));
+  const yMax = toD(maxMD);   // display depth axis
+  // Effective axial load — signed (+ tension, − compression); plotted in display
+  const rotPts   = rotAllSt.map(s   => ({ x: toF(s.axialLoad_lbf / 1000), y: toD(s.md) }));
+  const slidePts = slideAllSt.map(s => ({ x: toF(s.axialLoad_lbf / 1000), y: toD(s.md) }));
 
   // Buckling limits on the compression (negative) side
   // null fSin/fHel = vertical section: limit is 0 (any compression buckles)
-  const sinPts = bk.stations.map(s => ({ x: s.fSin_lbf != null ? -s.fSin_lbf / 1000 : 0, y: s.md }));
-  const helPts = bk.stations.map(s => ({ x: s.fHel_lbf != null ? -s.fHel_lbf / 1000 : 0, y: s.md }));
+  const sinPts = bk.stations.map(s => ({ x: toF(s.fSin_lbf != null ? -s.fSin_lbf / 1000 : 0), y: toD(s.md) }));
+  const helPts = bk.stations.map(s => ({ x: toF(s.fHel_lbf != null ? -s.fHel_lbf / 1000 : 0), y: toD(s.md) }));
   // Extend final segment to actual TD (bk.stations uses el.md0, one interval short of maxMD)
   const lastBk = bk.stations[bk.stations.length - 1];
-  sinPts.push({ x: lastBk?.fSin_lbf != null ? -lastBk.fSin_lbf / 1000 : 0, y: maxMD });
-  helPts.push({ x: lastBk?.fHel_lbf != null ? -lastBk.fHel_lbf / 1000 : 0, y: maxMD });
+  sinPts.push({ x: toF(lastBk?.fSin_lbf != null ? -lastBk.fSin_lbf / 1000 : 0), y: yMax });
+  helPts.push({ x: toF(lastBk?.fHel_lbf != null ? -lastBk.fHel_lbf / 1000 : 0), y: yMax });
 
   // Scale X axis from axial load curves only — extreme BHA-clearance limit values
   // must not blow out the scale and hide the normal buildup/horizontal limits
@@ -238,7 +265,7 @@ function drawBuckling(r) {
   const xMin = Math.min(...axX, ...helPts.map(p => p.x), -1) * 1.1;
   const xRange = xMax - xMin;
 
-  const g = _chartGridDepthDownSigned(ctx, W, H, xMin, xMax, maxMD, 'Axial Load (klbs)', 'MD (ft)');
+  const g = _chartGridDepthDownSigned(ctx, W, H, xMin, xMax, yMax, `Axial Load (${uF})`, `MD (${uD})`);
 
   // CI expects x values mapped as (p.x / xMax_ci) * pw, so shift by xMin
   const shift = pts => pts.map(p => ({ x: p.x - xMin, y: p.y }));
@@ -249,8 +276,8 @@ function drawBuckling(r) {
     { pts: shift(slidePts), color: '#7f8c8d', label: 'Axial — Sliding'   },
   ];
   CI.storeLive(CID, liveCurves);
-  CI.register(CID, { pad: g, xMax: xRange, yMax: maxMD,
-    xLabel: 'Axial Load (klbs)', yLabel: 'MD (ft)', depthDown: true, xOffset: xMin });
+  CI.register(CID, { pad: g, xMax: xRange, yMax,
+    xLabel: `Axial Load (${uF})`, yLabel: `MD (${uD})`, depthDown: true, xOffset: xMin });
   CI.drawFrozen(ctx, CID);
 
   // Clip all curves to chart area so extreme BHA-section values don't overflow
@@ -258,15 +285,15 @@ function drawBuckling(r) {
   ctx.beginPath(); ctx.rect(g.l, g.t, g.pw, g.ph); ctx.clip();
 
   // Sinusoidal limit — orange
-  _chartLineDepthDownSigned(ctx, sinPts,   '#e67e22', 1.5, g, xMin, xMax, maxMD);
+  _chartLineDepthDownSigned(ctx, sinPts,   '#e67e22', 1.5, g, xMin, xMax, yMax);
   // Helical limit — red
-  _chartLineDepthDownSigned(ctx, helPts,   '#c0392b', 1.5, g, xMin, xMax, maxMD);
+  _chartLineDepthDownSigned(ctx, helPts,   '#c0392b', 1.5, g, xMin, xMax, yMax);
   // Sliding axial load — gray dashed
   ctx.setLineDash([6, 3]);
-  _chartLineDepthDownSigned(ctx, slidePts, '#7f8c8d', 1.5, g, xMin, xMax, maxMD);
+  _chartLineDepthDownSigned(ctx, slidePts, '#7f8c8d', 1.5, g, xMin, xMax, yMax);
   ctx.setLineDash([]);
   // Rotating axial load — blue solid
-  _chartLineDepthDownSigned(ctx, rotPts,   '#2a7fa8', 2,   g, xMin, xMax, maxMD);
+  _chartLineDepthDownSigned(ctx, rotPts,   '#2a7fa8', 2,   g, xMin, xMax, yMax);
 
   ctx.restore();
 
@@ -283,12 +310,19 @@ function drawOverpull(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const blockWt  = +(document.getElementById('ovpBlock')?.value    || 35);
-  const dpWt     = +(document.getElementById('ovpDPwt')?.value     || 19.5);
+  const toF = v => QP_UNITS.toDisplay('force', v);
+  const toD = v => QP_UNITS.toDisplay('depth', v);
+  const uF  = QP_UNITS.label('force'), uD = QP_UNITS.label('depth'), uMW = QP_UNITS.label('mw');
+
+  const _blkRaw = document.getElementById('ovpBlock')?.value;
+  const _dpRaw  = document.getElementById('ovpDPwt')?.value;
+  const _mwRaw  = document.getElementById('ovpMW')?.value;
+  const blockWt  = (_blkRaw==='' || _blkRaw==null) ? 35   : QP_UNITS.fromDisplay('force', +_blkRaw);  // klbf (canonical)
+  const dpWt     = (_dpRaw ==='' || _dpRaw ==null) ? 19.5 : QP_UNITS.fromDisplay('linwt', +_dpRaw);   // lb/ft
+  const mw       = (_mwRaw ==='' || _mwRaw ==null) ? fluidGet().mudWeight : QP_UNITS.fromDisplay('mw', +_mwRaw); // ppg
   const ffLo     = +(document.getElementById('ovpFFlo')?.value     || 0.20);
   const ffMid    = +(document.getElementById('ovpFFmid')?.value    || 0.30);
   const ffHi     = +(document.getElementById('ovpFFhi')?.value     || 0.40);
-  const mw       = +(document.getElementById('ovpMW')?.value       || fluidGet().mudWeight);
   const yieldPct = +(document.getElementById('ovpYieldPct')?.value || 100) / 100;
   const BF       = 1 - mw / 65.5;
 
@@ -328,15 +362,17 @@ function drawOverpull(r) {
   }
 
   const yieldMax = yieldSegs.length ? Math.max(...yieldSegs.map(s => s.yieldK)) : 0;
-  const xMax = Math.max(...poohHi.map(toV), ...freeWt.map(toV), yieldMax, 1) * 1.1;
+  const xMaxImp = Math.max(...poohHi.map(toV), ...freeWt.map(toV), yieldMax, 1) * 1.1;
+  const xMax = toF(xMaxImp);
+  const yMax = toD(maxMD);
 
-  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hook Load (klbs)', 'MD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, `Hook Load (${uF})`, `MD (${uD})`);
 
   ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
   ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} klbs`, g.l + g.pw - 4, g.t + g.ph - 4);
+  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${QP_UNITS.toDisplay('mw',mw).toFixed(1)} ${uMW}  Block=${toF(blockWt).toFixed(0)} ${uF}`, g.l + g.pw - 4, g.t + g.ph - 4);
 
-  const toLine = sts => sts.map(s => ({ x: toV(s), y: s.md }));
+  const toLine = sts => sts.map(s => ({ x: toF(toV(s)), y: toD(s.md) }));
   const liveCurves = [
     { pts: toLine(freeWt),  color: '#7f8c8d', label: 'Free Wt'         },
     { pts: toLine(poohLo),  color: '#e07878', label: `PKP FF ${ffLo}`  },
@@ -344,20 +380,20 @@ function drawOverpull(r) {
     { pts: toLine(poohHi),  color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
   ];
   CI.storeLive(CID, liveCurves);
-  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hook Load (klbs)', yLabel: 'MD (ft)', depthDown: true });
+  CI.register(CID, { pad: g, xMax, yMax, xLabel: `Hook Load (${uF})`, yLabel: `MD (${uD})`, depthDown: true });
   CI.drawFrozen(ctx, CID);
 
   // Free weight: gray long-dash
   ctx.setLineDash([8, 4]);
-  _chartLineDepthDown(ctx, liveCurves[0].pts, '#7f8c8d', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[0].pts, '#7f8c8d', 1.5, g, xMax, yMax);
 
   // Pick-up (POOH): lo/hi dashed, mid solid
   ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[1].pts, '#e07878', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, '#e07878', 1.5, g, xMax, yMax);
   ctx.setLineDash([]);
-  _chartLineDepthDown(ctx, liveCurves[2].pts, '#c0392b', 2,   g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, '#c0392b', 2,   g, xMax, yMax);
   ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[3].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[3].pts, '#8b1a1a', 1.5, g, xMax, yMax);
   ctx.setLineDash([]);
 
   // Tensile yield limit step-function
@@ -367,12 +403,12 @@ function drawOverpull(r) {
     ctx.setLineDash([5, 3]);
     for (let i = 0; i < yieldSegs.length; i++) {
       const seg = yieldSegs[i];
-      const x  = g.l + Math.min(seg.yieldK / xMax, 1) * g.pw;
-      const y0 = g.t + (seg.topMD / maxMD) * g.ph;
-      const y1 = g.t + (seg.botMD / maxMD) * g.ph;
+      const x  = g.l + Math.min(toF(seg.yieldK) / xMax, 1) * g.pw;
+      const y0 = g.t + (toD(seg.topMD) / yMax) * g.ph;
+      const y1 = g.t + (toD(seg.botMD) / yMax) * g.ph;
       ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
       if (i + 1 < yieldSegs.length) {
-        const xNext = g.l + Math.min(yieldSegs[i + 1].yieldK / xMax, 1) * g.pw;
+        const xNext = g.l + Math.min(toF(yieldSegs[i + 1].yieldK) / xMax, 1) * g.pw;
         ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(xNext, y1); ctx.stroke();
       }
     }
@@ -382,11 +418,11 @@ function drawOverpull(r) {
       const key = seg.yieldK.toFixed(0);
       if (seen.has(key)) return;
       seen.add(key);
-      const x = g.l + Math.min(seg.yieldK / xMax, 1) * g.pw;
-      const y = g.t + (seg.topMD / maxMD) * g.ph + 4;
+      const x = g.l + Math.min(toF(seg.yieldK) / xMax, 1) * g.pw;
+      const y = g.t + (toD(seg.topMD) / yMax) * g.ph + 4;
       ctx.fillStyle = YIELD_CLR; ctx.font = '9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText(`${seg.label}: ${seg.yieldK.toFixed(0)} k`, x + 3, y);
+      ctx.fillText(`${seg.label}: ${toF(seg.yieldK).toFixed(0)} ${uF}`, x + 3, y);
     });
   }
 
@@ -408,13 +444,21 @@ function drawBroomstick(r) {
   if (!c) return;
   const { ctx, W, H } = c;
 
-  const blockWt = +(document.getElementById('bsBlock')?.value  || 35);
-  const dpWt  = +(document.getElementById('bsDPwt')?.value  || 22.5);
+  const toF = v => QP_UNITS.toDisplay('force', v);
+  const toD = v => QP_UNITS.toDisplay('depth', v);
+  const uF  = QP_UNITS.label('force'), uD = QP_UNITS.label('depth'), uMW = QP_UNITS.label('mw');
+
+  const _blkRaw = document.getElementById('bsBlock')?.value;
+  const _dpRaw  = document.getElementById('bsDPwt')?.value;
+  const _mwRaw  = document.getElementById('bsMW')?.value;
+  const _hlRaw  = document.getElementById('bsMaxHL')?.value;
+  const blockWt = (_blkRaw==='' || _blkRaw==null) ? 35   : QP_UNITS.fromDisplay('force', +_blkRaw);  // klbf (canonical)
+  const dpWt  = (_dpRaw==='' || _dpRaw==null) ? 22.5 : QP_UNITS.fromDisplay('linwt', +_dpRaw);       // lb/ft
+  const mw    = (_mwRaw==='' || _mwRaw==null) ? (fluidGet().mudWeight || 10.0) : QP_UNITS.fromDisplay('mw', +_mwRaw); // ppg
+  const maxHL = (_hlRaw==='' || _hlRaw==null) ? 0    : QP_UNITS.fromDisplay('force', +_hlRaw);       // rig hook-load limit, klbf (canonical)
   const ffLo  = +(document.getElementById('bsFFlo')?.value  || 0.20);
   const ffMid = +(document.getElementById('bsFFmid')?.value || 0.30);
   const ffHi  = +(document.getElementById('bsFFhi')?.value  || 0.40);
-  const mw    = +(document.getElementById('bsMW')?.value    || fluidGet().mudWeight || 10.0);
-  const maxHL = +(document.getElementById('bsMaxHL')?.value || 0);   // rig hook-load limit (kips)
   const BF    = 1 - mw / 65.5;
 
   // 3 runs: FF lo/mid/hi at single MW and DP weight
@@ -448,8 +492,8 @@ function drawBroomstick(r) {
     const surf = sts.reduce((mn, s) => s.md < mn.md ? s : mn, sts[0]);
     return surf.axialLoad_lbf / 1000;
   };
-  const toBS = (sl, s) => Math.max(0, blockWt + sl - s.axialLoad_lbf / 1000);
-  const toBSLine = (sl, sts) => sts.map(s => ({ x: toBS(sl, s), y: s.md }));
+  const toBS = (sl, s) => Math.max(0, blockWt + sl - s.axialLoad_lbf / 1000);   // klbf (canonical)
+  const toBSLine = (sl, sts) => sts.map(s => ({ x: toF(toBS(sl, s)), y: toD(s.md) }));
 
   const slRihLo   = surfLoad_klbs(rihLo);
   const slRihMid  = surfLoad_klbs(rihMid);
@@ -469,40 +513,41 @@ function drawBroomstick(r) {
     { pts: toBSLine(slPoohHi,  poohHi), color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
   ];
 
-  const xMax = Math.max(...liveCurves.flatMap(c => c.pts.map(p => p.x)), maxHL, 1) * 1.1;
+  const xMax = Math.max(...liveCurves.flatMap(c => c.pts.map(p => p.x)), toF(maxHL), 1) * 1.1;
+  const yMax = toD(maxMD);
 
-  const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hookload (kips)', 'MD (ft)');
+  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, `Hookload (${uF})`, `MD (${uD})`);
 
   ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${mw.toFixed(1)} ppg  Block=${blockWt} kips`,
+  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${QP_UNITS.toDisplay('mw',mw).toFixed(1)} ${uMW}  Block=${toF(blockWt).toFixed(0)} ${uF}`,
     g.l + 4, g.t + 4);
 
   CI.storeLive(CID, liveCurves);
-  CI.register(CID, { pad: g, xMax, yMax: maxMD, xLabel: 'Hookload (kips)', yLabel: 'MD (ft)', depthDown: true });
+  CI.register(CID, { pad: g, xMax, yMax, xLabel: `Hookload (${uF})`, yLabel: `MD (${uD})`, depthDown: true });
   CI.drawFrozen(ctx, CID);
 
   // RIH — lo/hi dashed, mid solid (blue)
   ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[0].pts, '#5a9fd4', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[0].pts, '#5a9fd4', 1.5, g, xMax, yMax);
   ctx.setLineDash([]);
-  _chartLineDepthDown(ctx, liveCurves[1].pts, '#2a7fa8', 2,   g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[1].pts, '#2a7fa8', 2,   g, xMax, yMax);
   ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[2].pts, '#1a5f88', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[2].pts, '#1a5f88', 1.5, g, xMax, yMax);
   ctx.setLineDash([]);
   // Rotation Off Bottom (single curve, purple)
-  _chartLineDepthDown(ctx, liveCurves[3].pts, '#8e44ad', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[3].pts, '#8e44ad', 1.5, g, xMax, yMax);
   // POOH — lo/hi dashed, mid solid (red)
   ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[4].pts, '#e07878', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[4].pts, '#e07878', 1.5, g, xMax, yMax);
   ctx.setLineDash([]);
-  _chartLineDepthDown(ctx, liveCurves[5].pts, '#c0392b', 2,   g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[5].pts, '#c0392b', 2,   g, xMax, yMax);
   ctx.setLineDash([5, 3]);
-  _chartLineDepthDown(ctx, liveCurves[6].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
+  _chartLineDepthDown(ctx, liveCurves[6].pts, '#8b1a1a', 1.5, g, xMax, yMax);
   ctx.setLineDash([]);
 
   // Rig hook-load limit — vertical red line
-  _rigLimitLine(ctx, g, maxHL, xMax, `Max HL ${maxHL}k`);
+  if (maxHL > 0) _rigLimitLine(ctx, g, toF(maxHL), xMax, `Max HL ${toF(maxHL).toFixed(0)} ${uF}`);
 
   const bsLegLabels = [`RIH ${ffLo}`, `RIH ${ffMid}`, `RIH ${ffHi}`,
      'Rot Off Btm',

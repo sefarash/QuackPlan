@@ -32,9 +32,25 @@ const _OC_ID_SET = new Set(_OC_IDS);
 
 // Controls whose DOM value is a display-unit quantity (canonical = imperial).
 const _OC_UNITS = {
+  // Hydraulics range sliders (+ their min/max inputs)
   hydMWmin: 'mw',   hydMWslider: 'mw',   hydMWmax: 'mw',
   hydFlowMin: 'flow', hydFlowSlider: 'flow', hydFlowMax: 'flow',
+  // T&D chart controls (plain number inputs)
+  torqWOB: 'force', torqMaxTq: 'torque_k',
+  buckWOB: 'force',
+  ovpBlock: 'force', ovpDPwt: 'linwt', ovpMW: 'mw',
+  bsBlock: 'force',  bsDPwt: 'linwt',  bsMW: 'mw',  bsMaxHL: 'force',
 };
+const _OC_SLIDER_SET = new Set(['hydMWmin','hydMWslider','hydMWmax','hydFlowMin','hydFlowSlider','hydFlowMax']);
+
+// Convert every plain (non-slider) unit-typed control field in place.
+function _ocConvertPlainFields(fromSys, toSys) {
+  Object.keys(_OC_UNITS).forEach(id => {
+    if (_OC_SLIDER_SET.has(id)) return;   // sliders use the range-aware retune
+    const el = document.getElementById(id);
+    if (el && el.value !== '') el.value = +QP_UNITS.convert(_OC_UNITS[id], +el.value, fromSys, toSys).toFixed(2);
+  });
+}
 
 // The range sliders and the min/max inputs that drive their range + a metric step.
 const _OC_SLIDERS = [
@@ -158,11 +174,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // with no scenario loaded yet, convert the static HTML default slider fields
   // (scenario load, when it happens, sets absolute display values anyway).
   if (!_ocLoaded && QP_UNITS.isMetric()) {
+    _ocConvertPlainFields('imperial', 'metric');
     _ocRetuneSliders('imperial', 'metric');
   } else {
     _ocSyncSliderRanges();
     _ocSyncSliderLabels();
   }
+  if (typeof _tdUpdateControlLabels === 'function') _tdUpdateControlLabels();
 
   // Single delegated listener on the body — fires for every change/input
   // inside any output panel, identified by element ID.
@@ -173,7 +191,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// On unit change, re-express the hydraulics sliders (range-then-value) + relabel.
+// On unit change, re-express all unit-typed output controls (plain fields in
+// place, sliders range-then-value), relabel the T&D controls, and redraw the
+// active panel. This listener is registered last (output-controls loads after
+// trajectory-input / td-charts), so the fields are converted before this final
+// redraw reads them.
 QP_UNITS.onChange((newSys, oldSys) => {
+  _ocConvertPlainFields(oldSys, newSys);
   _ocRetuneSliders(oldSys, newSys);
+  if (typeof _tdUpdateControlLabels === 'function') _tdUpdateControlLabels();
+  if (typeof qpState !== 'undefined' && qpState.activeOutputTab && typeof redrawOutputPanel === 'function') {
+    redrawOutputPanel(qpState.activeOutputTab);
+  }
 });

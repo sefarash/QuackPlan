@@ -484,12 +484,12 @@
     <!-- Torque -->
     <div id="panel-torque" class="output-panel">
       <div class="chart-controls">
-        <label>WOB <input type="number" id="torqWOB" value="15" style="width:60px"> klbs</label>
+        <label>WOB <input type="number" id="torqWOB" value="15" style="width:60px"> <span id="uTorqWOB">klbf</span></label>
         <label>FF Low <input type="number" id="torqFFlo" value="0.2" step="0.05" style="width:55px"></label>
         <label>FF Mid <input type="number" id="torqFFmid" value="0.3" step="0.05" style="width:55px"></label>
         <label>FF High <input type="number" id="torqFFhi" value="0.4" step="0.05" style="width:55px"></label>
         <label>MUT % <input type="number" id="torqMUTpct" value="100" min="10" max="100" step="5" style="width:50px" onchange="qpState.tdResult && drawTorque(qpState.tdResult)"></label>
-        <label title="Top-drive / rotary torque rating — drawn as a limit line (0 = off)">Max Torque <input type="number" id="torqMaxTq" value="0" min="0" step="1" style="width:60px" onchange="qpState.tdResult && drawTorque(qpState.tdResult)"> kft·lb</label>
+        <label title="Top-drive / rotary torque rating — drawn as a limit line (0 = off)">Max Torque <input type="number" id="torqMaxTq" value="0" min="0" step="1" style="width:60px" onchange="qpState.tdResult && drawTorque(qpState.tdResult)"> <span id="uTorqMaxTq">kft·lb</span></label>
         <label><input type="checkbox" id="torqRotary" checked> Rotary</label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
         <button class="hdr-btn" onclick="exportTD()">⬇ T&amp;D CSV</button>
@@ -507,7 +507,7 @@
     <div id="panel-buckling" class="output-panel">
       <div class="chart-controls">
         <label>WOB <input type="number" id="buckWOB" value="15" style="width:60px"
-          onchange="if(qpState.activeOutputTab==='buckling'&&qpState.tdResult)drawBuckling(qpState.tdResult)"> klbs</label>
+          onchange="if(qpState.activeOutputTab==='buckling'&&qpState.tdResult)drawBuckling(qpState.tdResult)"> <span id="uBuckWOB">klbf</span></label>
         <label>FF Low <input type="number" id="buckFFlo" value="0.2" step="0.05" style="width:55px"></label>
         <label>FF Mid <input type="number" id="buckFFmid" value="0.3" step="0.05" style="width:55px"
           onchange="if(qpState.activeOutputTab==='buckling'&&qpState.tdResult)drawBuckling(qpState.tdResult)"></label>
@@ -526,9 +526,9 @@
     <!-- Overpull -->
     <div id="panel-overpull" class="output-panel">
       <div class="chart-controls">
-        <label>Block <input type="number" id="ovpBlock" value="35" style="width:60px"> kips</label>
-        <label>DP weight <input type="number" id="ovpDPwt" value="22.5" step="0.5" style="width:65px"> ppf</label>
-        <label>MW <input type="number" id="ovpMW" value="10" step="0.1" style="width:55px"> ppg</label>
+        <label>Block <input type="number" id="ovpBlock" value="35" style="width:60px"> <span id="uOvpBlock">klbf</span></label>
+        <label>DP weight <input type="number" id="ovpDPwt" value="22.5" step="0.5" style="width:65px"> <span id="uOvpDPwt">lb/ft</span></label>
+        <label>MW <input type="number" id="ovpMW" value="10" step="0.1" style="width:55px"> <span id="uOvpMW">ppg</span></label>
         <label>FF Low <input type="number" id="ovpFFlo" value="0.2" step="0.05" style="width:55px"></label>
         <label>FF Mid <input type="number" id="ovpFFmid" value="0.3" step="0.05" style="width:55px"></label>
         <label>FF High <input type="number" id="ovpFFhi" value="0.4" step="0.05" style="width:55px"></label>
@@ -545,13 +545,13 @@
     <!-- Broomstick -->
     <div id="panel-broomstick" class="output-panel">
       <div class="chart-controls">
-        <label>Block <input type="number" id="bsBlock" value="35" step="5" style="width:55px"> kips</label>
-        <label>DP weight <input type="number" id="bsDPwt" value="22.5" step="0.5" style="width:65px"> ppf</label>
-        <label>MW <input type="number" id="bsMW" value="10" step="0.5" style="width:50px"> ppg</label>
+        <label>Block <input type="number" id="bsBlock" value="35" step="5" style="width:55px"> <span id="uBsBlock">klbf</span></label>
+        <label>DP weight <input type="number" id="bsDPwt" value="22.5" step="0.5" style="width:65px"> <span id="uBsDPwt">lb/ft</span></label>
+        <label>MW <input type="number" id="bsMW" value="10" step="0.5" style="width:50px"> <span id="uBsMW">ppg</span></label>
         <label>FF Low <input type="number" id="bsFFlo"  value="0.2" step="0.05" style="width:50px"></label>
         <label>FF Mid <input type="number" id="bsFFmid" value="0.3" step="0.05" style="width:50px"></label>
         <label>FF High <input type="number" id="bsFFhi"  value="0.4" step="0.05" style="width:50px"></label>
-        <label title="Rig / derrick hook-load rating — drawn as a limit line (0 = off)">Max Hookload <input type="number" id="bsMaxHL" value="0" min="0" step="10" style="width:60px" onchange="qpState.tdResult && drawBroomstick(qpState.tdResult)"> kips</label>
+        <label title="Rig / derrick hook-load rating — drawn as a limit line (0 = off)">Max Hookload <input type="number" id="bsMaxHL" value="0" min="0" step="10" style="width:60px" onchange="qpState.tdResult && drawBroomstick(qpState.tdResult)"> <span id="uBsMaxHL">klbf</span></label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
         <button class="hdr-btn" onclick="exportTD()">⬇ T&amp;D CSV</button>
         <button class="hdr-btn" onclick="exportChartPNG('broomstickCanvas','broomstick.png')">⬇ PNG</button>

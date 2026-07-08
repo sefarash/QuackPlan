@@ -29,6 +29,7 @@ const QP_UNITS = (() => {
     press:  { factor: 6.894757,   imp: 'psi',     met: 'kPa'   },
     force:  { factor: 4.448222,   imp: 'klbf',    met: 'kN'    },
     torque: { factor: 1.3558179,  imp: 'ft·lb',   met: 'N·m'   },
+    torque_k:{ factor: 1.3558179, imp: 'kft·lb',  met: 'kN·m'  }, // ×1000-scaled torque (chart axis, max-torque input)
     flow:   { factor: 3.785412,   imp: 'gpm',     met: 'L/min' },
     linwt:  { factor: 1.488164,   imp: 'lb/ft',   met: 'kg/m'  },
     dls:    { factor: 0.9842520,  imp: '°/100ft', met: '°/30m' },
