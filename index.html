@@ -487,6 +487,7 @@
         <label>FF Mid <input type="number" id="torqFFmid" value="0.3" step="0.05" style="width:55px"></label>
         <label>FF High <input type="number" id="torqFFhi" value="0.4" step="0.05" style="width:55px"></label>
         <label>MUT % <input type="number" id="torqMUTpct" value="100" min="10" max="100" step="5" style="width:50px" onchange="qpState.tdResult && drawTorque(qpState.tdResult)"></label>
+        <label title="Top-drive / rotary torque rating — drawn as a limit line (0 = off)">Max Torque <input type="number" id="torqMaxTq" value="0" min="0" step="1" style="width:60px" onchange="qpState.tdResult && drawTorque(qpState.tdResult)"> kft·lb</label>
         <label><input type="checkbox" id="torqRotary" checked> Rotary</label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
         <button class="hdr-btn" onclick="exportTD()">⬇ T&amp;D CSV</button>
@@ -548,6 +549,7 @@
         <label>FF Low <input type="number" id="bsFFlo"  value="0.2" step="0.05" style="width:50px"></label>
         <label>FF Mid <input type="number" id="bsFFmid" value="0.3" step="0.05" style="width:50px"></label>
         <label>FF High <input type="number" id="bsFFhi"  value="0.4" step="0.05" style="width:50px"></label>
+        <label title="Rig / derrick hook-load rating — drawn as a limit line (0 = off)">Max Hookload <input type="number" id="bsMaxHL" value="0" min="0" step="10" style="width:60px" onchange="qpState.tdResult && drawBroomstick(qpState.tdResult)"> kips</label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
         <button class="hdr-btn" onclick="exportTD()">⬇ T&amp;D CSV</button>
         <button class="hdr-btn" onclick="exportChartPNG('broomstickCanvas','broomstick.png')">⬇ PNG</button>

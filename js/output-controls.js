@@ -8,13 +8,13 @@
 // All input IDs in the output panels that users can manually change
 const _OC_IDS = [
   // Torque
-  'torqWOB', 'torqFFlo', 'torqFFmid', 'torqFFhi', 'torqRotary',
+  'torqWOB', 'torqFFlo', 'torqFFmid', 'torqFFhi', 'torqRotary', 'torqMaxTq',
   // Buckling
   'buckWOB', 'buckFFlo', 'buckFFmid',
   // Overpull
   'ovpBlock', 'ovpDPwt', 'ovpMW', 'ovpFFlo', 'ovpFFmid', 'ovpFFhi',
   // Broomstick
-  'bsBlock', 'bsDPwt', 'bsMW', 'bsFFlo', 'bsFFmid', 'bsFFhi',
+  'bsBlock', 'bsDPwt', 'bsMW', 'bsFFlo', 'bsFFmid', 'bsFFhi', 'bsMaxHL',
   // Hydraulics
   'hydMWmin', 'hydMWslider', 'hydMWmax', 'hydFlowMin', 'hydFlowSlider', 'hydFlowMax',
   // Casing design

@@ -63,6 +63,23 @@ function _chartLine(ctx, pts, color, lw, l, t, pw, ph, xMax, yMax) {
   ctx.stroke();
 }
 
+// Vertical rig-limit reference line on a depth-down chart (x = value axis).
+// Draws a bold dashed line at xVal across the full depth range with a label.
+// No-op when xVal <= 0. Callers should fold xVal into xMax so the line is on
+// screen with the curves visible to its left.
+function _rigLimitLine(ctx, g, xVal, xMax, label) {
+  if (!(xVal > 0)) return;
+  const x = g.l + Math.min(xVal / xMax, 1) * g.pw;
+  ctx.save();
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2; ctx.setLineDash([7, 4]);
+  ctx.beginPath(); ctx.moveTo(x, g.t); ctx.lineTo(x, g.t + g.ph); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#c0392b'; ctx.font = 'bold 9px sans-serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+  ctx.fillText(label, x - 4, g.t + 4);
+  ctx.restore();
+}
+
 // ── Torque chart ──────────────────────────────────────────────────────────────
 function drawTorque(r) {
   const CID = 'torqueCanvas';
@@ -76,6 +93,7 @@ function drawTorque(r) {
   const _wobRaw = document.getElementById('torqWOB')?.value;
   const wob    = (_wobRaw === '' || _wobRaw == null ? 15 : +_wobRaw) * 1000;
   const mutPct = +(document.getElementById('torqMUTpct')?.value || 100) / 100;
+  const maxTq  = +(document.getElementById('torqMaxTq')?.value || 0);   // rig torque limit (kft·lb)
 
   const modes  = r.modes?.rotOn?.ffSensitivity;
   if (!modes) { _noData(ctx, W, H, 'Run Compute first'); return; }
@@ -111,7 +129,7 @@ function drawTorque(r) {
   }
 
   const mutMax = mutSegs.length ? Math.max(...mutSegs.map(s => s.mutK)) : 0;
-  const xMax   = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), mutMax, 1) * 1.1;
+  const xMax   = Math.max(...stHi.map(s => s.torque_ftlbs / 1000), mutMax, maxTq, 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Torque (ft·lbs ×1000)', 'MD (ft)');
 
@@ -159,12 +177,16 @@ function drawTorque(r) {
     });
   }
 
+  // Rig torque limit — vertical red line
+  _rigLimitLine(ctx, g, maxTq, xMax, `Max Tq ${maxTq}k`);
+
   const legendLabels  = ['FF '+ffLo, 'FF '+ffMid, 'FF '+ffHi];
   const legendColors  = [CHART_COLORS.lo, CHART_COLORS.mid, CHART_COLORS.hi];
   if (mutSegs.length) {
     legendLabels.push(`MUT ${Math.round(mutPct * 100)}%`);
     legendColors.push('#c0392b');
   }
+  if (maxTq > 0) { legendLabels.push('Rig Limit'); legendColors.push('#c0392b'); }
   _legend(ctx, W, g.t, legendLabels, legendColors);
   CI.drawAnnotations(ctx, CID);
 }
@@ -392,6 +414,7 @@ function drawBroomstick(r) {
   const ffMid = +(document.getElementById('bsFFmid')?.value || 0.30);
   const ffHi  = +(document.getElementById('bsFFhi')?.value  || 0.40);
   const mw    = +(document.getElementById('bsMW')?.value    || fluidGet().mudWeight || 10.0);
+  const maxHL = +(document.getElementById('bsMaxHL')?.value || 0);   // rig hook-load limit (kips)
   const BF    = 1 - mw / 65.5;
 
   // 3 runs: FF lo/mid/hi at single MW and DP weight
@@ -446,7 +469,7 @@ function drawBroomstick(r) {
     { pts: toBSLine(slPoohHi,  poohHi), color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
   ];
 
-  const xMax = Math.max(...liveCurves.flatMap(c => c.pts.map(p => p.x)), 1) * 1.1;
+  const xMax = Math.max(...liveCurves.flatMap(c => c.pts.map(p => p.x)), maxHL, 1) * 1.1;
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, maxMD, 'Hookload (kips)', 'MD (ft)');
 
@@ -478,13 +501,17 @@ function drawBroomstick(r) {
   _chartLineDepthDown(ctx, liveCurves[6].pts, '#8b1a1a', 1.5, g, xMax, maxMD);
   ctx.setLineDash([]);
 
-  _legend(ctx, W, g.t,
-    [`RIH ${ffLo}`, `RIH ${ffMid}`, `RIH ${ffHi}`,
+  // Rig hook-load limit — vertical red line
+  _rigLimitLine(ctx, g, maxHL, xMax, `Max HL ${maxHL}k`);
+
+  const bsLegLabels = [`RIH ${ffLo}`, `RIH ${ffMid}`, `RIH ${ffHi}`,
      'Rot Off Btm',
-     `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`],
-    ['#5a9fd4', '#2a7fa8', '#1a5f88',
+     `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`];
+  const bsLegColors = ['#5a9fd4', '#2a7fa8', '#1a5f88',
      '#8e44ad',
-     '#e07878', '#c0392b', '#8b1a1a']);
+     '#e07878', '#c0392b', '#8b1a1a'];
+  if (maxHL > 0) { bsLegLabels.push('Rig Limit'); bsLegColors.push('#c0392b'); }
+  _legend(ctx, W, g.t, bsLegLabels, bsLegColors);
 
   // ── Chart section labels ──────────────────────────────────────────────────
   const pw = g.pw, ph = g.ph;
