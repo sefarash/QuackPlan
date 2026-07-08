@@ -346,18 +346,26 @@ function _renderKTTable(results, mw, meta) {
   if (!div) return;
   meta = meta || {};
 
-  // Governing (minimum) real-gas KT across sections that can take a kick
-  const gasVals = results.map(r => r.ktGas).filter(v => v != null && v > 0);
-  const minGas  = gasVals.length ? Math.min(...gasVals) : null;
+  // Governing (minimum) real-gas KT over the swabbed-valid sections (PP ≤ MW).
+  // True-kick sections (PP > MW) are out of the WECS swabbed scope, so they are
+  // excluded from the governing figure (but still shown per-row with a ⚠).
+  const swabRows = results.filter(r => r.gasSwab && r.ktGas != null);
+  const minGas   = swabRows.length ? Math.min(...swabRows.map(r => r.ktGas)) : null;
+  const trueKickOnly = minGas == null && results.some(r => r.ktGas != null && !r.gasSwab);
 
   const rows = results.map(r => {
-    // Status now driven by the real-gas KT when available, else the static estimate
-    const govKt = r.ktGas != null ? r.ktGas : r.kt;
-    const status = r.ob                  ? { txt: '✓ OB',       cls: 'color:#2aad6a;font-weight:bold' }
-      : govKt == null                    ? { txt: '— no data',  cls: 'color:var(--text-dim)' }
-      : govKt >= 20                      ? { txt: '✓ OK',       cls: 'color:#2aad6a;font-weight:bold' }
-      : govKt >= 10                      ? { txt: '⚠ Low',      cls: 'color:#e0a020;font-weight:bold' }
-                                         : { txt: '✕ Critical', cls: 'color:#e05555;font-weight:bold' };
+    // The real-gas KT governs the status when it computed; an overbalanced 'OB'
+    // reading only applies to the static (no-influx) model, so it must NOT mask a
+    // finite swabbed real-gas tolerance.
+    const status = r.ktGas != null
+      ? (r.ktGas >= 20 ? { txt: '✓ OK',       cls: 'color:#2aad6a;font-weight:bold' }
+       : r.ktGas >= 10 ? { txt: '⚠ Low',      cls: 'color:#e0a020;font-weight:bold' }
+                       : { txt: '✕ Critical', cls: 'color:#e05555;font-weight:bold' })
+      : r.ob          ? { txt: '✓ OB',        cls: 'color:#2aad6a;font-weight:bold' }
+      : r.kt == null  ? { txt: '— no data',   cls: 'color:var(--text-dim)' }
+      : r.kt >= 20    ? { txt: '✓ OK',        cls: 'color:#2aad6a;font-weight:bold' }
+      : r.kt >= 10    ? { txt: '⚠ Low',       cls: 'color:#e0a020;font-weight:bold' }
+                      : { txt: '✕ Critical',  cls: 'color:#e05555;font-weight:bold' };
     const ktTxt   = r.ob ? '∞' : r.kt   != null ? r.kt + ' bbl' : '—';
     const gasTxt  = r.gasInf ? '∞ (>WP)' : r.ktGas != null ? r.ktGas.toFixed(1) + ' bbl' : '—';
     const swab    = !r.gasSwab ? ' title="PP&gt;MW: true/induced kick — beyond the WECS swabbed scope; use WellPlan/DrillBench"' : '';
@@ -397,7 +405,8 @@ function _renderKTTable(results, mw, meta) {
       <tbody>${rows}</tbody>
     </table>
     <p style="margin-top:8px;font-size:11px">
-      <strong>Governing (min) real-gas KT: ${minGas != null ? minGas.toFixed(1) + ' bbl' : '—'}</strong>
+      <strong>Governing (min) real-gas KT: ${minGas != null ? minGas.toFixed(1) + ' bbl'
+        : trueKickOnly ? '— (true-kick sections only — use WellPlan/DrillBench)' : '—'}</strong>
       &nbsp;·&nbsp; MW = ${mw} ppg &nbsp;·&nbsp; safety margin ${meta.safetyPsi || 100} psi &nbsp;·&nbsp; influx: ${influxNote}
     </p>
     <p style="margin-top:6px;font-size:10px;color:var(--text-dim);line-height:1.5">
