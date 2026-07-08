@@ -733,6 +733,30 @@
       </div>
     </div>
 
+    <!-- Anti-Collision -->
+    <div id="panel-anticollision" class="output-panel">
+      <div class="chart-controls" style="flex-wrap:wrap;align-items:flex-start;gap:8px">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span class="text-dim">Offset well survey — MD Inc Azi per line</span>
+          <textarea id="acOffsetPaste" rows="3" style="width:210px;font:11px monospace"
+            placeholder="0 0 0&#10;3000 0 0&#10;9000 30 90"></textarea>
+        </div>
+        <label>Slot ΔN <input type="number" id="acWhN" value="0" step="10" style="width:60px"> <span id="uAcWhN">ft</span></label>
+        <label>Slot ΔE <input type="number" id="acWhE" value="50" step="10" style="width:60px"> <span id="uAcWhE">ft</span></label>
+        <label title="Offset well RKB relative to reference (offset deeper = positive)">Datum ΔTVD <input type="number" id="acWhTVD" value="0" step="5" style="width:55px"> <span id="uAcWhTVD">ft</span></label>
+        <label title="Fixed positional uncertainty (both wells)">Err base <input type="number" id="acErrBase" value="3" step="1" style="width:50px"> <span id="uAcErrBase">ft</span></label>
+        <label title="Uncertainty growth as a fraction of measured depth (e.g. 0.0015 = 0.15% of MD)">Err/MD <input type="number" id="acErrGrad" value="0.0015" step="0.0005" style="width:65px"></label>
+        <label title="Confidence multiple on the uncertainty radius (ISCWSA ~2.795 ≈ 2D 97.5%)">k-σ <input type="number" id="acKSigma" value="2.795" step="0.1" style="width:55px"></label>
+        <button class="hdr-btn" onclick="drawAntiCollision()">Analyse</button>
+        <button class="hdr-btn" onclick="exportChartPNG('antiCollisionCanvas','anti-collision.png')">⬇ PNG</button>
+        <span id="acSummary" class="text-dim" style="width:100%"></span>
+        <span class="text-dim" style="width:100%;font-size:10px">Geometry (distance) is exact. Positional uncertainty is a <strong>simplified</strong> base+gradient model — not the full ISCWSA MWD tool-code error model.</span>
+      </div>
+      <div class="output-canvas-wrap">
+        <canvas id="antiCollisionCanvas"></canvas>
+      </div>
+    </div>
+
   </div><!-- /panel-center -->
 
   <!-- RIGHT — Well Schematic -->
@@ -758,6 +782,7 @@
     <button class="output-tab" onclick="switchOutputTab('cd',this)">Casing Design</button>
     <button class="output-tab" onclick="switchOutputTab('kt',this)">Kick Tolerance</button>
     <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
+    <button class="output-tab" onclick="switchOutputTab('anticollision',this)">Anti-Collision</button>
     <button class="output-tab" onclick="switchOutputTab('finaldiagram',this)">Final Diagram</button>
   </nav>
   <div class="footer-right" id="footerStatus">Ready</div>
@@ -865,6 +890,8 @@
 <script src="js/scenario-io.js"></script>
 <script src="js/witsml-import.js"></script>
 <script src="js/string-validation.js"></script>
+<script src="js/anticollision-engine.js"></script>
+<script src="js/anticollision-ui.js"></script>
 <script src="js/compare-ui.js"></script>
 <script src="js/report.js"></script>
 <script>
@@ -888,7 +915,7 @@
     ['trajVsCanvas','trajPlanCanvas',
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
      'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdTriaxialCanvas','ktCanvas',
-     'finalDiagramCanvas'].forEach(id => CI.attach(id));
+     'antiCollisionCanvas','finalDiagramCanvas'].forEach(id => CI.attach(id));
 
     makeRowsDraggable('traj1Body',      traj1Recalc);
     makeRowsDraggable('traj2Body',      traj2Recalc);
