@@ -32,6 +32,7 @@
     <button class="input-tab" onclick="switchInputTab('ppfg',this)">PPFG</button>
     <button class="input-tab" onclick="switchInputTab('activity',this)">Activity</button>
     <button class="input-tab" onclick="switchInputTab('handover',this)">Handover</button>
+    <button class="input-tab" onclick="switchInputTab('compare',this)">Compare</button>
   </nav>
 
   <div class="header-right">
@@ -419,6 +420,48 @@
       </table>
     </div>
 
+    <div id="panel-compare" class="input-panel">
+      <div class="panel-title">⚖ Scenario Comparison</div>
+      <div class="cmp-selectors">
+        <div class="cmp-slot">
+          <label class="text-dim" style="font-size:11px">Scenario A</label>
+          <select id="cmpSelA" class="cmp-select"></select>
+        </div>
+        <div class="cmp-slot">
+          <label class="text-dim" style="font-size:11px">Scenario B</label>
+          <select id="cmpSelB" class="cmp-select"></select>
+        </div>
+        <div class="cmp-slot">
+          <label class="text-dim" style="font-size:11px">Scenario C (optional)</label>
+          <select id="cmpSelC" class="cmp-select"></select>
+        </div>
+        <div class="cmp-slot" style="flex:0 0 auto;justify-content:flex-end">
+          <button class="add-row-btn" onclick="compareRun()">Compare →</button>
+        </div>
+      </div>
+
+      <div id="cmpResults" style="display:none">
+        <table class="qp-table" id="cmpTable">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th id="cmpHeadA" style="text-align:center"></th>
+              <th id="cmpHeadB" style="text-align:center"></th>
+              <th id="cmpHeadC" style="text-align:center"></th>
+            </tr>
+          </thead>
+          <tbody id="cmpBody"></tbody>
+        </table>
+      </div>
+
+      <div id="cmpChartWrap" style="display:none;margin-top:16px">
+        <div class="text-dim" style="font-size:11px;margin-bottom:4px">Trajectory overlay — TVD vs MD</div>
+        <div style="width:100%;height:300px">
+          <canvas id="cmpCanvas" style="width:100%;height:100%"></canvas>
+        </div>
+      </div>
+    </div>
+
     <!-- ── OUTPUT PANELS ── -->
 
     <!-- Trajectory Plot -->
@@ -521,22 +564,22 @@
       <div class="chart-controls" style="margin-top:8px;margin-bottom:4px">
         <label>MW &nbsp;
           <input type="number" id="hydMWmin" value="8" step="0.5" style="width:38px;text-align:right"
-            oninput="document.getElementById('hydMWslider').min=this.value;qpCompute()">
+            oninput="document.getElementById('hydMWslider').min=this.value;qpComputeDebounced()">
           <input type="range" id="hydMWslider" min="8" max="16" step="0.5" value="10"
-            oninput="document.getElementById('hydMWval').textContent=this.value;qpCompute()"
+            oninput="document.getElementById('hydMWval').textContent=this.value;qpComputeDebounced()"
             style="width:100px; vertical-align:middle">
           <input type="number" id="hydMWmax" value="16" step="0.5" style="width:38px"
-            oninput="document.getElementById('hydMWslider').max=this.value;qpCompute()">
+            oninput="document.getElementById('hydMWslider').max=this.value;qpComputeDebounced()">
           &nbsp;<span id="hydMWval">10</span> ppg
         </label>
         <label>Flow rate &nbsp;
           <input type="number" id="hydFlowMin" value="100" step="10" style="width:48px;text-align:right"
-            oninput="document.getElementById('hydFlowSlider').min=this.value;qpCompute()">
+            oninput="document.getElementById('hydFlowSlider').min=this.value;qpComputeDebounced()">
           <input type="range" id="hydFlowSlider" min="100" max="600" step="10" value="280"
-            oninput="document.getElementById('hydFlowVal').textContent=this.value;qpCompute()"
+            oninput="document.getElementById('hydFlowVal').textContent=this.value;qpComputeDebounced()"
             style="width:120px; vertical-align:middle">
           <input type="number" id="hydFlowMax" value="600" step="10" style="width:48px"
-            oninput="document.getElementById('hydFlowSlider').max=this.value;qpCompute()">
+            oninput="document.getElementById('hydFlowSlider').max=this.value;qpComputeDebounced()">
           &nbsp;<span id="hydFlowVal">280</span> gpm
         </label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
@@ -802,6 +845,7 @@
 <script src="js/scenario-io.js"></script>
 <script src="js/witsml-import.js"></script>
 <script src="js/string-validation.js"></script>
+<script src="js/compare-ui.js"></script>
 <script>
   // ── Theme toggle ──────────────────────────────────────────────────
   function toggleTheme() {

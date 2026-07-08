@@ -42,6 +42,16 @@ function qpCompute() {
   }
 }
 
+// Debounced qpCompute for high-frequency inputs (the hydraulics sliders fire
+// oninput on every pixel of drag). A single compute can cost 50–100 ms on a
+// long/tortured survey, so a trailing debounce coalesces a drag into one
+// compute when it pauses — eliminating the per-pixel main-thread blocking.
+let _qpComputeTimer = null;
+function qpComputeDebounced(delay = 50) {
+  if (_qpComputeTimer) clearTimeout(_qpComputeTimer);
+  _qpComputeTimer = setTimeout(() => { _qpComputeTimer = null; qpCompute(); }, delay);
+}
+
 // Derive Power-Law n and K from the Bingham PV/YP (standard API RP 13D).
 // The 600/300 rpm Fann dial readings are recovered from PV/YP:
 //   θ600 = 2·PV + YP,   θ300 = PV + YP
