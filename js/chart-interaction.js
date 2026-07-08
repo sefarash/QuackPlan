@@ -106,6 +106,8 @@ const CI = (() => {
   function attach(id) {
     const canvas = document.getElementById(id);
     if (!canvas) return;
+    if (canvas.dataset.ciAttached) return;   // guard: don't stack duplicate listeners
+    canvas.dataset.ciAttached = '1';
 
     canvas.parentElement.style.position = 'relative';
 
@@ -330,6 +332,13 @@ const CI = (() => {
     return cx >= pad.l && cx <= pad.l + pad.pw && cy >= pad.t && cy <= pad.t + pad.ph;
   }
 
+  // Drop frozen snapshots and annotations across all canvases — call on scenario
+  // switch so one well's snapshots don't ghost onto another. meta/live are kept
+  // (they are repopulated by the next draw).
+  function clearAll() {
+    Object.values(_state).forEach(s => { s.frozen = []; s.annotations = []; });
+  }
+
   function _redraw(id) {
     const map = {
       torqueCanvas: 'torque', bucklingCanvas: 'buckling',
@@ -343,5 +352,5 @@ const CI = (() => {
       redrawOutputPanel(map[id] || (typeof qpState !== 'undefined' && qpState.activeOutputTab));
   }
 
-  return { attach, register, storeLive, getFrozen, drawFrozen, drawAnnotations };
+  return { attach, register, storeLive, getFrozen, drawFrozen, drawAnnotations, clearAll };
 })();

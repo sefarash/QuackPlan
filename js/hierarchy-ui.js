@@ -237,6 +237,10 @@ function _loadScenario(id) {
     if (!node || !node.data) return;
     const d = node.data;
 
+    // Clear frozen chart snapshots / annotations so one well's overlays don't
+    // ghost onto the next scenario's charts
+    if (typeof CI !== 'undefined' && CI.clearAll) CI.clearAll();
+
     // Clear all tables first so stale rows don't persist
     document.getElementById('traj1Body').innerHTML      = '';
     document.getElementById('traj2Body').innerHTML      = '';

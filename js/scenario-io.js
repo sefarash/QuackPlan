@@ -111,6 +111,9 @@ async function _importScenarioDoc(doc) {
 
   const inp = doc.inputs || {};
 
+  // Clear frozen chart snapshots / annotations from the previous scenario
+  if (typeof CI !== 'undefined' && CI.clearAll) CI.clearAll();
+
   // Clear all input tables (same as _loadScenario)
   ['traj1Body','traj2Body','tortBody','schematicBody','bhaBody',
    'nozzleBody','mwdBody','activityBody','servicesBody',
