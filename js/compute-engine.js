@@ -206,13 +206,24 @@ function _computeHyd(survey, fluid, bha) {
   };
 }
 
+// TVD at a given MD, linearly interpolated between bracketing survey stations
+// (previously snapped to the nearest station, giving shoe/ECD TVDs off by up to
+// half a station interval — visible as casing/KT shoe TVD disagreeing with the
+// schematic, which interpolates).
 function _tvdAt(survey, md) {
   if (!survey || !survey.length) return md;
-  let best = survey[0];
-  for (const s of survey) {
-    if (Math.abs(s.md - md) < Math.abs(best.md - md)) best = s;
+  if (md <= survey[0].md) return survey[0].tvd;
+  const last = survey[survey.length - 1];
+  if (md >= last.md) return last.tvd;
+  for (let i = 1; i < survey.length; i++) {
+    if (md <= survey[i].md) {
+      const s0 = survey[i - 1], s1 = survey[i];
+      const span = s1.md - s0.md;
+      if (span <= 0) return s0.tvd;
+      return s0.tvd + (md - s0.md) / span * (s1.tvd - s0.tvd);
+    }
   }
-  return best.tvd;
+  return last.tvd;
 }
 
 function setStatus(msg, isError) {
