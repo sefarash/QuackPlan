@@ -56,14 +56,14 @@ function traj1Recalc() {
   qpState.baseSurvey = survey;
   qpState.survey = survey;
 
-  const kbElev = _kbElevationAboveMSL();
+  const kbElev = _kbElevationAboveMSL();   // imperial ft
   survey.forEach((pt, i) => {
     const row = body.rows[i];
     if (!row) return;
-    const dls100 = (pt.dls * DLS_SCALE).toFixed(2);
-    _setCell(row, 'tvd',   pt.tvd.toFixed(1));
-    _setCell(row, 'tvdss', (pt.tvd - kbElev).toFixed(1));   // TVDss = TVD − RKB-above-MSL
-    _setCell(row, 'dls',   dls100);
+    const dls100 = pt.dls * DLS_SCALE;      // °/100ft (imperial canonical)
+    _setCell(row, 'tvd',   QP_UNITS.toDisplay('depth', pt.tvd).toFixed(1));
+    _setCell(row, 'tvdss', QP_UNITS.toDisplay('depth', pt.tvd - kbElev).toFixed(1)); // TVDss = TVD − RKB-above-MSL
+    _setCell(row, 'dls',   QP_UNITS.toDisplay('dls', dls100).toFixed(2));
   });
 
   if (typeof drawSchematic === 'function') drawSchematic(survey);
@@ -77,14 +77,15 @@ function _trajValidate(stations) {
   if (!body) return true;
   for (const tr of body.rows) tr.style.outline = '';
 
+  const u = QP_UNITS.label('depth');
+  const fmt = ft => Math.round(QP_UNITS.toDisplay('depth', ft)).toLocaleString();
   const warnings = [];
   for (let i = 1; i < stations.length; i++) {
-    const md = stations[i].md, prev = stations[i - 1].md;
+    const md = stations[i].md, prev = stations[i - 1].md;   // imperial
     if (!(md > prev)) {
-      const how = md < prev ? 'decreases from' : 'repeats';
       warnings.push(md < prev
-        ? `Row ${i + 1}: MD ${md.toLocaleString()} ft ${how} ${prev.toLocaleString()} ft — MD must strictly increase down the wellbore`
-        : `Row ${i + 1}: MD ${md.toLocaleString()} ft ${how} the previous station — each MD must be greater than the one above`);
+        ? `Row ${i + 1}: MD ${fmt(md)} ${u} decreases from ${fmt(prev)} ${u} — MD must strictly increase down the wellbore`
+        : `Row ${i + 1}: MD ${fmt(md)} ${u} repeats the previous station — each MD must be greater than the one above`);
       if (body.rows[i]) body.rows[i].style.outline = '2px solid #e05555';
     }
   }
@@ -98,15 +99,56 @@ function _trajValidate(stations) {
   return warnings.length === 0;
 }
 
+// ── Unit-system wiring (Option 1) ──────────────────────────────────────────────
+
+// Refresh the Option 1 column headers with the current unit labels
+function _trajUpdateHeaders() {
+  const d = QP_UNITS.label('depth'), dls = QP_UNITS.label('dls');
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  set('hdrMD',    `MD (${d})`);
+  set('hdrTVD',   `TVD (${d})`);
+  set('hdrTVDss', `TVDss (${d})`);
+  set('hdrDLS',   `DLS (${dls})`);
+}
+
+// Convert the Option 1 MD input fields between two unit systems in place
+function _traj1ConvertFields(fromSys, toSys) {
+  const body = document.getElementById('traj1Body');
+  if (!body) return;
+  for (const row of body.rows) {
+    const inp = row.querySelectorAll('input[type=number]')[0];
+    if (inp && inp.value !== '') {
+      inp.value = +QP_UNITS.convert('depth', +inp.value, fromSys, toSys).toFixed(3);
+    }
+  }
+}
+
+// On unit change: relabel, convert the visible MD fields, recompute the ACTIVE
+// trajectory option (so qpState.survey isn't clobbered by an inactive option),
+// and redraw the active output panel (e.g. the trajectory plot).
+QP_UNITS.onChange((newSys, oldSys) => {
+  _trajUpdateHeaders();
+  _traj1ConvertFields(oldSys, newSys);
+  const opt = qpState.activeTrajOpt;
+  if      (opt === 'opt2' && typeof traj2Recalc === 'function') traj2Recalc();
+  else if (opt === 'tort' && typeof tortRecalc  === 'function') tortRecalc();
+  else                                                          traj1Recalc();
+  if (qpState.activeOutputTab && typeof redrawOutputPanel === 'function') {
+    redrawOutputPanel(qpState.activeOutputTab);
+  }
+});
+
 function _traj1ReadStations() {
   const rows = document.getElementById('traj1Body').rows;
   const stations = [];
   for (const row of rows) {
     const inputs = row.querySelectorAll('input[type=number]');
-    const md  = +(inputs[0]?.value || 0);
+    if (inputs[0]?.value === '' && stations.length > 0) continue;
+    // MD field is in display units → convert to imperial (canonical); inc/az are
+    // angles (identical in both systems).
+    const md  = QP_UNITS.fromDisplay('depth', +(inputs[0]?.value || 0));
     const inc = +(inputs[1]?.value || 0);
     const az  = +(inputs[2]?.value || 0);
-    if (inputs[0]?.value === '' && stations.length > 0) continue;
     stations.push({ md, inc, az });
   }
   return stations;
@@ -124,14 +166,17 @@ function _traj1Save() {
   }
   const rows = document.getElementById('traj1Body').rows;
   const data = [];
-  let prevMD = 0;
+  let prevMD = 0;   // imperial (canonical)
   for (const row of rows) {
     const inputs = row.querySelectorAll('input[type=number]');
-    const md  = inputs[0]?.value !== '' ? inputs[0]?.value : String(prevMD);
+    // Store MD in imperial (canonical), converting from the display field
+    const md  = inputs[0]?.value !== ''
+      ? +QP_UNITS.fromDisplay('depth', +inputs[0].value).toFixed(4)
+      : prevMD;
     const inc = inputs[1]?.value || '0';
     const azi = inputs[2]?.value || '0';
-    data.push({ md, inc, azi });
-    prevMD = +md;
+    data.push({ md: String(md), inc, azi });
+    prevMD = md;
   }
   dbSaveScenarioData(qpState.currentScenarioId, 'traj1', data);
 }
@@ -139,7 +184,11 @@ function _traj1Save() {
 function trajLoadRows(data) {
   const body = document.getElementById('traj1Body');
   body.innerHTML = '';
-  (data || []).forEach(v => traj1AddRow(v));
+  // Saved MD is imperial (canonical) → convert to display units for the field
+  (data || []).forEach(v => traj1AddRow({
+    md:  (v.md === '' || v.md == null) ? v.md : +QP_UNITS.toDisplay('depth', +v.md).toFixed(3),
+    inc: v.inc, azi: v.azi,
+  }));
 }
 
 // ── Excel paste handler ───────────────────────────────────────────────────────
@@ -159,11 +208,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Seed two empty rows so the user sees something
+  // Seed two empty rows so the user sees something (5000 ft canonical → display)
   if (!document.getElementById('traj1Body').rows.length) {
-    traj1AddRow({ md: 0,    inc: 0, azi: 0 });
-    traj1AddRow({ md: 5000, inc: 0, azi: 0 });
+    traj1AddRow({ md: 0, inc: 0, azi: 0 });
+    traj1AddRow({ md: +QP_UNITS.toDisplay('depth', 5000).toFixed(3), inc: 0, azi: 0 });
   }
+  _trajUpdateHeaders();
 });
 
 // ── Option 2 ─────────────────────────────────────────────────────────────────

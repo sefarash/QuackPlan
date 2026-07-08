@@ -47,6 +47,7 @@
     </label>
     <button class="hdr-btn" onclick="showNewProjectModal()">+ Project</button>
     <button class="hdr-btn primary" onclick="qpCompute()">⚡ Run</button>
+    <button class="hdr-btn" id="unitToggle" onclick="qpToggleUnits()" title="Toggle imperial / metric units">Imperial</button>
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark / light theme">🌙</button>
   </div>
 </header>
@@ -111,12 +112,12 @@
           <thead>
             <tr>
               <th class="drag-col"></th>
-              <th>MD (ft)</th>
+              <th id="hdrMD">MD (ft)</th>
               <th>Inc (°)</th>
               <th>Azi (°)</th>
-              <th>TVD (ft)</th>
-              <th>TVDss (ft)</th>
-              <th>DLS (°/100')</th>
+              <th id="hdrTVD">TVD (ft)</th>
+              <th id="hdrTVDss">TVDss (ft)</th>
+              <th id="hdrDLS">DLS (°/100')</th>
               <th class="row-act"></th>
             </tr>
           </thead>
@@ -816,6 +817,7 @@
 </script>
 
 <!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
+<script src="js/units.js"></script>
 <script src="js/chart-interaction.js"></script>
 <script src="js/survey-engine.js"></script>
 <script src="js/rheology-engine.js"></script>

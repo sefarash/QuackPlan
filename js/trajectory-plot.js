@@ -101,17 +101,22 @@ function _drawVS(survey) {
   _vsLoad();
   _vsDrag.areas = [];
 
+  // Positions/labels shown in display units; survey stays imperial (canonical),
+  // so _interpSurvey lookups below still use imperial MD.
+  const toD = v => QP_UNITS.toDisplay('depth', v);
+  const uD  = QP_UNITS.label('depth');
+
   const dense = _densify(survey, 50);
   const pts = dense.map(s => ({
-    dep: Math.sqrt(s.north * s.north + s.east * s.east),
-    tvd: s.tvd,
-    md:  s.md,
+    dep: toD(Math.sqrt(s.north * s.north + s.east * s.east)),
+    tvd: toD(s.tvd),
+    md:  toD(s.md),
   }));
 
   const xMax = Math.max(...pts.map(p => p.dep), 10)  * 1.18;
   const yMax = Math.max(...pts.map(p => p.tvd), 100) * 1.10;
 
-  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, '', 'TVD (ft)', { bottomX: true });
+  const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, '', `TVD (${uD})`, { bottomX: true });
   const C = _qpColors();
 
   // Title
@@ -121,7 +126,7 @@ function _drawVS(survey) {
 
   // Register with CI and draw frozen
   CI.storeLive(CID, [{ pts: pts.map(p => ({ x: p.dep, y: p.tvd })), color: '#1a5f7a', label: 'VS' }]);
-  CI.register(CID, { pad: g, xMax, yMax, xLabel: 'Departure (ft)', yLabel: 'TVD (ft)', depthDown: true });
+  CI.register(CID, { pad: g, xMax, yMax, xLabel: `Departure (${uD})`, yLabel: `TVD (${uD})`, depthDown: true });
   CI.drawFrozen(ctx, CID);
 
   // ── Wellpath line ──
@@ -140,12 +145,12 @@ function _drawVS(survey) {
 
   const shoeItems = [];
   _readSchematicRows().forEach(row => {
-    const md = +(row.bot || 0);
+    const md = +(row.bot || 0);           // imperial
     if (!md) return;
     const st  = _interpSurvey(survey, md);
-    const dep = Math.sqrt(st.north * st.north + st.east * st.east);
-    const sy  = g.t + (st.tvd / yMax) * g.ph;
-    const bx  = g.l + (dep   / xMax)  * g.pw;
+    const dep = toD(Math.sqrt(st.north * st.north + st.east * st.east));
+    const sy  = g.t + (toD(st.tvd) / yMax) * g.ph;
+    const bx  = g.l + (dep         / xMax) * g.pw;
     if (sy < g.t - 2 || sy > g.t + g.ph + 2) return;
 
     const grade = row.grade     || '';
@@ -158,8 +163,8 @@ function _drawVS(survey) {
       sy, bx,
       lines: [
         line1,
-        `TVD: ${Math.round(st.tvd).toLocaleString()}ft`,
-        `MD: ${Math.round(md).toLocaleString()}ft`,
+        `TVD: ${Math.round(toD(st.tvd)).toLocaleString()}${uD}`,
+        `MD: ${Math.round(toD(md)).toLocaleString()}${uD}`,
       ],
     });
   });
@@ -217,20 +222,20 @@ function _drawVS(survey) {
     _vsDrag.areas.push({ key, x: lx - 2, y: fy - 2, w: 150, h: LBL_H + 4 });
   });
 
-  // ── MD tick labels ──
-  const last     = pts[pts.length - 1];
-  const interval = _niceInterval(last.md, 6);
+  // ── MD tick labels ── (interval nice in display units; interp stays imperial)
+  const last     = pts[pts.length - 1];               // pts.md is display
+  const interval = _niceInterval(last.md, 6);         // display interval
   ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
-  for (let md = interval; md < last.md - interval * 0.5; md += interval) {
-    const st  = _interpSurvey(survey, md);
-    const dep = Math.sqrt(st.north * st.north + st.east * st.east);
-    const px  = g.l + (dep    / xMax) * g.pw;
-    const py  = g.t + (st.tvd / yMax) * g.ph;
+  for (let mdD = interval; mdD < last.md - interval * 0.5; mdD += interval) {
+    const st  = _interpSurvey(survey, QP_UNITS.fromDisplay('depth', mdD));
+    const dep = toD(Math.sqrt(st.north * st.north + st.east * st.east));
+    const px  = g.l + (dep       / xMax) * g.pw;
+    const py  = g.t + (toD(st.tvd) / yMax) * g.ph;
     ctx.fillStyle = C.border;
     ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = C.dim;
     ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-    ctx.fillText(Math.round(md) + "'", px - 3, py - 2);
+    ctx.fillText(Math.round(mdD) + ' ' + uD, px - 3, py - 2);
   }
 
   // ── Surface marker ──
@@ -238,9 +243,9 @@ function _drawVS(survey) {
   ctx.beginPath(); ctx.arc(g.l, g.t, 5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  ctx.fillText('Surface  0\' MD', g.l + 7, g.t - 1);
+  ctx.fillText(`Surface  0 ${uD} MD`, g.l + 7, g.t - 1);
 
-  // ── TD marker ──
+  // ── TD marker ── (last.dep/tvd/md already in display units)
   const tdx = g.l + (last.dep / xMax) * g.pw;
   const tdy = g.t  + (last.tvd / yMax) * g.ph;
   ctx.fillStyle = '#c0392b';
@@ -248,8 +253,8 @@ function _drawVS(survey) {
   ctx.fillStyle = C.text; ctx.font = 'bold 9px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   const tdIndent = ctx.measureText('TD  ').width;
-  ctx.fillText(`TD  ${Math.round(last.tvd).toLocaleString()}' TVD`, tdx + 7, tdy + 2);
-  ctx.fillText(`${Math.round(last.md).toLocaleString()}' MD`,       tdx + 7 + tdIndent, tdy + 13);
+  ctx.fillText(`TD  ${Math.round(last.tvd).toLocaleString()} ${uD} TVD`, tdx + 7, tdy + 2);
+  ctx.fillText(`${Math.round(last.md).toLocaleString()} ${uD} MD`,       tdx + 7 + tdIndent, tdy + 13);
 
   CI.drawAnnotations(ctx, CID);
 }
@@ -283,6 +288,10 @@ function _drawPlan(survey) {
   const toX = e => PP.l + ((e - E0) / range) * pw;
   const toY = n => PP.t + (1 - (n - N0) / range) * ph;
 
+  // Positioning stays imperial (self-scaling); only labels convert to display
+  const toD = v => QP_UNITS.toDisplay('depth', v);
+  const uD  = QP_UNITS.label('depth');
+
   // Grid
   const ticks = 4;
   const C = _qpColors();
@@ -294,9 +303,9 @@ function _drawPlan(survey) {
     ctx.beginPath(); ctx.moveTo(PP.l, toY(n)); ctx.lineTo(PP.l + pw, toY(n)); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '8px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(_shortFt(e), toX(e), PP.t + ph + 3);
+    ctx.fillText(_shortNum(toD(e)), toX(e), PP.t + ph + 3);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText(_shortFt(n), PP.l - 2, toY(n));
+    ctx.fillText(_shortNum(toD(n)), PP.l - 2, toY(n));
   }
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(PP.l, PP.t, pw, ph);
@@ -304,9 +313,9 @@ function _drawPlan(survey) {
   // Axis labels
   ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.fillText('Easting (ft)', PP.l + pw / 2, H - 16);
+  ctx.fillText(`Easting (${uD})`, PP.l + pw / 2, H - 16);
   ctx.save(); ctx.translate(13, PP.t + ph / 2); ctx.rotate(-Math.PI / 2);
-  ctx.fillText('Northing (ft)', 0, 0); ctx.restore();
+  ctx.fillText(`Northing (${uD})`, 0, 0); ctx.restore();
 
   // Title
   ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
@@ -354,10 +363,10 @@ function _drawPlan(survey) {
   // Register plan view with CI (offset coordinates so tooltip shows real E/N)
   CI.register(CID, {
     pad: { l: PP.l, t: PP.t, pw, ph },
-    xMax: range, yMax: range,
-    xLabel: 'Easting (ft)', yLabel: 'Northing (ft)',
+    xMax: toD(range), yMax: toD(range),
+    xLabel: `Easting (${uD})`, yLabel: `Northing (${uD})`,
     depthDown: false,
-    xOffset: E0, yOffset: N0,
+    xOffset: toD(E0), yOffset: toD(N0),
   });
 }
 
@@ -430,7 +439,7 @@ function _niceInterval(maxVal, targetCount) {
   return mag * nice;
 }
 
-function _shortFt(v) {
+function _shortNum(v) {
   const a = Math.abs(v);
   if (a >= 1000) return (v / 1000).toFixed(1) + 'k';
   return Math.round(v).toString();

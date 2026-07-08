@@ -103,6 +103,17 @@ There is no reactive state for inputs — all input panels read directly from DO
 
 Torque and Overpull draw functions call `tdCompute()` directly for each FF sensitivity curve rather than reusing the stored result.
 
+### Unit system (`js/units.js`)
+
+`QP_UNITS` holds the active system (`imperial` | `metric`, persisted in localStorage; header toggle). **Imperial is canonical**: everything stored in IndexedDB, in `qpState`, and inside every compute engine is imperial. Conversion happens *only* at the display/input boundary:
+
+- `QP_UNITS.fromDisplay(qty, v)` — input field (display) → imperial, at read/save time
+- `QP_UNITS.toDisplay(qty, v)` — imperial → display, when rendering cells/labels/charts
+- `QP_UNITS.label(qty)` — the unit string for the header/axis
+- `QP_UNITS.onChange((newSys, oldSys) => …)` — re-render hook; convert visible input fields with `QP_UNITS.convert(qty, v, oldSys, newSys)`
+
+Quantities: `depth, diam, mw, press, force, torque, flow, linwt, dls, angle`. In imperial every factor is 1, so converted code is byte-for-byte identical to pre-units behaviour. **Trajectory Option 1 + the trajectory plot are the converted reference implementation** — other panels (schematic, BHA, fluid, hydraulics, T&D, casing, AFE) still render imperial labels until converted following the same pattern.
+
 ### Persistence
 
 - `db-engine.js` — IndexedDB for hierarchy tree and all scenario inputs (survey, BHA, schematic, fluid, trajectory options). Persisted automatically on every change.
