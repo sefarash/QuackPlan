@@ -35,6 +35,7 @@ const QP_UNITS = (() => {
     angle:  { factor: 1,          imp: '°',       met: '°'     },
     visc:   { factor: 1,          imp: 'cP',      met: 'mPa·s' }, // 1 cP ≡ 1 mPa·s
     yieldstress: { factor: 0.4788026, imp: 'lb/100ft²', met: 'Pa' },
+    mass:   { factor: 0.4535924,  imp: 'lbs',     met: 'kg'    },
   };
 
   function _factor(qty, sys) {

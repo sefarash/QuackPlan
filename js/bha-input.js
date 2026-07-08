@@ -191,8 +191,8 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
     <td class="editable">${gradeCell}</td>
     <td class="editable">${connCell}</td>
     <td class="editable"><input class="bha-id-n" type="number" step="0.125" value="${_id}" onchange="bhaSave()"></td>
-    <td class="editable"><input class="bha-wt-n" type="number" step="1"     value="${_wt}" onchange="bhaSave()"></td>
-    <td class="editable"><input class="bha-len-n" type="number" step="1"    value="${_len}" onchange="_bhaLenChanged(this)"></td>
+    <td class="editable"><input class="bha-wt-n" type="number" step="1"     value="${+QP_UNITS.toDisplay('mass', _wt).toFixed(1)}" onchange="bhaSave()"></td>
+    <td class="editable"><input class="bha-len-n" type="number" step="1"    value="${+QP_UNITS.toDisplay('depth', _len).toFixed(2)}" onchange="_bhaLenChanged(this)"></td>
     <td class="calc-cell" data-col="ppf">—</td>
     <td class="calc-cell" data-col="cumwt">—</td>
     <td class="calc-cell" data-col="cumlen">—</td>
@@ -310,8 +310,11 @@ function _bhaDPConnChanged(sel) {
   const idN   = tr.querySelector('.bha-id-n');
   const wtN   = tr.querySelector('.bha-wt-n');
   const connH = tr.querySelector('.bha-conn');
-  if (idN)   idN.value   = spec.tubeID;
-  if (wtN)   wtN.value   = Math.round(spec.adjWt * (+(lenN?.value || 30)));
+  if (idN)   idN.value   = spec.tubeID;   // inches
+  if (wtN) {
+    const lenFt = QP_UNITS.fromDisplay('depth', +(lenN?.value || 30));   // display → imperial
+    wtN.value = +QP_UNITS.toDisplay('mass', spec.adjWt * lenFt).toFixed(1);
+  }
   if (connH) connH.value = spec.conn;
   bhaSave();
 }
@@ -326,10 +329,11 @@ function _bhaLenChanged(inp) {
     const grade = tr.querySelector('.bha-cat-grade')?.value;
     const conn  = tr.querySelector('.bha-conn')?.value;
     if (od && od !== 'custom' && nomWt && grade && conn) {
-      const spec = dpSpecFull(od, nomWt, grade, conn);
-      const wtN  = tr.querySelector('.bha-wt-n');
-      const len  = +(inp.value || 0);
-      if (spec && wtN && len > 0) wtN.value = Math.round(spec.adjWt * len);
+      const spec  = dpSpecFull(od, nomWt, grade, conn);
+      const wtN   = tr.querySelector('.bha-wt-n');
+      const lenFt = QP_UNITS.fromDisplay('depth', +(inp.value || 0));   // display → imperial ft
+      // spec.adjWt is lb/ft (imperial); total lbs → display mass for the field
+      if (spec && wtN && lenFt > 0) wtN.value = +QP_UNITS.toDisplay('mass', spec.adjWt * lenFt).toFixed(1);
     }
   }
   bhaSave();
@@ -532,6 +536,39 @@ function _bhaRecalc() {
   });
 }
 
+// ── Unit-system wiring ─────────────────────────────────────────────────────────
+// OD/ID stay in inches (API sizes). Weight (mass), Length (depth) and the
+// computed PPF/Cum columns follow the active system. Because PPF = wt/len and the
+// Cum columns are sums of the (display) fields, _bhaRecalc yields display units
+// automatically (kg/m, kg, m) — no change needed there.
+
+function _bhaImp(q, v) {   // display field value → imperial (canonical), keep '' empty
+  return (v === '' || v == null) ? '' : +QP_UNITS.fromDisplay(q, +v).toFixed(4);
+}
+
+function _bhaUpdateHeaders() {
+  const set = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+  set('hdrBhaWt',     `Weight (${QP_UNITS.label('mass')})`);
+  set('hdrBhaLen',    `Length (${QP_UNITS.label('depth')})`);
+  set('hdrBhaPPF',    `PPF (${QP_UNITS.label('linwt')})`);
+  set('hdrBhaCumWt',  `Cum Wt (${QP_UNITS.label('mass')})`);
+  set('hdrBhaCumLen', `Cum Len (${QP_UNITS.label('depth')})`);
+}
+
+function _bhaConvertFields(fromSys, toSys) {
+  for (const tr of document.getElementById('bhaBody').rows) {
+    const wt = tr.querySelector('.bha-wt-n'), len = tr.querySelector('.bha-len-n');
+    if (wt  && wt.value  !== '') wt.value  = +QP_UNITS.convert('mass',  +wt.value,  fromSys, toSys).toFixed(1);
+    if (len && len.value !== '') len.value = +QP_UNITS.convert('depth', +len.value, fromSys, toSys).toFixed(2);
+  }
+}
+
+QP_UNITS.onChange((newSys, oldSys) => {
+  _bhaConvertFields(oldSys, newSys);
+  _bhaUpdateHeaders();
+  _bhaRecalc();   // PPF/Cum recompute in display units from the converted fields
+});
+
 function bhaLoadState(data) {
   const body = document.getElementById('bhaBody');
   body.innerHTML = '';
@@ -554,10 +591,11 @@ function bhaSave() {
   for (const tr of document.getElementById('bhaBody').rows) {
     rows.push({
       comp:     tr.querySelector('.bha-type')?.value       || '',
-      od:       tr.querySelector('.bha-od-n')?.value       || '',
-      id:       tr.querySelector('.bha-id-n')?.value       || '',
-      wt:       tr.querySelector('.bha-wt-n')?.value       || '',
-      len:      tr.querySelector('.bha-len-n')?.value      || '',
+      od:       tr.querySelector('.bha-od-n')?.value       || '',   // inches
+      id:       tr.querySelector('.bha-id-n')?.value       || '',   // inches
+      // store imperial (canonical) from the display fields
+      wt:       _bhaImp('mass',  tr.querySelector('.bha-wt-n')?.value),
+      len:      _bhaImp('depth', tr.querySelector('.bha-len-n')?.value),
       grade:    tr.querySelector('.bha-grade')?.value      || '',
       conn:     tr.querySelector('.bha-conn')?.value       || tr.querySelector('.bha-cat-conn')?.value || '',
       catOD:    tr.querySelector('.bha-cat-od')?.value     || '',
@@ -603,10 +641,11 @@ function bhaGet() {
     }
     rows.push({
       type:          comp,
-      od:            odVal,
-      id:            +(tr.querySelector('.bha-id-n')?.value  || 2.25),
-      weightLbs:     +(tr.querySelector('.bha-wt-n')?.value  || 0),
-      lengthFt:      +(tr.querySelector('.bha-len-n')?.value || 30),
+      od:            odVal,                                              // inches
+      id:            +(tr.querySelector('.bha-id-n')?.value  || 2.25),   // inches
+      // Weight/Length fields are display units → imperial (canonical)
+      weightLbs:     QP_UNITS.fromDisplay('mass',  +(tr.querySelector('.bha-wt-n')?.value  || 0)),
+      lengthFt:      QP_UNITS.fromDisplay('depth', +(tr.querySelector('.bha-len-n')?.value || 30)),
       nomWt_ppf:     _nomWt,
       mut_ftlb:      _mut,
       tensYield_lbs: _tensYield,
@@ -748,4 +787,5 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('mwdBody').rows.length) {
     mwdLoadState(null);  // seeds MWD + Drive System defaults
   }
+  _bhaUpdateHeaders();
 });

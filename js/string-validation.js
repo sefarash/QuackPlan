@@ -148,13 +148,14 @@ function _bhaValidate() {
     const tightID  = tightest.id;
     const tightRow = tightest.row;
 
+    const _mdD = `${Math.round(QP_UNITS.toDisplay('depth', midDepthMD)).toLocaleString()} ${QP_UNITS.label('depth')}`;
     if (compOD > tightID) {
-      const msg = `${comp.type} OD ${compOD}" > ${tightRow.size}" ${tightRow.def} ID ${tightID.toFixed(3)}" at ~${Math.round(midDepthMD).toLocaleString()}' MD — will not pass through`;
+      const msg = `${comp.type} OD ${compOD}" > ${tightRow.size}" ${tightRow.def} ID ${tightID.toFixed(3)}" at ~${_mdD} MD — will not pass through`;
       warnings.push(msg);
       if (trList[idx]) trList[idx].style.outline = '2px solid #e05555';
     } else if (compOD > tightID * 0.90) {
       const clearance = ((tightID - compOD) / tightID * 100).toFixed(1);
-      warnings.push(`${comp.type} OD ${compOD}": only ${clearance}% clearance inside ${tightRow.size}" ${tightRow.def} (ID ${tightID.toFixed(3)}") at ~${Math.round(midDepthMD).toLocaleString()}' MD`);
+      warnings.push(`${comp.type} OD ${compOD}": only ${clearance}% clearance inside ${tightRow.size}" ${tightRow.def} (ID ${tightID.toFixed(3)}") at ~${_mdD} MD`);
       if (trList[idx]) trList[idx].style.outline = '2px solid #e0a020';
     }
   });
