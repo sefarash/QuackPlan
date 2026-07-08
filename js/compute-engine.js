@@ -1,12 +1,17 @@
 // ===== COMPUTE ENGINE =====
 // Master orchestrator: reads all inputs → T&D + Hydraulics → stores results → triggers redraws
 
-function qpCompute() {
+// Generation counter so a slow async T&D result from a superseded run cannot
+// overwrite qpState.tdResult after a newer compute has already started.
+let _qpComputeGen = 0;
+
+async function qpCompute() {
   const survey = qpState.survey;
   if (!survey || survey.length < 2) {
     setStatus('No trajectory — add stations first'); return;
   }
 
+  const gen = ++_qpComputeGen;
   setStatus('Computing…');
 
   // Guard the whole pipeline: a throw in T&D, hydraulics or a draw function must
@@ -15,20 +20,23 @@ function qpCompute() {
     const fluid = fluidGet();
     const bha   = bhaGet();
 
-    // ── Torque & Drag ──────────────────────────────────────────────────────────
+    // ── Torque & Drag (off the main thread when a Worker is available) ──────────
     const torqWOB  = +(document.getElementById('torqWOB')?.value  || 15);
-    const ffLo     = +(document.getElementById('torqFFlo')?.value || 0.20);
     const ffMid    = +(document.getElementById('torqFFmid')?.value|| 0.30);
-    const ffHi     = +(document.getElementById('torqFFhi')?.value || 0.40);
 
-    const tdResult = tdCompute(survey, bha, null, fluid.mudWeight, {
+    // tdComputeAsync runs in the Web Worker when possible, else synchronously on
+    // the main thread (file:// origin / older browser). It never rejects.
+    const tdResult = await tdComputeAsync(survey, bha, null, fluid.mudWeight, {
       ffCased: ffMid, ffOpen: ffMid,
       wob_klbs: torqWOB,
       overpullMargin_lbf: 100000,
     });
+
+    // A newer qpCompute() started while we were awaiting — drop this stale result.
+    if (gen !== _qpComputeGen) return;
     qpState.tdResult = tdResult;
 
-    // ── Hydraulics ─────────────────────────────────────────────────────────────
+    // ── Hydraulics (main thread — reads the DOM, not yet pure) ──────────────────
     const hydResult = _computeHyd(survey, fluid, bha);
     qpState.hydResult = hydResult;
 

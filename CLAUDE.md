@@ -26,9 +26,10 @@ Single-page app. One HTML file, one CSS file, many global JS files loaded via `<
 
 ```
 User input (DOM tables/forms)
-  → qpCompute() in compute-engine.js          ← master orchestrator
-      → tdCompute() in td-engine.js            ← torque & drag (Johancsik soft-string)
-      → _computeHyd() in compute-engine.js     ← hydraulics
+  → qpCompute() in compute-engine.js          ← master orchestrator (async)
+      → tdComputeAsync() in td-worker-client.js ← T&D in a Web Worker (falls back to sync tdCompute)
+          → tdCompute() in td-engine.js        ← torque & drag (Johancsik soft-string), pure fn
+      → _computeHyd() in compute-engine.js     ← hydraulics (main thread — reads DOM)
       → results stored in qpState (state.js)
   → redrawOutputPanel(name) in state.js        ← dispatches to draw functions
       → drawTorque / drawBuckling / drawOverpull / drawBroomstick (td-charts.js)
@@ -36,6 +37,18 @@ User input (DOM tables/forms)
       → drawAFE (afe-chart.js)
       → drawTrajPlot (trajectory-plot.js)
 ```
+
+**T&D Web Worker.** `qpCompute()` is `async`: it offloads the main T&D run to a Worker
+(`js/td-worker.js`, which `importScripts('td-engine.js')`) via `tdComputeAsync()`
+(`js/td-worker-client.js`). `tdCompute()` is a pure, DOM-free function, so it runs
+standalone in the Worker. Workers **cannot be constructed from a `file://` origin**, so
+`tdComputeAsync()` transparently falls back to synchronous main-thread `tdCompute()` when
+the Worker is unavailable (file://, old browser, or runtime failure) — it never rejects.
+A generation counter (`_qpComputeGen`) drops a stale async result if a newer `qpCompute()`
+started while awaiting. The four T&D chart draw functions still call `tdCompute()`
+**synchronously** (for their inline FF-sensitivity curves) — only the primary
+`qpCompute()` path is offloaded. `td-engine.js` is loaded on the main thread (via
+`<script>`) too, for the fallback and the draw functions.
 
 ### Global state
 
