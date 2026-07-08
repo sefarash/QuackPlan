@@ -22,8 +22,10 @@ const _OC_IDS = [
   'hydMWmin', 'hydMWslider', 'hydMWmax', 'hydFlowMin', 'hydFlowSlider', 'hydFlowMax',
   // Casing design
   'cdSFBurst', 'cdSFCollapse',
-  // Kick tolerance (real-gas model)
-  'ktSafety', 'ktSurfTemp', 'ktGeoGrad', 'ktInflux', 'ktInfluxGrad',
+  // NOTE: the kick-tolerance model inputs (ktSafety/ktSurfTemp/ktGeoGrad/
+  // ktInflux/ktInfluxGrad) are intentionally NOT persisted here — they are
+  // display-unit (incl. temperature, an offset conversion) and output-controls
+  // stores raw values, which would corrupt them across a unit-system change.
 ];
 
 const _OC_ID_SET = new Set(_OC_IDS);

@@ -413,9 +413,9 @@
         <thead>
           <tr>
             <th class="drag-col"></th>
-            <th>TVD (ft)</th>
-            <th>Max Pore Pressure (ppg)</th>
-            <th>Min Frac Gradient (ppg)</th>
+            <th id="hdrPpfgTVD">TVD (ft)</th>
+            <th id="hdrPpfgPP">Max Pore Pressure (ppg)</th>
+            <th id="hdrPpfgFG">Min Frac Gradient (ppg)</th>
             <th class="row-act"></th>
           </tr>
         </thead>
@@ -677,19 +677,19 @@
     <!-- Kick Tolerance -->
     <div id="panel-kt" class="output-panel">
       <div class="chart-controls" style="flex-wrap:wrap;gap:8px 12px">
-        <span class="text-dim">MW: <strong id="ktMWdisplay">—</strong> ppg (from Fluid tab)</span>
+        <span class="text-dim">MW: <strong id="ktMWdisplay">—</strong> <span id="ktMWunit">ppg</span> (from Fluid tab)</span>
         <label style="font-size:12px" title="Choke-operator error + choke/kill-line & annular losses above the weak point (WECS: ≥100 psi)">
-          Safety margin <input type="number" id="ktSafety" value="100" step="10" min="0" style="width:56px" onchange="drawKickTolerance()"> psi</label>
-        <label style="font-size:12px">Surface T <input type="number" id="ktSurfTemp" value="70" step="5" style="width:48px" onchange="drawKickTolerance()"> °F</label>
+          Safety margin <input type="number" id="ktSafety" value="100" step="10" min="0" style="width:56px" onchange="drawKickTolerance()"> <span id="uKtSafety">psi</span></label>
+        <label style="font-size:12px">Surface T <input type="number" id="ktSurfTemp" value="70" step="5" style="width:48px" onchange="drawKickTolerance()"> <span id="uKtTemp">°F</span></label>
         <label style="font-size:12px" title="Geothermal gradient — sets kick-zone &amp; weak-point temperature for real-gas density">
-          Geo grad <input type="number" id="ktGeoGrad" value="1.5" step="0.1" style="width:48px" onchange="drawKickTolerance()"> °F/100ft</label>
+          Geo grad <input type="number" id="ktGeoGrad" value="1.5" step="0.1" style="width:48px" onchange="drawKickTolerance()"> <span id="uKtGeo">°F/100ft</span></label>
         <label style="font-size:12px" title="Methane real-gas PVT, or a fixed influx gradient (WECS default 0.1 psi/ft) for oil/known fluids">
           Influx
           <select id="ktInflux" style="font-size:12px" onchange="drawKickTolerance()">
             <option value="methane">Methane (real gas)</option>
             <option value="fixed">Fixed gradient</option>
           </select>
-          <input type="number" id="ktInfluxGrad" value="0.1" step="0.01" style="width:52px" title="psi/ft (used when Influx = Fixed gradient)" onchange="drawKickTolerance()"> psi/ft</label>
+          <input type="number" id="ktInfluxGrad" value="0.1" step="0.01" style="width:52px" title="influx gradient (used when Influx = Fixed gradient)" onchange="drawKickTolerance()"> <span id="uKtInflux">psi/ft</span></label>
         <button class="hdr-btn" onclick="drawKickTolerance()">Compute</button>
         <button class="hdr-btn" onclick="exportKT()">⬇ KT CSV</button>
         <button class="hdr-btn" onclick="exportChartPNG('ktCanvas','ppfg_kt.png')">⬇ PNG</button>

@@ -36,6 +36,8 @@ const QP_UNITS = (() => {
     visc:   { factor: 1,          imp: 'cP',      met: 'mPa·s' }, // 1 cP ≡ 1 mPa·s
     yieldstress: { factor: 0.4788026, imp: 'lb/100ft²', met: 'Pa' },
     mass:   { factor: 0.4535924,  imp: 'lbs',     met: 'kg'    },
+    volume: { factor: 0.1589873,  imp: 'bbl',     met: 'm³'    },
+    pgrad:  { factor: 22.62060,   imp: 'psi/ft',  met: 'kPa/m' }, // pressure gradient
   };
 
   function _factor(qty, sys) {
