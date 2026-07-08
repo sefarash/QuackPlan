@@ -11,17 +11,42 @@ function dbOpen() {
     if (_db) { resolve(_db); return; }
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
+    // Stepped schema migrations. e.oldVersion is 0 for a brand-new database and
+    // the previously-installed version for an upgrade. Each block runs once, in
+    // order, for any DB coming from below that version — so a v0 user runs them
+    // all while a v1 user runs only v2+. To change the schema: add a new
+    // `if (oldV < N)` block and bump DB_VERSION to N; NEVER edit a shipped block
+    // (existing users have already run it). Use e.target.transaction to read or
+    // backfill existing records during an upgrade.
     req.onupgradeneeded = e => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('nodes')) {
+      const db   = e.target.result;
+      const oldV = e.oldVersion;
+
+      // v1 — initial schema: hierarchy 'nodes' store keyed by id, indexed by
+      // parentId and type.
+      if (oldV < 1) {
         const store = db.createObjectStore('nodes', { keyPath: 'id', autoIncrement: true });
         store.createIndex('by_parent', 'parentId', { unique: false });
         store.createIndex('by_type',   'type',     { unique: false });
       }
+
+      // Future migrations go here, e.g.:
+      // if (oldV < 2) {
+      //   const store = e.target.transaction.objectStore('nodes');
+      //   store.createIndex('by_name', 'name', { unique: false });
+      // }
     };
 
-    req.onsuccess = e => { _db = e.target.result; resolve(_db); };
+    req.onsuccess = e => {
+      _db = e.target.result;
+      // If another tab opens a newer DB version, close this connection so its
+      // upgrade isn't blocked (and drop the cache so the next call reopens).
+      _db.onversionchange = () => { _db.close(); _db = null; };
+      resolve(_db);
+    };
     req.onerror   = e => reject(e.target.error);
+    req.onblocked = () => reject(new Error(
+      'QuackPlan database upgrade is blocked by another open tab — close it and reload.'));
   });
 }
 
