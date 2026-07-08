@@ -112,7 +112,7 @@ Torque and Overpull draw functions call `tdCompute()` directly for each FF sensi
 - `QP_UNITS.label(qty)` — the unit string for the header/axis
 - `QP_UNITS.onChange((newSys, oldSys) => …)` — re-render hook; convert visible input fields with `QP_UNITS.convert(qty, v, oldSys, newSys)`
 
-Quantities: `depth, diam, mw, press, force, torque, flow, linwt, dls, angle, visc, yieldstress`. In imperial every factor is 1, so converted code is byte-for-byte identical to pre-units behaviour. **Converted so far: Trajectory Option 1, the trajectory plot, and the Fluid panel** — remaining panels (schematic, BHA, hydraulics, T&D, casing, AFE) still render imperial labels until converted following the same pattern.
+Quantities: `depth, diam, mw, press, force, torque, flow, linwt, dls, angle, visc, yieldstress`. In imperial every factor is 1, so converted code is byte-for-byte identical to pre-units behaviour. **Converted so far: Trajectory Option 1, the trajectory plot, the Fluid panel, and the Hydraulics output charts** (SPP/ECD/pressure convert; flow stays gpm to match the still-imperial MW/flow sliders — those are range sliders whose min/max/persistence need a dedicated pass). Remaining: schematic, BHA, T&D charts, casing, AFE, and the hydraulics MW/flow sliders.
 
 ### Persistence
 

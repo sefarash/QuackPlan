@@ -10,13 +10,19 @@ function drawHydSweep(h) {
 
   if (!h?.sweep?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  const xMax   = h.sweepXmax || Math.max(...h.sweep.map(s => s.q), 1);
-  const maxSPP = Math.max(...h.sweep.map(s => s.spp), h.sppLimit || 3500) * 1.1;
+  // h stores imperial (canonical). SPP/pressures and ECD convert to display; flow
+  // stays in gpm to match the (imperial) flow slider — same quantity, adjacent.
+  const toP = v => QP_UNITS.toDisplay('press', v);
+  const toM = v => QP_UNITS.toDisplay('mw',    v);
+  const uP = QP_UNITS.label('press'), uM = QP_UNITS.label('mw');
 
-  const g = _chartGrid(ctx, W, H, xMax, maxSPP, 'Flow Rate (gpm)', 'SPP (psi)');
+  const xMax   = h.sweepXmax || Math.max(...h.sweep.map(s => s.q), 1);   // gpm
+  const maxSPP = toP(Math.max(...h.sweep.map(s => s.spp), h.sppLimit || 3500)) * 1.1;
+
+  const g = _chartGrid(ctx, W, H, xMax, maxSPP, 'Flow Rate (gpm)', `SPP (${uP})`);
 
   // SPP limit line
-  const limitY = g.t + (1 - h.sppLimit / maxSPP) * g.ph;
+  const limitY = g.t + (1 - toP(h.sppLimit) / maxSPP) * g.ph;
   ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 1;
   ctx.setLineDash([6, 3]);
   ctx.beginPath(); ctx.moveTo(g.l, limitY); ctx.lineTo(g.l + g.pw, limitY); ctx.stroke();
@@ -25,9 +31,9 @@ function drawHydSweep(h) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
   ctx.fillText('SPP limit', g.l + 4, limitY - 2);
 
-  const sweepPts = h.sweep.map(s => ({ x: s.q, y: s.spp }));
+  const sweepPts = h.sweep.map(s => ({ x: s.q, y: toP(s.spp) }));
   CI.storeLive(CID, [{ pts: sweepPts, color: '#1a5f7a', label: 'SPP' }]);
-  CI.register(CID, { pad: g, xMax, yMax: maxSPP, xLabel: 'Flow Rate (gpm)', yLabel: 'SPP (psi)', depthDown: false });
+  CI.register(CID, { pad: g, xMax, yMax: maxSPP, xLabel: 'Flow Rate (gpm)', yLabel: `SPP (${uP})`, depthDown: false });
   CI.drawFrozen(ctx, CID);
 
   // SPP curve
@@ -35,17 +41,17 @@ function drawHydSweep(h) {
 
   // Operating point marker
   const opX = g.l + (h.flowRate / xMax) * g.pw;
-  const opY = g.t + (1 - h.pumpPressure / maxSPP) * g.ph;
+  const opY = g.t + (1 - toP(h.pumpPressure) / maxSPP) * g.ph;
   ctx.fillStyle = '#f0a500';
   ctx.beginPath(); ctx.arc(opX, opY, 5, 0, Math.PI * 2); ctx.fill();
   const C = _qpColors();
   ctx.fillStyle = C.text; ctx.font = '10px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  ctx.fillText(`${h.flowRate} gpm / ${h.pumpPressure} psi`, opX + 8, opY - 2);
+  ctx.fillText(`${h.flowRate} gpm / ${Math.round(toP(h.pumpPressure))} ${uP}`, opX + 8, opY - 2);
 
   ctx.fillStyle = C.text; ctx.font = '11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(`ECD at bit: ${h.ecdAtBit} ppg   HSI: ${h.hsi?.toFixed(2) ?? '—'}`, g.l, g.t + 4);
+  ctx.fillText(`ECD at bit: ${toM(h.ecdAtBit).toFixed(uM === 'ppg' ? 2 : 0)} ${uM}   HSI: ${h.hsi?.toFixed(2) ?? '—'}`, g.l, g.t + 4);
 
   CI.drawAnnotations(ctx, CID);
 }
@@ -57,6 +63,9 @@ function drawHydPie(h) {
   const C = _qpColors();
 
   if (!h?.pumpPressure) { _noData(ctx, W, H, '—'); return; }
+
+  const toP = v => QP_UNITS.toDisplay('press', v);   // psi (canonical) → display
+  const uP  = QP_UNITS.label('press');
 
   const slices = [
     { label: 'Annular', val: h.totalAnnLoss, color: '#2a7fa8' },
@@ -87,7 +96,7 @@ function drawHydPie(h) {
       const ly   = cy + radius * 0.68 * Math.sin(mid);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(Math.round(sl.val) + ' psi', lx, ly);
+      ctx.fillText(Math.round(toP(sl.val)) + ' ' + uP, lx, ly);
     }
     angle += sweep;
   });
@@ -97,7 +106,7 @@ function drawHydPie(h) {
   ctx.beginPath(); ctx.arc(cx, cy, radius * 0.42, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = C.text; ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(h.pumpPressure + ' psi', cx, cy - 6);
+  ctx.fillText(Math.round(toP(h.pumpPressure)) + ' ' + uP, cx, cy - 6);
   ctx.font = '9px sans-serif'; ctx.fillStyle = C.dim;
   ctx.fillText('Total SPP', cx, cy + 8);
 
