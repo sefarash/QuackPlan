@@ -183,11 +183,27 @@ function exportKT() {
 
   if (!casingRows.length) { alert('Add casing strings in Well Schematic.'); return; }
 
+  // Real-gas (WECS) inputs + BHA geometry — mirror drawKickTolerance
+  const safetyPsi = +(document.getElementById('ktSafety')?.value   || 100);
+  const surfT     = +(document.getElementById('ktSurfTemp')?.value || 70);
+  const geoGrad   = +(document.getElementById('ktGeoGrad')?.value  || 1.5);
+  const influxSel = document.getElementById('ktInflux')?.value || 'methane';
+  const influx    = influxSel === 'methane' ? 'methane' : +(document.getElementById('ktInfluxGrad')?.value || 0.1);
+  const tempAtR   = tvd => surfT + geoGrad / 100 * tvd + 459.67;
+  const comps     = bha.components || [];
+  const dcComps   = comps.filter(c => c.type === 'Drill Collar');
+  const dcOD      = dcComps.length ? Math.max(...dcComps.map(c => +c.od || 0)) : (dpOD + 1.5);
+  const dcLen     = dcComps.reduce((s, c) => s + (+c.lengthFt || 0), 0);
+  const tempKick_R = tempAtR(maxTVD);
+  const canGas    = typeof _ktGasTolerance === 'function';
+
   const lines = [
     '# QuackPlan Kick Tolerance Export',
+    `# Real-gas model: safety margin ${safetyPsi} psi, surface T ${surfT} F, geo grad ${geoGrad} F/100ft, influx ${influxSel}`,
     _row('Section', 'Shoe MD (ft)', 'Shoe TVD (ft)',
          'FG at Shoe (ppg)', 'PP at TD (ppg)',
-         'MAASP (psi)', 'Hole Diam (in)', 'Ann Capacity (bbl/ft)', 'KT (bbl)', 'Status'),
+         'MAASP (psi)', 'Hole Diam (in)', 'Ann Capacity (bbl/ft)',
+         'KT static (bbl)', 'KT real-gas (bbl)', 'Scope', 'Status'),
     ...casingRows.map(row => {
       const shoeMD  = +(row.bot);
       const shoeTVD = _tvdAt(survey, shoeMD);
@@ -198,8 +214,18 @@ function exportKT() {
       const annCap  = Math.max(0, 0.000971 * (dh * dh - dpOD * dpOD));
       const dPPg    = pp - mw;
       const kt      = dPPg > 0 && annCap > 0 ? (maasp / (dPPg * 0.052)) * annCap : null;
-      const status  = kt === null ? 'N/A'
-        : kt >= 20 ? 'OK' : kt >= 10 ? 'Low' : 'Critical';
+
+      const capBHA = Math.max(0, (dh * dh - dcOD * dcOD) / 1029.4);
+      const capDP  = Math.max(0, (dh * dh - dpOD * dpOD) / 1029.4);
+      const gas = (canGas && shoeTVD > 0 && maxTVD > shoeTVD)
+        ? _ktGasTolerance({ mw, pp, fg, tvdKick: maxTVD, tvdWeak: shoeTVD,
+            tempKick_R, tempWeak_R: tempAtR(shoeTVD), safetyPsi, capBHA, capDP, dcLen, influx })
+        : null;
+      const gasKt = gas && gas.kt != null ? gas.kt : null;
+      const govKt = gasKt != null ? gasKt : kt;
+      const status = govKt === null ? 'N/A'
+        : govKt >= 20 ? 'OK' : govKt >= 10 ? 'Low' : 'Critical';
+
       return _row(
         `${row.size}" ${row.def}`,
         Math.round(shoeMD), Math.round(shoeTVD),
@@ -207,6 +233,8 @@ function exportKT() {
         Math.round(maasp), dh,
         annCap.toFixed(4),
         kt !== null ? Math.round(kt) : 'N/A',
+        gasKt != null ? (gas.infinite ? 'inf (>WP)' : gasKt.toFixed(1)) : 'N/A',
+        gas ? (gas.swabbed ? 'swabbed' : 'true kick (use WellPlan/DrillBench)') : '',
         status,
       );
     }),
