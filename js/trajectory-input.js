@@ -123,16 +123,42 @@ function _traj1ConvertFields(fromSys, toSys) {
   }
 }
 
-// On unit change: relabel, convert the visible MD fields, recompute the ACTIVE
-// trajectory option (so qpState.survey isn't clobbered by an inactive option),
-// and redraw the active output panel (e.g. the trajectory plot).
+// Schematic MD Top/Bottom column headers reflect the current depth unit
+function _schUpdateHeaders() {
+  const d = QP_UNITS.label('depth');
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  set('hdrSchTop', `MD Top (${d})`);
+  set('hdrSchBot', `MD Bottom (${d})`);
+}
+
+// Convert the schematic MD Top/Bottom input fields between unit systems in place
+function _schConvertFields(fromSys, toSys) {
+  const body = document.getElementById('schematicBody');
+  if (!body) return;
+  for (const tr of body.rows) {
+    const nums = tr.querySelectorAll('input[type=number]');   // [0]=OD (inches), [1]=top, [2]=bot
+    [1, 2].forEach(i => {
+      const inp = nums[i];
+      if (inp && inp.value !== '') inp.value = +QP_UNITS.convert('depth', +inp.value, fromSys, toSys).toFixed(2);
+    });
+  }
+}
+
+// On unit change: relabel, convert the visible trajectory + schematic MD fields,
+// recompute the ACTIVE trajectory option (so qpState.survey isn't clobbered by an
+// inactive one), redraw the schematic, then the active output panel. Schematic
+// fields are converted BEFORE any redraw that reads _readSchematicRows (e.g. the
+// trajectory plot's shoe markers).
 QP_UNITS.onChange((newSys, oldSys) => {
   _trajUpdateHeaders();
   _traj1ConvertFields(oldSys, newSys);
+  _schUpdateHeaders();
+  _schConvertFields(oldSys, newSys);
   const opt = qpState.activeTrajOpt;
   if      (opt === 'opt2' && typeof traj2Recalc === 'function') traj2Recalc();
   else if (opt === 'tort' && typeof tortRecalc  === 'function') tortRecalc();
   else                                                          traj1Recalc();
+  if (typeof drawSchematic === 'function' && qpState.survey?.length > 1) drawSchematic(qpState.survey);
   if (qpState.activeOutputTab && typeof redrawOutputPanel === 'function') {
     redrawOutputPanel(qpState.activeOutputTab);
   }
@@ -214,6 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     traj1AddRow({ md: +QP_UNITS.toDisplay('depth', 5000).toFixed(3), inc: 0, azi: 0 });
   }
   _trajUpdateHeaders();
+  _schUpdateHeaders();
 });
 
 // ── Option 2 ─────────────────────────────────────────────────────────────────
@@ -528,8 +555,8 @@ function schematicAddRow(preset) {
       <input type="number" class="sch-size" step="0.125" value="${preset?.size ?? 13.375}"
         style="width:58px" onchange="schematicSave()">
     </td>
-    <td class="editable"><input type="number" step="1" value="${preset?.top ?? 0}" onchange="schematicSave()"></td>
-    <td class="editable"><input type="number" step="1" value="${preset?.bot ?? 5000}" onchange="schematicSave()"></td>
+    <td class="editable"><input type="number" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.top ?? 0).toFixed(2)}" onchange="schematicSave()"></td>
+    <td class="editable"><input type="number" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.bot ?? 5000).toFixed(2)}" onchange="schematicSave()"></td>
     <td class="row-act"><button onclick="this.closest('tr').remove();schematicSave()">✕</button></td>`;
   body.appendChild(tr);
   schematicSave();
@@ -714,9 +741,10 @@ function schematicSave() {
     const inputs  = tr.querySelectorAll('input[type=number]');
     rows.push({
       def:         selDef?.value,
-      size:        sizeIn?.value ?? inputs[0]?.value,
-      top:         inputs[1]?.value,
-      bot:         inputs[2]?.value,
+      size:        sizeIn?.value ?? inputs[0]?.value,   // OD stays inches
+      // MD top/bot fields are display units → store imperial (canonical)
+      top:         inputs[1]?.value !== '' ? +QP_UNITS.fromDisplay('depth', +inputs[1].value).toFixed(4) : inputs[1]?.value,
+      bot:         inputs[2]?.value !== '' ? +QP_UNITS.fromDisplay('depth', +inputs[2].value).toFixed(4) : inputs[2]?.value,
       od:          odSel?.value  || '',
       odCustom:    odTxt?.value  || '',
       wt:          wtSel?.value  || '',

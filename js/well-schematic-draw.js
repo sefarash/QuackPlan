@@ -111,6 +111,11 @@ function drawSchematic(survey) {
   const schRows  = _readSchematicRows();
   const maxDepth = Math.max(lastSurvey.md, ...schRows.map(r => +(r.bot || 0)), 1);
 
+  // Positions stay in imperial (self-scaling); depth LABELS convert to display
+  const _toD    = v => QP_UNITS.toDisplay('depth', v);
+  const _uD     = QP_UNITS.label('depth');
+  const _uTick  = QP_UNITS.isMetric() ? 'm' : "'";
+
   // ── Layout ─────────────────────────────────────────────────────────────────
   const PAD_T = 90, PAD_B = 24, PAD_L = 46, PAD_R = 8;
   const plotH  = H - PAD_T - PAD_B;
@@ -155,7 +160,7 @@ function drawSchematic(survey) {
     ctx.beginPath();
     ctx.moveTo(PAD_L - 3, y); ctx.lineTo(PAD_L, y);
     ctx.stroke();
-    if (i > 0) ctx.fillText(Math.round(tvd) + "'", PAD_L - 5, y);
+    if (i > 0) ctx.fillText(Math.round(_toD(tvd)) + _uTick, PAD_L - 5, y);
   }
 
   // ── Casing strings ─────────────────────────────────────────────────────────
@@ -243,8 +248,8 @@ function drawSchematic(survey) {
       : `${size}" ${row.def}`;
     labelData.push({
       lx, yShoe: yBot, color,
-      line1, line2: `TVD: ${tvdVal.toLocaleString()}ft`,
-      line3: `MD: ${Math.round(botMD).toLocaleString()}ft`,
+      line1, line2: `TVD: ${Math.round(_toD(tvdVal)).toLocaleString()}${_uD}`,
+      line3: `MD: ${Math.round(_toD(botMD)).toLocaleString()}${_uD}`,
     });
   });
 
@@ -320,12 +325,15 @@ function drawSchematic(survey) {
   ctx.font         = '9px sans-serif';
   ctx.textAlign    = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(`MD: ${Math.round(lastSurvey.md).toLocaleString()} ft`, 4, 4);
-  ctx.fillText(`TVD: ${Math.round(lastSurvey.tvd).toLocaleString()} ft`, 4, 15);
+  ctx.fillText(`MD: ${Math.round(_toD(lastSurvey.md)).toLocaleString()} ${_uD}`, 4, 4);
+  ctx.fillText(`TVD: ${Math.round(_toD(lastSurvey.tvd)).toLocaleString()} ${_uD}`, 4, 15);
 }
 
 function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   const datums = qpState.wellDatums;
+
+  // Datum distances (rkb/gl/water depth) are imperial ft → display for labels
+  const _bd = ft => Math.round(QP_UNITS.toDisplay('depth', ft)) + (QP_UNITS.isMetric() ? 'm' : "'");
 
   const X0   = 2;
   const X1   = cx - 4;
@@ -402,7 +410,7 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
       ctx.fillStyle = '#0055aa'; ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       ctx.fillText('MSL', LBL, yMSL - 1);
-      _drawBracket(ctx, BRKT, yRKB, yMSL, `${rkb}'`, '#1a5f7a');
+      _drawBracket(ctx, BRKT, yRKB, yMSL, _bd(rkb), '#1a5f7a');
     }
     if (ySB !== null && ySB < yBot && seaBed > 0) {
       ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
@@ -411,7 +419,7 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
       ctx.fillStyle = '#b8976a'; ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       ctx.fillText('SB', LBL, ySB - 1);
-      if (yMSL !== null && yMSL < yBot) _drawBracket(ctx, BRKT, yMSL, ySB, `${seaBed}'`, '#0055aa');
+      if (yMSL !== null && yMSL < yBot) _drawBracket(ctx, BRKT, yMSL, ySB, _bd(seaBed), '#0055aa');
     }
   } else {
     // Onshore: RKB → GL → MSL
@@ -427,7 +435,7 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
       ctx.fillStyle = '#2a7a2a'; ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       ctx.fillText('GL', LBL, yGL - 1);
-      _drawBracket(ctx, BRKT, yRKB, yGL, `${rkb}'`, '#1a5f7a');
+      _drawBracket(ctx, BRKT, yRKB, yGL, _bd(rkb), '#1a5f7a');
     }
     if (yMSL < yBot && gl > 0) {
       ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
@@ -436,7 +444,7 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
       ctx.fillStyle = '#0055aa'; ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       ctx.fillText('MSL', LBL, yMSL - 1);
-      if (yGL < yBot) _drawBracket(ctx, BRKT, yGL, yMSL, `${gl}'`, '#2a7a2a');
+      if (yGL < yBot) _drawBracket(ctx, BRKT, yGL, yMSL, _bd(gl), '#2a7a2a');
     }
   }
 }
@@ -518,9 +526,10 @@ function _readSchematicRows() {
     const isGrCustom = grSel?.value === 'custom';
     rows.push({
       def:  sel?.value        || 'Open Hole',
-      size: inputs[0]?.value  || 9.625,
-      top:  inputs[1]?.value  || 0,
-      bot:  inputs[2]?.value  || 5000,
+      size: inputs[0]?.value  || 9.625,   // OD stays in inches (API sizes)
+      // MD top/bot fields are display units → imperial (canonical) for all consumers
+      top:  QP_UNITS.fromDisplay('depth', +(inputs[1]?.value || 0)),
+      bot:  QP_UNITS.fromDisplay('depth', +(inputs[2]?.value || 5000)),
       ...(spec ? {
         nomWt_ppf:  spec.nomWt_ppf,
         grade:      spec.grade,
