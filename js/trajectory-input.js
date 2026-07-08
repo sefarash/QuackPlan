@@ -35,6 +35,13 @@ function traj1Recalc() {
   const stations = _traj1ReadStations();
   if (stations.length < 1) return;
 
+  // Always persist raw edits so nothing is lost, even if the MD sequence is bad
+  _traj1Save();
+
+  // MD must strictly increase down the wellbore. A non-monotonic sequence would
+  // otherwise silently produce garbage TVD/DLS and NaN/Infinity downstream.
+  if (!_trajValidate(stations)) return;   // warning shown; keep the last good survey
+
   const survey = computeSurvey(stations);
   qpState.baseSurvey = survey;
   qpState.survey = survey;
@@ -48,8 +55,36 @@ function traj1Recalc() {
     _setCell(row, 'dls',   dls100);
   });
 
-  _traj1Save();
   if (typeof drawSchematic === 'function') drawSchematic(survey);
+}
+
+// Validate that survey MD strictly increases. Highlights offending rows and
+// renders a red warning; returns true when the sequence is valid.
+function _trajValidate(stations) {
+  const body    = document.getElementById('traj1Body');
+  const warnDiv = document.getElementById('trajWarnings');
+  if (!body) return true;
+  for (const tr of body.rows) tr.style.outline = '';
+
+  const warnings = [];
+  for (let i = 1; i < stations.length; i++) {
+    const md = stations[i].md, prev = stations[i - 1].md;
+    if (!(md > prev)) {
+      const how = md < prev ? 'decreases from' : 'repeats';
+      warnings.push(md < prev
+        ? `Row ${i + 1}: MD ${md.toLocaleString()} ft ${how} ${prev.toLocaleString()} ft — MD must strictly increase down the wellbore`
+        : `Row ${i + 1}: MD ${md.toLocaleString()} ft ${how} the previous station — each MD must be greater than the one above`);
+      if (body.rows[i]) body.rows[i].style.outline = '2px solid #e05555';
+    }
+  }
+
+  if (warnDiv) {
+    warnDiv.innerHTML = warnings.map(msg =>
+      `<div style="display:flex;align-items:flex-start;gap:5px;padding:3px 0;font-size:10px;color:#e05555">
+         <span style="flex-shrink:0;font-weight:bold">✕</span><span>${msg}</span>
+       </div>`).join('');
+  }
+  return warnings.length === 0;
 }
 
 function _traj1ReadStations() {
