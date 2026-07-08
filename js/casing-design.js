@@ -2,9 +2,20 @@
 
 const GAS_GRAD = 0.1; // psi/ft gas gradient
 
-// In-memory ratings store — survives redraws within a session and is
-// populated on scenario load / JSON import so ratings are never lost.
+// In-memory ratings store (imperial/canonical) — survives redraws within a
+// session and is populated on scenario load / JSON import so ratings are never
+// lost.
 let _cdRatingsLoaded = {};
+
+// True only while a unit toggle is redrawing: the rating INPUT fields still hold
+// the previous system's values, so _readCDRatings must use the canonical store
+// instead of fromDisplay-ing stale DOM values.
+let _cdUnitsToggling = false;
+
+QP_UNITS.onChange(() => {
+  _cdUnitsToggling = true;
+  try { drawCasingDesign(); } finally { _cdUnitsToggling = false; }
+});
 
 function cdRatingsLoadState(data) {
   _cdRatingsLoaded = data || {};
@@ -47,17 +58,21 @@ function _selectedCDKey() {
 }
 
 function _readCDRatings() {
+  // During a unit toggle the DOM fields are in the old system — use canonical
+  if (_cdUnitsToggling) return { ..._cdRatingsLoaded };
   const tbody = document.getElementById('cdRatingsBody');
   if (!tbody) return { ..._cdRatingsLoaded };
   const out = {};
   for (const tr of tbody.rows) {
     const key    = tr.dataset.key;
     const inputs = tr.querySelectorAll('input[type=number]');
+    // Fields are display units → imperial (canonical): burst/collapse are
+    // pressures (psi), tension/compression are forces (klbf).
     if (key) out[key] = {
-      burst:       +(inputs[0]?.value || 0),
-      collapse:    +(inputs[1]?.value || 0),
-      tension:     +(inputs[2]?.value || 0),
-      compression: +(inputs[3]?.value || 0),
+      burst:       QP_UNITS.fromDisplay('press', +(inputs[0]?.value || 0)),
+      collapse:    QP_UNITS.fromDisplay('press', +(inputs[1]?.value || 0)),
+      tension:     QP_UNITS.fromDisplay('force', +(inputs[2]?.value || 0)),
+      compression: QP_UNITS.fromDisplay('force', +(inputs[3]?.value || 0)),
     };
   }
   // Merge any keys not yet in DOM (e.g. freshly loaded section not yet rendered)
@@ -78,14 +93,23 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
     return;
   }
 
+    // Ratings stored imperial (psi / klbf) → display for the fields & limits
+  const dP = v => +QP_UNITS.toDisplay('press', v).toFixed(0);
+  const dF = v => +QP_UNITS.toDisplay('force', v).toFixed(1);
+  const uP = QP_UNITS.label('press'), uF = QP_UNITS.label('force'), uD = QP_UNITS.label('depth');
+
   const rows = casingRows.map((row, idx) => {
     const key      = _cdKey(row);
     const r        = ratings[key] || {};
-    const bLim     = r.burst       ? Math.round(r.burst       / sfBurst)       : null;
-    const cLim     = r.collapse    ? Math.round(r.collapse    / sfCollapse)    : null;
-    const tLim     = r.tension     ? +(r.tension     / sfTension).toFixed(1)     : null;
-    const compLim  = r.compression ? +(r.compression / sfCompression).toFixed(1) : null;
-    const shoeTVD  = Math.round(_tvdAt(survey, +(row.bot)));
+    const bVal     = r.burst       ? dP(r.burst)       : '';
+    const cVal     = r.collapse    ? dP(r.collapse)    : '';
+    const tVal     = r.tension     ? dF(r.tension)     : '';
+    const compVal  = r.compression ? dF(r.compression) : '';
+    const bLim     = r.burst       ? dP(r.burst       / sfBurst)       : null;
+    const cLim     = r.collapse    ? dP(r.collapse    / sfCollapse)    : null;
+    const tLim     = r.tension     ? dF(r.tension     / sfTension)     : null;
+    const compLim  = r.compression ? dF(r.compression / sfCompression) : null;
+    const shoeTVD  = Math.round(QP_UNITS.toDisplay('depth', _tvdAt(survey, +(row.bot))));
     const checked  = (selectedKey ? key === selectedKey : idx === 0) ? 'checked' : '';
     const specLine = [row.grade, row.nomWt_ppf ? row.nomWt_ppf + ' ppf' : null]
                        .filter(Boolean).join(' · ');
@@ -97,25 +121,25 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
       <td style="font-size:11px;padding:4px 4px">
         <strong>${row.size}" ${row.def}</strong><br>
         <span style="color:var(--text-dim);font-size:10px">${specLine}</span><br>
-        <span style="color:var(--text-dim);font-size:10px">${shoeTVD.toLocaleString()} ft TVD</span>
+        <span style="color:var(--text-dim);font-size:10px">${shoeTVD.toLocaleString()} ${uD} TVD</span>
       </td>
       <td style="padding:2px 4px">
-        <input type="number" step="100" value="${r.burst || ''}" placeholder="psi"
+        <input type="number" step="100" value="${bVal}" placeholder="${uP}"
           style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
         ${bLim !== null ? `<div style="font-size:10px;color:#2aad6a">/ ${sfBurst} = ${bLim.toLocaleString()}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
-        <input type="number" step="100" value="${r.collapse || ''}" placeholder="psi"
+        <input type="number" step="100" value="${cVal}" placeholder="${uP}"
           style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
         ${cLim !== null ? `<div style="font-size:10px;color:#b07ad0">/ ${sfCollapse} = ${cLim.toLocaleString()}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
-        <input type="number" step="10" value="${r.tension || ''}" placeholder="klbf"
+        <input type="number" step="10" value="${tVal}" placeholder="${uF}"
           style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
         ${tLim !== null ? `<div style="font-size:10px;color:#3aafd8">/ ${sfTension} = ${tLim}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
-        <input type="number" step="10" value="${r.compression || ''}" placeholder="klbf"
+        <input type="number" step="10" value="${compVal}" placeholder="${uF}"
           style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
         ${compLim !== null ? `<div style="font-size:10px;color:#e0a020">/ ${sfCompression} = ${compLim}</div>` : ''}
       </td>
@@ -128,10 +152,10 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
       <thead><tr>
         <th style="width:28px"></th>
         <th>Section</th>
-        <th>Burst (psi)</th>
-        <th>Collapse (psi)</th>
-        <th>Tension (klbf)</th>
-        <th>Compr. (klbf)</th>
+        <th>Burst (${uP})</th>
+        <th>Collapse (${uP})</th>
+        <th>Tension (${uF})</th>
+        <th>Compr. (${uF})</th>
       </tr></thead>
       <tbody id="cdRatingsBody">${rows}</tbody>
     </table>

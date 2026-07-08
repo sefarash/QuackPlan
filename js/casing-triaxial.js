@@ -61,9 +61,10 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
     ctx.beginPath(); ctx.moveTo(l, gy);  ctx.lineTo(l + pw, gy); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText((-xR + 2 * xR * i / 5).toFixed(0), gx, t + ph + 4);
+    // Axes are axial force (klbf) and differential pressure (psi) → display labels
+    ctx.fillText(Math.round(QP_UNITS.toDisplay('force', -xR + 2 * xR * i / 5)).toLocaleString(), gx, t + ph + 4);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText((yR - 2 * yR * i / 5).toFixed(0), l - 5, gy);
+    ctx.fillText(Math.round(QP_UNITS.toDisplay('press', yR - 2 * yR * i / 5)).toLocaleString(), l - 5, gy);
   }
 
   const x0 = l + pw / 2, y0 = t + ph / 2;
@@ -78,14 +79,14 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   // X axis title: direction embedded so no separate hints needed near data area
   ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText('Compression ←  Axial Load (klbf)  → Tension', l + pw / 2, t - 58);
+  ctx.fillText(`Compression ←  Axial Load (${QP_UNITS.label('force')})  → Tension`, l + pw / 2, t - 58);
 
   // Y axis title: direction embedded
   ctx.save();
   ctx.translate(12, t + ph / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   ctx.fillStyle = C.text;
-  ctx.fillText('↓ Collapse   Diff. Pressure (psi)   Burst ↑', 0, 0);
+  ctx.fillText(`↓ Collapse   Diff. Pressure (${QP_UNITS.label('press')})   Burst ↑`, 0, 0);
   ctx.restore();
 
   return { l, t, pw, ph, xR, yR };
@@ -260,9 +261,11 @@ function drawCasingTriaxial() {
   ]);
   CI.register(CID, {
     pad: { l: g.l, t: g.t, pw: g.pw, ph: g.ph },
-    xMax: 2 * xR, yMax: 2 * yR,
-    xLabel: 'Axial Load (klbf)', yLabel: 'Diff. Pressure (psi)',
-    depthDown: false, xOffset: -xR, yOffset: -yR,
+    // tooltip in display units (linear scale preserves the pixel→value mapping)
+    xMax: QP_UNITS.toDisplay('force', 2 * xR), yMax: QP_UNITS.toDisplay('press', 2 * yR),
+    xLabel: `Axial Load (${QP_UNITS.label('force')})`, yLabel: `Diff. Pressure (${QP_UNITS.label('press')})`,
+    depthDown: false,
+    xOffset: QP_UNITS.toDisplay('force', -xR), yOffset: QP_UNITS.toDisplay('press', -yR),
   });
   CI.drawFrozen(ctx, CID);
 
@@ -382,16 +385,23 @@ function drawCasingTriaxial() {
   ctx.fillText(specStr, g.l + g.pw / 2, g.t - 10);
 
   ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
+  // Display helpers: force (klbf→kN), stress (psi → kpsi | MPa), dogleg
+  const _dF = v => Math.round(QP_UNITS.toDisplay('force', v)).toLocaleString();
+  const _uF = QP_UNITS.label('force');
+  const _met = QP_UNITS.isMetric();
+  const _dStress  = psi => _met ? (psi * 0.00689476).toFixed(0) : (psi / 1000).toFixed(0);
+  const _dStress1 = psi => _met ? (psi * 0.00689476).toFixed(1) : (psi / 1000).toFixed(1);
+  const _uStress  = _met ? 'MPa' : 'kpsi';
   const jointStr = (row.jointYield != null && +row.jointYield > 0 && +row.jointYield < bodyYield_klbf)
-    ? `  ·  Joint Yield = ${(+row.jointYield).toFixed(0)} klbf`
+    ? `  ·  Joint Yield = ${_dF(+row.jointYield)} ${_uF}`
     : '';
   ctx.fillText(
-    `σ_y = ${(σy/1000).toFixed(0)} kpsi  ·  Body Yield = ${bodyYield_klbf.toFixed(0)} klbf${jointStr}  ·  ID = ${id_in.toFixed(3)}"`,
+    `σ_y = ${_dStress(σy)} ${_uStress}  ·  Body Yield = ${_dF(bodyYield_klbf)} ${_uF}${jointStr}  ·  ID = ${id_in.toFixed(3)}"`,
     g.l + g.pw / 2, g.t - 28
   );
   if (F_bend > 0.1) {
     ctx.fillText(
-      `Bending: Max DLS = ${DLS_max_deg.toFixed(2)}°/100ft  ·  σ_b = ${(σ_bend/1000).toFixed(1)} kpsi  ·  ±${F_bend.toFixed(1)} klbf (dashed bars)`,
+      `Bending: Max DLS = ${QP_UNITS.toDisplay('dls', DLS_max_deg).toFixed(2)} ${QP_UNITS.label('dls')}  ·  σ_b = ${_dStress1(σ_bend)} ${_uStress}  ·  ±${_dF(F_bend)} ${_uF} (dashed bars)`,
       g.l + g.pw / 2, g.t - 46
     );
   }
