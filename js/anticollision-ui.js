@@ -135,14 +135,72 @@ function drawAntiCollision() {
   _legend(ctx, W, g.t, curves.map(c => c.label), curves.map(c => c.color));
   CI.drawAnnotations(ctx, CID);
 
+  // Closest-approach ellipse of uncertainty (lateral N–E semi-axes at kσ).
+  const minIdx = res.stations.findIndex(s => s.sf === res.minSF);
+  let ellTxt = '';
+  const k = opts.kSigma;
+  if (minIdx >= 0 && opts.refCov && typeof emLateralEllipse === 'function') {
+    const er = emLateralEllipse(opts.refCov[minIdx]);
+    const jStar = _acNearestIdx(offSurvey, res.stations[minIdx].offMd);
+    const eo = emLateralEllipse(opts.offCov[jStar]);
+    ellTxt = `  ·  ellipse@CA ref ±${n1(toD(k * er.major))}×${n1(toD(k * er.minor))} / off ±${n1(toD(k * eo.major))}×${n1(toD(k * eo.minor))} ${uD}`;
+  }
+
+  // Stash everything the CSV export needs.
+  _acLast = { stations: res.stations, refDense, offSurvey, refCov: opts.refCov, offCov: opts.offCov, k, minIdx };
+
   const sf = res.minSF;
   const status = sf == null ? '—' : (sf < 1 ? '⚠ COLLISION RISK' : (sf < 1.5 ? 'CAUTION (SF < 1.5)' : 'OK'));
   const modelTag = res.model === 'covariance' ? 'ISCWSA-style ellipsoid' : 'isotropic';
   _acSetSummary(
     `Min distance ${n1(toD(res.minDist))} ${uD}` +
     (res.minAt ? ` @ ref MD ${Math.round(toD(res.minAt.md))} ${uD} (offset MD ${Math.round(toD(res.minAt.offMd))} ${uD})` : '') +
-    `  ·  Min SF ${sf == null ? '—' : sf.toFixed(2)}  ·  ${status}  ·  ${modelTag}`
+    `  ·  Min SF ${sf == null ? '—' : sf.toFixed(2)}  ·  ${status}  ·  ${modelTag}` + ellTxt
   );
+}
+
+// Last analysis (for CSV export).
+let _acLast = null;
+
+// Export the per-station anti-collision results as CSV (active display units).
+function exportAntiCollision() {
+  if (!_acLast || !_acLast.stations || !_acLast.stations.length) {
+    alert('Run an anti-collision analysis first (enter an offset well and press Analyse).');
+    return;
+  }
+  const { stations, refDense, offSurvey, refCov, offCov, k } = _acLast;
+  const toD = v => QP_UNITS.toDisplay('depth', v);
+  const uD  = QP_UNITS.label('depth');
+  const hasCov = refCov && offCov && typeof emLateralEllipse === 'function';
+
+  const lines = [
+    '# QuackPlan Anti-Collision Export',
+    `# Confidence k-sigma: ${k}`,
+    '# Uncertainty: reduced ISCWSA-style systematic model (depth-scale, inclination, azimuth) — not the full ISCWSA MWD tool-code model',
+    '',
+    _row(`Ref MD (${uD})`, `Ref TVD (${uD})`, `Distance (${uD})`, `Offset MD (${uD})`,
+         'Separation Factor',
+         `Ref ellipse major (${uD})`, `Ref ellipse minor (${uD})`,
+         `Off ellipse major (${uD})`, `Off ellipse minor (${uD})`),
+  ];
+  for (let i = 0; i < stations.length; i++) {
+    const s = stations[i];
+    const tvd = refDense[i] ? refDense[i].tvd : 0;
+    let rMaj = '', rMin = '', oMaj = '', oMin = '';
+    if (hasCov) {
+      const er = emLateralEllipse(refCov[i]);
+      const j  = _acNearestIdx(offSurvey, s.offMd);
+      const eo = emLateralEllipse(offCov[j]);
+      rMaj = toD(k * er.major).toFixed(2); rMin = toD(k * er.minor).toFixed(2);
+      oMaj = toD(k * eo.major).toFixed(2); oMin = toD(k * eo.minor).toFixed(2);
+    }
+    lines.push(_row(
+      toD(s.md).toFixed(2), toD(tvd).toFixed(2), toD(s.dist).toFixed(2), toD(s.offMd).toFixed(2),
+      s.sf == null || !isFinite(s.sf) ? '' : s.sf.toFixed(3),
+      rMaj, rMin, oMaj, oMin,
+    ));
+  }
+  _csvDownload('anti-collision.csv', lines.join('\n'));
 }
 
 function n1(v) { return (v == null || isNaN(v)) ? '—' : (+v).toFixed(1); }
