@@ -42,6 +42,7 @@
       &nbsp;|&nbsp;
       <span id="hdrScenarioName">—</span>
     </div>
+    <button class="hdr-btn" onclick="generateReport()" title="Generate a printable well-program report (print to PDF)">📄 Report</button>
     <button class="hdr-btn" onclick="exportScenario()" title="Export current scenario as JSON">⬇ Export</button>
     <label  class="hdr-btn" style="cursor:pointer" title="Import a QuackPlan JSON scenario file">⬆ Import
       <input type="file" accept=".json" style="display:none" onchange="importScenarioFile(this)">
@@ -864,6 +865,7 @@
 <script src="js/witsml-import.js"></script>
 <script src="js/string-validation.js"></script>
 <script src="js/compare-ui.js"></script>
+<script src="js/report.js"></script>
 <script>
   // ── Theme toggle ──────────────────────────────────────────────────
   function toggleTheme() {
