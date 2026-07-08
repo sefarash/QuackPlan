@@ -30,6 +30,16 @@ function traj1DeleteRow(btn) {
   traj1Recalc();
 }
 
+// RKB elevation above mean sea level (ft), used to convert TVD (from RKB) into
+// TVDss (below MSL): TVDss = TVD − this. Onshore the RKB sits GL-above-MSL plus
+// its height above ground; offshore the RKB height is measured from MSL directly.
+function _kbElevationAboveMSL() {
+  const d = qpState.wellDatums;
+  if (!d) return 0;
+  const rkb = +d.rkb || 0;
+  return d.environment === 'offshore' ? rkb : (+d.gl || 0) + rkb;
+}
+
 function traj1Recalc() {
   const body     = document.getElementById('traj1Body');
   const stations = _traj1ReadStations();
@@ -46,12 +56,13 @@ function traj1Recalc() {
   qpState.baseSurvey = survey;
   qpState.survey = survey;
 
+  const kbElev = _kbElevationAboveMSL();
   survey.forEach((pt, i) => {
     const row = body.rows[i];
     if (!row) return;
     const dls100 = (pt.dls * DLS_SCALE).toFixed(2);
     _setCell(row, 'tvd',   pt.tvd.toFixed(1));
-    _setCell(row, 'tvdss', pt.tvd.toFixed(1));   // TVDss ≈ TVD (no KB offset input yet)
+    _setCell(row, 'tvdss', (pt.tvd - kbElev).toFixed(1));   // TVDss = TVD − RKB-above-MSL
     _setCell(row, 'dls',   dls100);
   });
 
