@@ -274,27 +274,27 @@
           <div class="form-row">
             <label>Mud Weight</label>
             <input type="number" id="mudWeight" value="10" step="0.1" onchange="fluidChanged()">
-            <span class="unit">ppg</span>
+            <span class="unit" id="uMudWeight">ppg</span>
           </div>
           <div class="form-row">
             <label>Plastic Viscosity (PV)</label>
             <input type="number" id="pv" value="16" onchange="fluidChanged()">
-            <span class="unit">cP</span>
+            <span class="unit" id="uPV">cP</span>
           </div>
           <div class="form-row">
             <label>Yield Point (YP)</label>
             <input type="number" id="yp" value="13" onchange="fluidChanged()">
-            <span class="unit">lb/100ft²</span>
+            <span class="unit" id="uYP">lb/100ft²</span>
           </div>
           <div class="form-row">
             <label>Gel Strength (10s)</label>
             <input type="number" id="gel10s" value="5" onchange="fluidChanged()">
-            <span class="unit">lb/100ft²</span>
+            <span class="unit" id="uGel10s">lb/100ft²</span>
           </div>
           <div class="form-row">
             <label>Gel Strength (10m)</label>
             <input type="number" id="gel10m" value="10" onchange="fluidChanged()">
-            <span class="unit">lb/100ft²</span>
+            <span class="unit" id="uGel10m">lb/100ft²</span>
           </div>
         </div>
         <div>
@@ -302,7 +302,7 @@
           <div class="form-row">
             <label>τ₀ (yield stress)</label>
             <input type="number" id="tauY" value="8" step="0.1" onchange="fluidChanged()">
-            <span class="unit">lb/100ft²</span>
+            <span class="unit" id="uTauY">lb/100ft²</span>
           </div>
           <div class="form-row">
             <label>n (flow index)</label>
@@ -317,7 +317,7 @@
           <div class="form-row">
             <label>Flow Rate</label>
             <input type="number" id="flowRate" value="280" onchange="fluidChanged()">
-            <span class="unit">gpm</span>
+            <span class="unit" id="uFlow">gpm</span>
           </div>
           <div class="form-row">
             <label>Pump Efficiency</label>
@@ -327,7 +327,7 @@
           <div class="form-row">
             <label>Rig SPP Limit</label>
             <input type="number" id="rigSppLimit" value="3500" onchange="fluidChanged()">
-            <span class="unit">psi</span>
+            <span class="unit" id="uSPP">psi</span>
           </div>
         </div>
       </div>

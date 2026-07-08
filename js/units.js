@@ -33,6 +33,8 @@ const QP_UNITS = (() => {
     linwt:  { factor: 1.488164,   imp: 'lb/ft',   met: 'kg/m'  },
     dls:    { factor: 0.9842520,  imp: '°/100ft', met: '°/30m' },
     angle:  { factor: 1,          imp: '°',       met: '°'     },
+    visc:   { factor: 1,          imp: 'cP',      met: 'mPa·s' }, // 1 cP ≡ 1 mPa·s
+    yieldstress: { factor: 0.4788026, imp: 'lb/100ft²', met: 'Pa' },
   };
 
   function _factor(qty, sys) {
