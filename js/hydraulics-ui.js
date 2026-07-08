@@ -10,16 +10,16 @@ function drawHydSweep(h) {
 
   if (!h?.sweep?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  // h stores imperial (canonical). SPP/pressures and ECD convert to display; flow
-  // stays in gpm to match the (imperial) flow slider — same quantity, adjacent.
+  // h stores imperial (canonical); convert to display units for this chart
+  const toF = v => QP_UNITS.toDisplay('flow',  v);
   const toP = v => QP_UNITS.toDisplay('press', v);
   const toM = v => QP_UNITS.toDisplay('mw',    v);
-  const uP = QP_UNITS.label('press'), uM = QP_UNITS.label('mw');
+  const uF = QP_UNITS.label('flow'), uP = QP_UNITS.label('press'), uM = QP_UNITS.label('mw');
 
-  const xMax   = h.sweepXmax || Math.max(...h.sweep.map(s => s.q), 1);   // gpm
+  const xMax   = toF(h.sweepXmax || Math.max(...h.sweep.map(s => s.q), 1));
   const maxSPP = toP(Math.max(...h.sweep.map(s => s.spp), h.sppLimit || 3500)) * 1.1;
 
-  const g = _chartGrid(ctx, W, H, xMax, maxSPP, 'Flow Rate (gpm)', `SPP (${uP})`);
+  const g = _chartGrid(ctx, W, H, xMax, maxSPP, `Flow Rate (${uF})`, `SPP (${uP})`);
 
   // SPP limit line
   const limitY = g.t + (1 - toP(h.sppLimit) / maxSPP) * g.ph;
@@ -31,23 +31,23 @@ function drawHydSweep(h) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
   ctx.fillText('SPP limit', g.l + 4, limitY - 2);
 
-  const sweepPts = h.sweep.map(s => ({ x: s.q, y: toP(s.spp) }));
+  const sweepPts = h.sweep.map(s => ({ x: toF(s.q), y: toP(s.spp) }));
   CI.storeLive(CID, [{ pts: sweepPts, color: '#1a5f7a', label: 'SPP' }]);
-  CI.register(CID, { pad: g, xMax, yMax: maxSPP, xLabel: 'Flow Rate (gpm)', yLabel: `SPP (${uP})`, depthDown: false });
+  CI.register(CID, { pad: g, xMax, yMax: maxSPP, xLabel: `Flow Rate (${uF})`, yLabel: `SPP (${uP})`, depthDown: false });
   CI.drawFrozen(ctx, CID);
 
   // SPP curve
   _chartLine(ctx, sweepPts, '#1a5f7a', 2.5, g.l, g.t, g.pw, g.ph, xMax, maxSPP);
 
   // Operating point marker
-  const opX = g.l + (h.flowRate / xMax) * g.pw;
+  const opX = g.l + (toF(h.flowRate) / xMax) * g.pw;
   const opY = g.t + (1 - toP(h.pumpPressure) / maxSPP) * g.ph;
   ctx.fillStyle = '#f0a500';
   ctx.beginPath(); ctx.arc(opX, opY, 5, 0, Math.PI * 2); ctx.fill();
   const C = _qpColors();
   ctx.fillStyle = C.text; ctx.font = '10px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  ctx.fillText(`${h.flowRate} gpm / ${Math.round(toP(h.pumpPressure))} ${uP}`, opX + 8, opY - 2);
+  ctx.fillText(`${Math.round(toF(h.flowRate))} ${uF} / ${Math.round(toP(h.pumpPressure))} ${uP}`, opX + 8, opY - 2);
 
   ctx.fillStyle = C.text; ctx.font = '11px sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';

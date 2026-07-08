@@ -73,11 +73,12 @@ function _computeHyd(survey, fluid, bha) {
           tauY = 8, nHB = 0.7, kHB = 120, flowRate = 280,
           pumpEff = 90 } = fluid;
 
-  // Override flow rate from hydraulics slider if active. NOTE: the hydraulics
-  // MW/flow sliders remain in imperial (ppg/gpm) — see the units note in
-  // CLAUDE.md. Only the hydraulics output charts are unit-aware.
-  const activeFlow = +(document.getElementById('hydFlowSlider')?.value || flowRate);
-  const activeMW   = +(document.getElementById('hydMWslider')?.value   || mudWeight);
+  // Override flow rate / MW from the hydraulics sliders (display units) if active,
+  // converting back to imperial (canonical) for the calculations below.
+  const _fSl = document.getElementById('hydFlowSlider')?.value;
+  const _mSl = document.getElementById('hydMWslider')?.value;
+  const activeFlow = (_fSl != null && _fSl !== '') ? QP_UNITS.fromDisplay('flow', +_fSl) : flowRate;
+  const activeMW   = (_mSl != null && _mSl !== '') ? QP_UNITS.fromDisplay('mw',   +_mSl) : mudWeight;
 
   const dpOD       = bha.topDpOD_in   ?? 5.0;
   const dpID       = bha.topDpID_in   ?? 4.276;
