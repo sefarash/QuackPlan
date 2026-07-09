@@ -5,21 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QuackPlan — Well Planning</title>
 
-  <!-- ── Canonical-origin guard (data-loss prevention) ─────────────────────────
-       Production is the Cloudflare Worker at quackplan.ismayilov-rashad.workers.dev
-       — a STABLE url that does NOT change per deploy, so on this host there is no
-       origin-change data loss (that only affects Cloudflare *Pages* per-deploy
-       preview urls like <hash>.project.pages.dev). This guard is a safety net:
-       IndexedDB/localStorage are ORIGIN-scoped, so if you ever open the app on a
-       *.pages.dev preview origin it would see an empty database — bounce those to
-       the canonical host. It never touches workers.dev, custom domains, localhost
-       or file://. Set QP_CANONICAL_HOST to your real production host; '' disables. -->
+  <!-- ── Canonical-origin guard ────────────────────────────────────────────────
+       Keep one clean branded URL: send www → apex (quackplan.com) so users have a
+       single origin to bookmark/log in on. Data is now server-side (Cloudflare D1,
+       shared across origins), so this is about a tidy URL, not data durability.
+       Also bounces any legacy Cloudflare *Pages* preview origin. It never touches
+       the workers.dev fallback, other custom domains, localhost or file://.
+       Set QP_CANONICAL_HOST to your production host; '' disables the guard. -->
   <script>
     (function () {
-      var QP_CANONICAL_HOST = 'quackplan.ismayilov-rashad.workers.dev';   // '' disables
+      var QP_CANONICAL_HOST = 'quackplan.com';   // '' disables
       var h = location.hostname;
       if (QP_CANONICAL_HOST && h !== QP_CANONICAL_HOST &&
-          (h.endsWith('.pages.dev') || h === 'pages.dev')) {
+          (h === 'www.' + QP_CANONICAL_HOST || h.endsWith('.pages.dev') || h === 'pages.dev')) {
         location.replace(location.protocol + '//' + QP_CANONICAL_HOST +
                          location.pathname + location.search + location.hash);
       }
