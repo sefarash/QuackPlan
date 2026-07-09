@@ -112,6 +112,16 @@ function dbRoots() {
   }));
 }
 
+// Every node in the store (full hierarchy), unfiltered — for full backup/export.
+function dbAllNodes() {
+  return dbOpen().then(db => new Promise((resolve, reject) => {
+    const tx  = db.transaction('nodes', 'readonly');
+    const req = tx.objectStore('nodes').getAll();
+    req.onsuccess = e => resolve(e.target.result || []);
+    req.onerror   = e => reject(e.target.error);
+  }));
+}
+
 // ── Scenario data helpers ─────────────────────────────────────────────────────
 
 // Per-scenario write serialization. dbSaveScenarioData is a read-modify-write
