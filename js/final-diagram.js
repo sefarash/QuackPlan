@@ -262,26 +262,27 @@ function drawFinalDiagram() {
       _fdStrokeLine(ctx, idR, wCol + '88', 0.75);
     }
 
-    // Shoe triangle at bottom
+    // Shoe triangles — flare OUTWARD from the outer wall, hugging the casing and
+    // pointing up-hole, exactly like the well-schematic shoe (but oriented to the
+    // local wellpath tangent).
     if (!isOH) {
-      const p = pts[pts.length - 1];
+      const p  = pts[pts.length - 1];
       const p2 = pts[pts.length - 2] || pts[0];
       const tx = p.x - p2.x, ty = p.y - p2.y;
       const len = Math.sqrt(tx*tx + ty*ty) || 1;
-      const px = -ty/len * odHW, py = tx/len * odHW;
-      const sh = Math.min(10, odHW * 0.8);
-      const tx2 = tx/len * sh, ty2 = ty/len * sh;
+      const tux = tx/len, tuy = ty/len;     // unit tangent, down-hole
+      const ux  = -tuy,   uy  = tux;         // unit perpendicular (one side)
+      const sh  = Math.min(11, odHW * 0.55);
       ctx.fillStyle = wCol;
-      ctx.beginPath();
-      ctx.moveTo(p.x + px, p.y + py);
-      ctx.lineTo(p.x + px - tx2, p.y + py - ty2);
-      ctx.lineTo(p.x + tx2, p.y + ty2);
-      ctx.closePath(); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(p.x - px, p.y - py);
-      ctx.lineTo(p.x - px - tx2, p.y - py - ty2);
-      ctx.lineTo(p.x + tx2, p.y + ty2);
-      ctx.closePath(); ctx.fill();
+      for (const s of [1, -1]) {             // both walls
+        const ox = ux * s, oy = uy * s;      // outward unit for this side
+        const ax = p.x + ox * odHW, ay = p.y + oy * odHW;   // A: outer wall at shoe
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);                                  // shoe corner on the wall
+        ctx.lineTo(ax - tux * sh, ay - tuy * sh);            // up the wall (toward surface)
+        ctx.lineTo(ax + ox  * sh, ay + oy  * sh);            // flare outward at shoe depth
+        ctx.closePath(); ctx.fill();
+      }
     }
   });
 
