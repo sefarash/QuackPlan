@@ -50,9 +50,17 @@ async function authSubmit() {
   }
 }
 
+// Show a compact initials chip (full email on hover) instead of the whole email.
 function _setAccountLabel(email) {
   const el = document.getElementById('authAccount');
-  if (el) el.textContent = email || '';
+  if (!el) return;
+  if (!email) { el.textContent = ''; el.style.display = 'none'; el.title = ''; return; }
+  const local = email.split('@')[0] || email;
+  const parts = local.split(/[._\-+]+/).filter(Boolean);
+  const initials = (parts.length >= 2 ? parts[0][0] + parts[1][0] : local.slice(0, 2)).toUpperCase();
+  el.textContent = initials;
+  el.title = email;               // full email on hover
+  el.style.display = 'inline-flex';
 }
 
 function qpLogout() {

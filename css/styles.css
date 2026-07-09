@@ -1047,4 +1047,10 @@ body.dark .chart-controls select                  { color: var(--text); backgrou
 }
 .auth-toggle { font-size: 12px; color: var(--text-dim); text-align: center; margin-top: 4px; }
 .auth-toggle a { color: var(--accent); }
-.hdr-account { font-size: 11px; color: var(--text-dim); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hdr-account {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 700; letter-spacing: .02em;
+  cursor: default; flex: 0 0 auto; user-select: none;
+}
