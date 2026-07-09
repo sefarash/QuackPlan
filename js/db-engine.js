@@ -1,200 +1,79 @@
-// ===== INDEXEDDB ENGINE =====
+// ===== DATA ENGINE (server-backed) =====
 // Hierarchy: project → field → well → borehole → scenario
 // Each record: { id, parentId, name, type, data:{} }
+//
+// Data now lives in a Cloudflare D1 database behind the Worker API (see
+// worker/index.js), scoped to the logged-in user — so it survives a browser
+// wipe, eviction, or switching devices. This module keeps the SAME function
+// names and promise contracts the rest of the app already used against
+// IndexedDB, so no caller needed to change; only the storage backend moved.
 
-const DB_NAME    = 'QuackPlanDB';
-const DB_VERSION = 1;
-let _db = null;
+const QP_API = '/api';
 
-// Ask the browser to make storage DURABLE. Without this, IndexedDB/localStorage
-// are "best-effort" and the browser may evict them on restart, under storage
-// pressure, or (Safari) after ~7 days of no interaction — which looks like
-// "everything is gone after a restart". persist() is auto-granted on sites the
-// user has engaged with/bookmarked; if denied, the data is at eviction risk and
-// we warn so the user knows to keep a Backup.
-let _qpStoragePersisted = null;   // true | false | null(unknown/unsupported)
-async function qpRequestPersistentStorage() {
+// Session token (set by auth-ui.js on login). Stored in localStorage so a
+// reload stays logged in; if it's evicted the user just logs in again — the
+// DATA is safe on the server regardless.
+function qpToken()        { try { return localStorage.getItem('qp_token') || ''; } catch (_) { return ''; } }
+function qpSetToken(t)    { try { t ? localStorage.setItem('qp_token', t) : localStorage.removeItem('qp_token'); } catch (_) {} }
+
+// Core request helper. Resolves parsed JSON (or null); rejects on failure.
+// A 401 means the session is gone — hand off to auth-ui to show the login.
+async function _api(method, path, body) {
+  let res;
   try {
-    if (!navigator.storage || !navigator.storage.persist) {
-      console.info('[QuackPlan] persistent-storage API unavailable — storage is best-effort.');
-      return;
-    }
-    _qpStoragePersisted = await navigator.storage.persisted() || await navigator.storage.persist();
-    let est = '';
-    try {
-      if (navigator.storage.estimate) {
-        const e = await navigator.storage.estimate();
-        est = `  (using ~${Math.round((e.usage||0)/1024)} KB of ~${Math.round((e.quota||0)/1048576)} MB)`;
-      }
-    } catch (_) {}
-    console.info('[QuackPlan] persistent storage: ' +
-      (_qpStoragePersisted ? 'GRANTED — data is durable' + est
-                           : 'DENIED — best-effort, data may be evicted on restart. Use ⬇ Backup regularly.'));
-    if (_qpStoragePersisted === false && typeof setStatus === 'function') {
-      setStatus('⚠ Storage is not persistent — browser may clear data. Use ⬇ Backup to keep a copy.', true);
-    }
-  } catch (_) {}
-}
-// Fire as early as possible (before DOMContentLoaded) so durability is requested
-// up front; harmless to call again.
-qpRequestPersistentStorage();
-
-function dbOpen() {
-  return new Promise((resolve, reject) => {
-    if (_db) { resolve(_db); return; }
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-
-    // Stepped schema migrations. e.oldVersion is 0 for a brand-new database and
-    // the previously-installed version for an upgrade. Each block runs once, in
-    // order, for any DB coming from below that version — so a v0 user runs them
-    // all while a v1 user runs only v2+. To change the schema: add a new
-    // `if (oldV < N)` block and bump DB_VERSION to N; NEVER edit a shipped block
-    // (existing users have already run it). Use e.target.transaction to read or
-    // backfill existing records during an upgrade.
-    req.onupgradeneeded = e => {
-      const db   = e.target.result;
-      const oldV = e.oldVersion;
-
-      // v1 — initial schema: hierarchy 'nodes' store keyed by id, indexed by
-      // parentId and type.
-      if (oldV < 1) {
-        const store = db.createObjectStore('nodes', { keyPath: 'id', autoIncrement: true });
-        store.createIndex('by_parent', 'parentId', { unique: false });
-        store.createIndex('by_type',   'type',     { unique: false });
-      }
-
-      // Future migrations go here, e.g.:
-      // if (oldV < 2) {
-      //   const store = e.target.transaction.objectStore('nodes');
-      //   store.createIndex('by_name', 'name', { unique: false });
-      // }
-    };
-
-    req.onsuccess = e => {
-      _db = e.target.result;
-      // If another tab opens a newer DB version, close this connection so its
-      // upgrade isn't blocked (and drop the cache so the next call reopens).
-      _db.onversionchange = () => { _db.close(); _db = null; };
-      resolve(_db);
-    };
-    req.onerror   = e => reject(e.target.error);
-    req.onblocked = () => reject(new Error(
-      'QuackPlan database upgrade is blocked by another open tab — close it and reload.'));
-  });
+    res = await fetch(QP_API + path, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + qpToken() },
+      body: body != null ? JSON.stringify(body) : undefined,
+    });
+  } catch (netErr) {
+    if (typeof setStatus === 'function') setStatus('Network error — could not reach the server', true);
+    throw netErr;
+  }
+  if (res.status === 401) {
+    if (typeof qpAuthExpired === 'function') qpAuthExpired();
+    throw new Error('unauthorized');
+  }
+  if (!res.ok) {
+    let msg = 'Server error ' + res.status;
+    try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (_) {}
+    if (typeof setStatus === 'function') setStatus(msg, true);
+    throw new Error(msg);
+  }
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('application/json') ? res.json() : null;
 }
 
-// ── CRUD helpers ─────────────────────────────────────────────────────────────
+// ── Auth (used by auth-ui.js) ─────────────────────────────────────────────────
+function dbSignup(email, password) { return _api('POST', '/auth/signup', { email, password }); }
+function dbLogin(email, password)  { return _api('POST', '/auth/login',  { email, password }); }
+function dbMe()                    { return _api('GET',  '/auth/me'); }
+
+// ── CRUD (same contracts as the old IndexedDB engine) ─────────────────────────
+// Kept so existing callers work unchanged. dbOpen is now a no-op (the server is
+// the database); it resolves so any `dbOpen().then(...)` still works.
+function dbOpen() { return Promise.resolve(true); }
 
 function dbAdd(node) {
-  // node: { parentId, name, type, data }
-  return dbOpen().then(db => new Promise((resolve, reject) => {
-    const tx  = db.transaction('nodes', 'readwrite');
-    const req = tx.objectStore('nodes').add({ ...node, data: node.data || {} });
-    req.onsuccess = e => resolve(e.target.result);   // returns new id
-    req.onerror   = e => reject(e.target.error);
-  }));
+  return _api('POST', '/nodes', {
+    parentId: node.parentId ?? null, name: node.name, type: node.type, data: node.data || {},
+  }).then(r => r.id);
 }
 
-function dbGet(id) {
-  return dbOpen().then(db => new Promise((resolve, reject) => {
-    const tx  = db.transaction('nodes', 'readonly');
-    const req = tx.objectStore('nodes').get(id);
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
+function dbGet(id)        { return _api('GET', '/nodes/' + id).then(r => r || null); }
+function dbUpdate(node)   { return _api('PUT', '/nodes/' + node.id, node).then(() => node.id); }
+function dbDelete(id)     { return _api('DELETE', '/nodes/' + id); }   // cascades on the server
+function dbChildren(pid)  { return _api('GET', '/nodes?parent=' + encodeURIComponent(pid)); }
+function dbRoots()        { return _api('GET', '/nodes?roots=1'); }
+function dbAllNodes()     { return _api('GET', '/nodes'); }
 
-function dbUpdate(node) {
-  return dbOpen().then(db => new Promise((resolve, reject) => {
-    const tx  = db.transaction('nodes', 'readwrite');
-    const req = tx.objectStore('nodes').put(node);
-    req.onsuccess = () => resolve();
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
-
-function dbDelete(id) {
-  // Recursively delete children first
-  return dbChildren(id).then(children =>
-    Promise.all(children.map(c => dbDelete(c.id)))
-  ).then(() => dbOpen()).then(db => new Promise((resolve, reject) => {
-    const tx  = db.transaction('nodes', 'readwrite');
-    const req = tx.objectStore('nodes').delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
-
-function dbChildren(parentId) {
-  return dbOpen().then(db => new Promise((resolve, reject) => {
-    const tx    = db.transaction('nodes', 'readonly');
-    const idx   = tx.objectStore('nodes').index('by_parent');
-    const req   = idx.getAll(parentId);
-    req.onsuccess = e => resolve(e.target.result || []);
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
-
-function dbRoots() {
-  // parentId = null is not indexed by IndexedDB, so scan all and filter
-  return dbOpen().then(db => new Promise((resolve, reject) => {
-    const tx  = db.transaction('nodes', 'readonly');
-    const req = tx.objectStore('nodes').getAll();
-    req.onsuccess = e => resolve((e.target.result || []).filter(n => !n.parentId));
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
-
-// Every node in the store (full hierarchy), unfiltered — for full backup/export.
-function dbAllNodes() {
-  return dbOpen().then(db => new Promise((resolve, reject) => {
-    const tx  = db.transaction('nodes', 'readonly');
-    const req = tx.objectStore('nodes').getAll();
-    req.onsuccess = e => resolve(e.target.result || []);
-    req.onerror   = e => reject(e.target.error);
-  }));
-}
-
-// ── Scenario data helpers ─────────────────────────────────────────────────────
-
-// Per-scenario write serialization. dbSaveScenarioData is a read-modify-write
-// (get node → set node.data[key] → put node). Two saves to the SAME scenario
-// firing concurrently would both read the same snapshot and the second put would
-// clobber the first key (lost update). We chain all writes for a given scenarioId
-// so each get→mutate→put completes before the next begins. Writes to different
-// scenarios still run in parallel. A failed write (e.g. IndexedDB quota) is no
-// longer silent — it surfaces via setStatus instead of an unhandled rejection.
-const _dbWriteChains = {};
+// Per-key scenario save — atomic on the server (json_set), so the old
+// read-modify-write lost-update race is gone entirely.
 function dbSaveScenarioData(scenarioId, key, value) {
-  const run = () => dbGet(scenarioId).then(node => {
-    if (!node) return;
-    node.data = node.data || {};
-    node.data[key] = value;
-    return dbUpdate(node);
-  });
-  const prev = _dbWriteChains[scenarioId] || Promise.resolve();
-  const next = prev.then(run).catch(err => {
-    console.error('dbSaveScenarioData failed:', err);
-    if (typeof setStatus === 'function') {
-      setStatus('Save failed — browser storage may be full (details in console)', true);
-    }
-  });
-  _dbWriteChains[scenarioId] = next;
-  // Drop the chain entry once it settles, unless a newer write has replaced it.
-  next.then(() => { if (_dbWriteChains[scenarioId] === next) delete _dbWriteChains[scenarioId]; });
-  return next;
+  return _api('PATCH', '/nodes/' + scenarioId + '/data', { key, value });
 }
-
 function dbLoadScenarioData(scenarioId, key) {
   return dbGet(scenarioId).then(node => (node && node.data) ? node.data[key] : null);
 }
 
-// ── Rename ───────────────────────────────────────────────────────────────────
-
-function dbRename(id, newName) {
-  return dbGet(id).then(node => {
-    if (!node) return;
-    node.name = newName;
-    return dbUpdate(node);
-  });
-}
+function dbRename(id, newName) { return _api('PATCH', '/nodes/' + id + '/name', { name: newName }); }

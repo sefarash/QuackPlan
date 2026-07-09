@@ -1,0 +1,11 @@
+worker
+migrations
+node_modules
+.wrangler
+package.json
+package-lock.json
+wrangler.toml
+.dev.vars
+.git
+Casing.xlsx
+Drill pipe.xlsx

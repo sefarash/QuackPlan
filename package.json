@@ -1,0 +1,15 @@
+{
+  "name": "quackplan",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create quackplan-db",
+    "db:migrate": "wrangler d1 migrations apply quackplan-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply quackplan-db --local"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

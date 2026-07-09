@@ -430,16 +430,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Data loading is deferred until the user is authenticated — auth-ui.js calls
+  // hierarchyBoot() once a session is established (so no API call fires with no
+  // token). See js/auth-ui.js.
+});
+
+// Load the tree + restore the last-opened scenario. Called after login.
+function hierarchyBoot() {
   hierarchyRefresh();
 
-  // Restore last selected scenario after tree is rendered
   const lastId = +localStorage.getItem('qp_lastScenarioId');
   if (lastId) {
     dbGet(lastId).then(node => {
       if (!node) { _updateGate(); return; }
       qpState.currentScenarioId = lastId;
       _loadScenario(lastId);
-      // Restore header context and well datums
       dbGet(node.parentId)
         .then(bh => bh ? dbGet(bh.parentId) : null)
         .then(well => {
@@ -448,10 +453,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       _updateGate();
       hierarchyRefresh();
-    });
+    }).catch(() => _updateGate());
   } else {
     _updateGate();
   }
-});
+}
 
 function _cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }

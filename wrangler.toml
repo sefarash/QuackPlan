@@ -1,6 +1,16 @@
 name = "quackplan"
+main = "worker/index.js"
 compatibility_date = "2025-05-08"
 
 [assets]
 directory = "."
+binding = "ASSETS"
 not_found_handling = "single-page-application"
+
+# D1 database. Create it once with:  wrangler d1 create quackplan-db
+# then paste the returned database_id below (local dev works without it).
+[[d1_databases]]
+binding = "DB"
+database_name = "quackplan-db"
+database_id = "REPLACE_WITH_ID_FROM_wrangler_d1_create"
+migrations_dir = "migrations"

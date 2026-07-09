@@ -31,6 +31,20 @@
 </head>
 <body>
 
+<!-- ═══════════════════════ AUTH OVERLAY ═══════════════════════ -->
+<div id="authOverlay" class="auth-overlay" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">🦆 <strong>Quack</strong>Plan</div>
+    <h2 id="authTitle">Sign in to QuackPlan</h2>
+    <p class="auth-tagline">Your wells are saved to your account — reachable from any device.</p>
+    <input id="authEmail" type="email" placeholder="Email" autocomplete="username" autofocus>
+    <input id="authPassword" type="password" placeholder="Password (min 8 characters)" autocomplete="current-password">
+    <div id="authError" class="auth-error" style="display:none"></div>
+    <button id="authSubmit" class="auth-btn" onclick="authSubmit()">Sign in</button>
+    <div id="authToggle" class="auth-toggle"></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════ HEADER ═══════════════════════ -->
 <header class="qp-header">
   <div class="qp-logo">
@@ -67,6 +81,8 @@
     <button class="hdr-btn" onclick="showNewProjectModal()">+ Project</button>
     <button class="hdr-btn primary" onclick="qpCompute()">⚡ Run</button>
     <button class="hdr-btn" id="unitToggle" onclick="qpToggleUnits()" title="Toggle imperial / metric units">Imperial</button>
+    <span id="authAccount" class="hdr-account" title="Signed-in account"></span>
+    <button class="hdr-btn" onclick="qpLogout()" title="Sign out">Sign out</button>
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark / light theme">🌙</button>
   </div>
 </header>
@@ -898,6 +914,7 @@
 <script src="js/state.js"></script>
 <script src="js/db-engine.js"></script>
 <script src="js/hierarchy-ui.js"></script>
+<script src="js/auth-ui.js"></script>
 <script src="js/casing-catalogue.js"></script>
 <script src="js/bha-catalogue.js"></script>
 <script src="js/trajectory-solver.js"></script>
