@@ -52,12 +52,15 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   border-bottom: 2px solid var(--border-dk);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
+  gap: 8px;
+  padding: 0 12px;
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 100;
 }
+/* Logo + right-side actions never shrink; only the middle input-tabs scroll. */
+.qp-logo, .header-sep, .header-right { flex: 0 0 auto; }
+.input-tab, .hdr-btn { flex: 0 0 auto; }
 
 .qp-logo {
   display: flex;
@@ -75,15 +78,25 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 
 .header-sep { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
 
-/* Input tabs (top) */
+/* Input tabs (top) — the flexible middle section: it scrolls internally when
+   the window is narrow so the logo (left) and the action buttons incl. Run
+   (right) always stay visible. */
 .input-tabs {
   display: flex;
+  align-items: center;
   gap: 6px;
   margin-left: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
+.input-tabs::-webkit-scrollbar { height: 5px; }
+.input-tabs::-webkit-scrollbar-thumb { background: var(--border-dk); border-radius: 3px; }
 
 .input-tab {
-  padding: 5px 16px;
+  padding: 5px 12px;
   border: 1.5px solid var(--border-dk);
   border-radius: 999px;
   background: transparent;
@@ -113,7 +126,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .hdr-scenario {
@@ -124,7 +137,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 .hdr-scenario strong { color: var(--accent); }
 
 .hdr-btn {
-  padding: 4px 10px;
+  padding: 4px 8px;
   border: 1px solid var(--border-dk);
   border-radius: 4px;
   background: var(--bg-card);
@@ -459,8 +472,25 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   z-index: 100;
 }
 
+/* Output tabs live in a single horizontal-scroll row so a growing number of
+   tabs never wraps onto a second line (which overlapped the footer). */
+#outputTabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+#outputTabs::-webkit-scrollbar { height: 5px; }
+#outputTabs::-webkit-scrollbar-thumb { background: var(--border-dk); border-radius: 3px; }
+
 .output-tab {
-  padding: 5px 14px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 5px 12px;
   border: 1.5px solid var(--border-dk);
   border-radius: 999px;
   background: transparent;
