@@ -2,6 +2,13 @@ name = "quackplan"
 main = "worker/index.js"
 compatibility_date = "2025-05-08"
 
+# Custom domains (Cloudflare provisions DNS + SSL automatically on deploy).
+# www redirects to the apex client-side (see the canonical-origin guard in index.html).
+routes = [
+  { pattern = "quackplan.com", custom_domain = true },
+  { pattern = "www.quackplan.com", custom_domain = true },
+]
+
 [assets]
 directory = "."
 binding = "ASSETS"
