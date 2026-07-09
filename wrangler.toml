@@ -12,5 +12,5 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "quackplan-db"
-database_id = "REPLACE_WITH_ID_FROM_wrangler_d1_create"
+database_id = "859d1108-b3dc-4ad8-a801-6a07e22b7fa6"
 migrations_dir = "migrations"

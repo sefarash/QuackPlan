@@ -1,3 +1,4 @@
+# Build/server files — never serve these as static assets
 worker
 migrations
 node_modules
@@ -6,6 +7,15 @@ package.json
 package-lock.json
 wrangler.toml
 .dev.vars
+.gitignore
+.assetsignore
 .git
-Casing.xlsx
-Drill pipe.xlsx
+CLAUDE.md
+# Dev-only design/reference files (not part of the app)
+wireframes
+*.jsx
+*.xlsx
+casing_data_catalogue.html
+drill_pipe_catalogue.html
+hwdp_drill_collar_catalogue.html
+hierarchy-demo.html
