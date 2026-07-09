@@ -313,11 +313,27 @@ function drawFinalDiagram() {
     const col = _fdColor(row.element);
     const hw  = Math.max(idHW * 0.85, 4);
 
-    // Draw a simple cross-bar marker at the element depth
-    ctx.fillStyle = col;
-    ctx.fillRect(x - hw, y - 4, hw * 2, 8);
-    ctx.strokeStyle = col; ctx.lineWidth = 1;
-    ctx.strokeRect(x - hw, y - 4, hw * 2, 8);
+    // Orient the marker ACROSS the wellbore at the local inclination (not flat
+    // horizontal): sample the path just above/below this MD, get the tangent in
+    // plot space, then draw the cross-bar perpendicular to it.
+    const mdLo = Math.max(survey[0].md, midMD - 30);
+    const mdHi = Math.min(survey[survey.length - 1].md, midMD + 30);
+    const sLo = _interpSurvey(survey, mdLo), sHi = _interpSurvey(survey, mdHi);
+    const xLo = toX(Math.hypot(sLo.north, sLo.east)), yLo = toY(sLo.tvd);
+    const xHi = toX(Math.hypot(sHi.north, sHi.east)), yHi = toY(sHi.tvd);
+    let tx = xHi - xLo, ty = yHi - yLo;
+    const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;   // unit tangent (along bore)
+    const ax = -ty, ay = tx;                                   // unit perpendicular (across bore)
+    const th = 4;                                              // half-thickness along the bore
+
+    // Cross-bar = quad spanning ±hw across the bore, ±th along it.
+    ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + ax*hw + tx*th, y + ay*hw + ty*th);
+    ctx.lineTo(x + ax*hw - tx*th, y + ay*hw - ty*th);
+    ctx.lineTo(x - ax*hw - tx*th, y - ay*hw - ty*th);
+    ctx.lineTo(x - ax*hw + tx*th, y - ay*hw + ty*th);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
 
     // Draggable label to the right
     const label = row.element + (row.size ? ' ' + row.size : '');
