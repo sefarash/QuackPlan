@@ -6,24 +6,20 @@
   <title>QuackPlan — Well Planning</title>
 
   <!-- ── Canonical-origin guard (data-loss prevention) ─────────────────────────
-       Cloudflare Pages gives every deployment its own preview origin
-       (<hash>.quackplan.pages.dev). IndexedDB and localStorage are ORIGIN-scoped,
-       so opening the app at a per-deploy preview URL sees a fresh, EMPTY database
-       — which looks like "the deploy deleted my data". pages.dev is on the Public
-       Suffix List, so those subdomains can't share storage; the only fix is to
-       always use ONE stable origin. This bounces any *.pages.dev preview origin
-       to the stable production origin so saved wells are never stranded.
-
-       Set QP_CANONICAL_HOST to your production host. If you use a custom domain,
-       put it here (e.g. 'app.quackplan.com'). Leave '' to disable the redirect. -->
+       Production is the Cloudflare Worker at quackplan.ismayilov-rashad.workers.dev
+       — a STABLE url that does NOT change per deploy, so on this host there is no
+       origin-change data loss (that only affects Cloudflare *Pages* per-deploy
+       preview urls like <hash>.project.pages.dev). This guard is a safety net:
+       IndexedDB/localStorage are ORIGIN-scoped, so if you ever open the app on a
+       *.pages.dev preview origin it would see an empty database — bounce those to
+       the canonical host. It never touches workers.dev, custom domains, localhost
+       or file://. Set QP_CANONICAL_HOST to your real production host; '' disables. -->
   <script>
     (function () {
-      var QP_CANONICAL_HOST = 'quackplan.pages.dev';   // stable production host ('' disables)
+      var QP_CANONICAL_HOST = 'quackplan.ismayilov-rashad.workers.dev';   // '' disables
       var h = location.hostname;
       if (QP_CANONICAL_HOST && h !== QP_CANONICAL_HOST &&
           (h.endsWith('.pages.dev') || h === 'pages.dev')) {
-        // Only ever redirects ephemeral Cloudflare preview origins — never a
-        // custom domain, localhost, 127.0.0.1, or file://.
         location.replace(location.protocol + '//' + QP_CANONICAL_HOST +
                          location.pathname + location.search + location.hash);
       }
