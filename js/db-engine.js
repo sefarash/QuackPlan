@@ -6,6 +6,39 @@ const DB_NAME    = 'QuackPlanDB';
 const DB_VERSION = 1;
 let _db = null;
 
+// Ask the browser to make storage DURABLE. Without this, IndexedDB/localStorage
+// are "best-effort" and the browser may evict them on restart, under storage
+// pressure, or (Safari) after ~7 days of no interaction — which looks like
+// "everything is gone after a restart". persist() is auto-granted on sites the
+// user has engaged with/bookmarked; if denied, the data is at eviction risk and
+// we warn so the user knows to keep a Backup.
+let _qpStoragePersisted = null;   // true | false | null(unknown/unsupported)
+async function qpRequestPersistentStorage() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) {
+      console.info('[QuackPlan] persistent-storage API unavailable — storage is best-effort.');
+      return;
+    }
+    _qpStoragePersisted = await navigator.storage.persisted() || await navigator.storage.persist();
+    let est = '';
+    try {
+      if (navigator.storage.estimate) {
+        const e = await navigator.storage.estimate();
+        est = `  (using ~${Math.round((e.usage||0)/1024)} KB of ~${Math.round((e.quota||0)/1048576)} MB)`;
+      }
+    } catch (_) {}
+    console.info('[QuackPlan] persistent storage: ' +
+      (_qpStoragePersisted ? 'GRANTED — data is durable' + est
+                           : 'DENIED — best-effort, data may be evicted on restart. Use ⬇ Backup regularly.'));
+    if (_qpStoragePersisted === false && typeof setStatus === 'function') {
+      setStatus('⚠ Storage is not persistent — browser may clear data. Use ⬇ Backup to keep a copy.', true);
+    }
+  } catch (_) {}
+}
+// Fire as early as possible (before DOMContentLoaded) so durability is requested
+// up front; harmless to call again.
+qpRequestPersistentStorage();
+
 function dbOpen() {
   return new Promise((resolve, reject) => {
     if (_db) { resolve(_db); return; }
