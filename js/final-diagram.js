@@ -304,14 +304,21 @@ function drawFinalDiagram() {
     const dep = Math.sqrt(st.north*st.north + st.east*st.east);
     const x   = toX(dep), y = toY(st.tvd);
 
-    // Inner bore half-width at this depth
-    let idHW = inToPx(8.5) / 2;
+    // Width = the SMALLEST bore (ID) among every string that spans this depth —
+    // i.e. the innermost casing / liner / open hole the element sits inside.
+    let idIn = null;
     for (const sr of schRows) {
-      if (midMD <= +(sr.bot)) { idHW = inToPx(_fdGetID(sr)) / 2; break; }
+      const top = +(sr.top || 0), bot = +(sr.bot || 0);
+      if (midMD >= top && midMD <= bot) {
+        const id = _fdGetID(sr);
+        if (idIn == null || id < idIn) idIn = id;
+      }
     }
+    if (idIn == null) idIn = 8.5;                  // fallback if outside all strings
+    const idHW = inToPx(idIn) / 2;
 
     const col = _fdColor(row.element);
-    const hw  = Math.max(idHW * 0.85, 4);
+    const hw  = Math.max(idHW * 0.95, 3);          // span the inner bore (small inset)
 
     // Orient the marker ACROSS the wellbore at the local inclination (not flat
     // horizontal): sample the path just above/below this MD, get the tangent in
