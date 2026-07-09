@@ -1,6 +1,103 @@
 // ===== FINAL DIAGRAM =====
 // Well completion diagram following actual wellpath geometry (TVD vs departure).
 
+// ── Draggable label state (mirrors the well-schematic pattern) ────────────────
+const _fdDrag = { offsets: new Map(), areas: [], active: null, _sid: null };
+
+function _fdStorageKey() { return `qp_fd_offsets_${qpState.currentScenarioId || 'none'}`; }
+
+function _fdSave() {
+  const obj = {};
+  _fdDrag.offsets.forEach((v, k) => { obj[k] = v; });
+  try { localStorage.setItem(_fdStorageKey(), JSON.stringify(obj)); } catch (_) {}
+}
+
+function _fdLoad() {
+  const sid = qpState.currentScenarioId || 'none';
+  if (_fdDrag._sid === sid) return;
+  _fdDrag._sid = sid;
+  _fdDrag.offsets.clear();
+  try {
+    const raw = localStorage.getItem(_fdStorageKey());
+    if (raw) Object.entries(JSON.parse(raw)).forEach(([k, v]) => _fdDrag.offsets.set(k, v));
+  } catch (_) {}
+}
+
+function _fdInitDrag(canvas) {
+  if (canvas._fdDragReady) return;
+  canvas._fdDragReady = true;
+
+  // Prefer the top-most (last-drawn) label when hit-areas overlap — matches what
+  // the user sees on top of the pile-up.
+  const hit = (mx, my) => {
+    for (let i = _fdDrag.areas.length - 1; i >= 0; i--) {
+      const a = _fdDrag.areas[i];
+      if (mx >= a.x && mx <= a.x + a.w && my >= a.y && my <= a.y + a.h) return a;
+    }
+    return null;
+  };
+
+  canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;                       // left-drag only (right-click = CI)
+    const r = canvas.getBoundingClientRect();
+    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    if (!a) return;
+    const off = _fdDrag.offsets.get(a.key) || { dx: 0, dy: 0 };
+    _fdDrag.active = { key: a.key, startX: e.clientX - r.left, startY: e.clientY - r.top, origDX: off.dx, origDY: off.dy };
+    e.preventDefault();
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    if (!_fdDrag.active) { if (hit(mx, my)) canvas.style.cursor = 'grab'; else if (canvas.style.cursor === 'grab') canvas.style.cursor = ''; return; }
+    canvas.style.cursor = 'grabbing';
+    const { key, startX, startY, origDX, origDY } = _fdDrag.active;
+    _fdDrag.offsets.set(key, { dx: origDX + mx - startX, dy: origDY + my - startY });
+    drawFinalDiagram();
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    if (_fdDrag.active) _fdSave();
+    _fdDrag.active = null;
+    canvas.style.cursor = '';
+  });
+  canvas.addEventListener('mouseleave', () => { _fdDrag.active = null; });
+
+  // Double-click a label to reset it to the auto position.
+  canvas.addEventListener('dblclick', e => {
+    const r = canvas.getBoundingClientRect();
+    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    if (!a) return;
+    _fdDrag.offsets.delete(a.key);
+    _fdSave();
+    drawFinalDiagram();
+  });
+}
+
+// Draw a callout label block anchored at (ax,ay), with its text block at
+// (baseX,baseY) + the saved drag offset, a leader line following it, and a
+// registered hit-area for dragging. textLines: [{text, font, color, dy}].
+function _fdDrawLabel(ctx, key, ax, ay, baseX, baseY, leaderColor, textLines) {
+  const off = _fdDrag.offsets.get(key) || { dx: 0, dy: 0 };
+  const lx = baseX + off.dx, ly = baseY + off.dy;
+
+  ctx.strokeStyle = leaderColor; ctx.lineWidth = 0.8; ctx.setLineDash([3, 2]);
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(lx - 4, ly); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  let maxW = 0, minDy = Infinity, maxDy = -Infinity;
+  textLines.forEach(t => {
+    ctx.font = t.font; ctx.fillStyle = t.color;
+    ctx.fillText(t.text, lx, ly + t.dy);
+    maxW = Math.max(maxW, ctx.measureText(t.text).width);
+    if (t.dy < minDy) minDy = t.dy;
+    if (t.dy > maxDy) maxDy = t.dy;
+  });
+  _fdDrag.areas.push({ x: lx - 3, y: ly + minDy - 7, w: maxW + 8, h: (maxDy - minDy) + 14, key });
+}
+
 const _FD_COLORS = {
   'BPV':          '#2a5fa8',
   'Packer':       '#1a7a4a',
@@ -87,6 +184,10 @@ function drawFinalDiagram() {
   const c = _chartSetup('finalDiagramCanvas');
   if (!c) return;
   const { ctx, W, H } = c;
+
+  _fdLoad();
+  _fdInitDrag(c.ctx.canvas);
+  _fdDrag.areas = [];        // rebuilt each draw as labels are placed
 
   const survey  = qpState.survey;
   const hoRows  = handoverGet().filter(r => r.element && r.element.trim());
@@ -217,11 +318,11 @@ function drawFinalDiagram() {
     ctx.strokeStyle = col; ctx.lineWidth = 1;
     ctx.strokeRect(x - hw, y - 4, hw * 2, 8);
 
-    // Label to the right
+    // Draggable label to the right
     const label = row.element + (row.size ? ' ' + row.size : '');
-    ctx.font = 'bold 8px sans-serif'; ctx.fillStyle = col;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(label, x + hw + 6, y);
+    _fdDrawLabel(ctx, `ho:${row.element}:${Math.round(midMD)}`, x + hw, y, x + hw + 6, y, col, [
+      { text: label, font: 'bold 8px sans-serif', color: col, dy: 0 },
+    ]);
   });
 
   // ── Casing labels (leader lines to shoe) ─────────────────────────────────────
@@ -245,18 +346,12 @@ function drawFinalDiagram() {
     const line2 = `${row.def}`;
     const line3 = `MD: ${Math.round(botMD).toLocaleString()}ft`;
 
-    // Leader from shoe outward to the right edge
-    const lx = x + odHW + 6;
-    ctx.strokeStyle = wCol; ctx.lineWidth = 0.8; ctx.setLineDash([3, 2]);
-    ctx.beginPath(); ctx.moveTo(x + odHW, y); ctx.lineTo(lx + 4, y); ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.font = 'bold 8.5px sans-serif'; ctx.fillStyle = wCol;
-    ctx.fillText(line1, lx + 6, y - 7);
-    ctx.font = '8px sans-serif'; ctx.fillStyle = C.dim;
-    ctx.fillText(line2, lx + 6, y + 1);
-    ctx.fillText(line3, lx + 6, y + 9);
+    // Draggable callout label (leader follows it) — anchored at the shoe.
+    _fdDrawLabel(ctx, `cas:${row.def}:${Math.round(botMD)}`, x + odHW, y, x + odHW + 12, y, wCol, [
+      { text: line1, font: 'bold 8.5px sans-serif', color: wCol,  dy: -7 },
+      { text: line2, font: '8px sans-serif',        color: C.dim, dy: 1  },
+      { text: line3, font: '8px sans-serif',        color: C.dim, dy: 9  },
+    ]);
   });
 
   // ── Depth axis (TVD) ─────────────────────────────────────────────────────────
@@ -299,6 +394,10 @@ function drawFinalDiagram() {
   ctx.fillStyle = C.text; ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillText('Final Well Diagram', lPad + pw / 2, 10);
+
+  ctx.fillStyle = C.dim; ctx.font = '8px sans-serif';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+  ctx.fillText('drag labels · double-click to reset', W - 8, 12);
 
   // ── CI registration ─────────────────────────────────────────────────────────
   CI.register('finalDiagramCanvas', {
