@@ -64,15 +64,6 @@
       &nbsp;|&nbsp;
       <span id="hdrScenarioName">—</span>
     </div>
-    <button class="hdr-btn" onclick="generateReport()" title="Generate a printable well-program report (print to PDF)">📄 Report</button>
-    <button class="hdr-btn" onclick="exportScenario()" title="Export current scenario as JSON">⬇ Export</button>
-    <label  class="hdr-btn" style="cursor:pointer" title="Import a QuackPlan JSON scenario file">⬆ Import
-      <input type="file" accept=".json" style="display:none" onchange="importScenarioFile(this)">
-    </label>
-    <button class="hdr-btn" onclick="backupAll()" title="Back up ALL projects/wells/scenarios to one file">⬇ Backup</button>
-    <label  class="hdr-btn" style="cursor:pointer" title="Restore a full-hierarchy backup file (adds to current wells)">⬆ Restore
-      <input type="file" accept=".json" style="display:none" onchange="restoreBackupFile(this)">
-    </label>
     <button class="hdr-btn" onclick="showNewProjectModal()">+ Project</button>
     <button class="hdr-btn primary" onclick="qpCompute()">⚡ Run</button>
     <button class="hdr-btn" id="unitToggle" onclick="qpToggleUnits()" title="Toggle imperial / metric units">Imperial</button>
@@ -790,9 +781,22 @@
 
   <!-- RIGHT — Well Schematic -->
   <div class="panel-schematic">
-    <div class="schematic-header">Well Schematic</div>
-    <div class="schematic-canvas-wrap">
-      <canvas id="schematicCanvas"></canvas>
+    <div class="schematic-main">
+      <div class="schematic-header">Well Schematic</div>
+      <div class="schematic-canvas-wrap">
+        <canvas id="schematicCanvas"></canvas>
+      </div>
+    </div>
+    <div class="schematic-toolbar">
+      <button class="tool-btn" onclick="generateReport()" title="Generate a printable well-program report (print to PDF)">📄 Report</button>
+      <button class="tool-btn" onclick="exportScenario()" title="Export current scenario as JSON">⬇ Export</button>
+      <label  class="tool-btn" title="Import a QuackPlan JSON scenario file">⬆ Import
+        <input type="file" accept=".json" style="display:none" onchange="importScenarioFile(this)">
+      </label>
+      <button class="tool-btn" onclick="backupAll()" title="Back up ALL projects/wells/scenarios to one file">⬇ Backup</button>
+      <label  class="tool-btn" title="Restore a full-hierarchy backup file (adds to current wells)">⬆ Restore
+        <input type="file" accept=".json" style="display:none" onchange="restoreBackupFile(this)">
+      </label>
     </div>
   </div>
 
