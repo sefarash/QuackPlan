@@ -439,10 +439,19 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
     const yMSL = Math.max(yMSL_sc, yGL  + MIN_GAP);
 
     if (yGL < yBot) {
-      ctx.strokeStyle = '#2a7a2a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-      ctx.beginPath(); ctx.moveTo(X0, yGL); ctx.lineTo(X1, yGL); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#2a7a2a'; ctx.font = 'bold 9px sans-serif';
+      // Ground fill below GL — makes the GL line read as the ground surface
+      // (the region above GL, between the rig floor/RKB and the ground, is the
+      // air gap the rig substructure spans).
+      ctx.fillStyle = 'rgba(150, 120, 70, 0.13)';
+      ctx.fillRect(0, yGL, W, Math.min(yBot, H) - yGL);
+      // Ground-surface line (solid, earth tone) + hatch ticks
+      ctx.strokeStyle = '#8a7040'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(0, yGL); ctx.lineTo(W, yGL); ctx.stroke();
+      ctx.lineWidth = 1;
+      for (let gx = 4; gx < W; gx += 9) {
+        ctx.beginPath(); ctx.moveTo(gx, yGL); ctx.lineTo(gx - 4, yGL + 4); ctx.stroke();
+      }
+      ctx.fillStyle = '#6f5a30'; ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       ctx.fillText('GL', LBL, yGL - 1);
       _drawBracket(ctx, BRKT, yRKB, yGL, _bd(rkb), '#1a5f7a');
