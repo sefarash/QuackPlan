@@ -123,7 +123,7 @@ function drawSchematic(survey) {
 
   // For onshore wells, casings whose top=0 (RKB) are drawn starting at the GL line
   const _d = qpState.wellDatums;
-  const _MIN_GAP = 16;
+  const _MIN_GAP = 24;
   let y_GL_casing = PAD_T; // default: no adjustment
   let glCasingMD  = 0;     // ground-level MD (seabed offshore / GL onshore); the
                            // top=0 → GL clamp only applies to casing set BELOW this,
@@ -230,9 +230,10 @@ function drawSchematic(survey) {
       ctx.beginPath(); ctx.moveTo(cx + halfW, yTop); ctx.lineTo(cx + halfW, yBot); ctx.stroke();
     }
 
-    // Shoe triangles
+    // Shoe triangles — never taller than the casing body, so a sliver casing's
+    // shoe can't poke up above its own top (e.g. above the GL/mudline line).
     if (!isOH) {
-      const sh = Math.min(11, halfW * 0.55);
+      const sh = Math.min(11, halfW * 0.55, Math.max(2, yBot - yTop));
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.moveTo(cx - halfW,      yBot);
@@ -351,7 +352,7 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   const BRKT = X0 + 14;
 
   const yRKB    = PAD_T;
-  const MIN_GAP = 16;
+  const MIN_GAP = 24;
   const yBot    = H - PAD_B;
 
   const rkb = datums?.rkb || 0;
