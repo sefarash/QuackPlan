@@ -198,13 +198,16 @@ function drawSchematic(survey) {
     const top   = +(row.top  || 0);
     const bot   = +(row.bot  || maxDepth);
     const halfW = (size / 2) * odScale;
-    // top=0 casings start at GL (onshore) or seabed (offshore), not at RKB —
-    // but only if the shoe is actually BELOW that line, otherwise the clamp would
-    // invert the casing (draw it upward above the mudline).
-    const yTop  = (top === 0 && y_GL_casing > PAD_T && bot > glCasingMD)
-      ? y_GL_casing
-      : PAD_T + Math.max(0, top) * scaleY;
-    const yBot  = PAD_T + Math.min(maxDepth, bot) * scaleY;
+    // top=0 casings start at GL (onshore) or seabed (offshore) when they are
+    // actually set BELOW that line; a casing whose shoe is above it (e.g. a
+    // conductor above the mudline) draws normally from RKB instead.
+    const belowGL = (top === 0 && y_GL_casing > PAD_T && bot > glCasingMD);
+    const yTop  = belowGL ? y_GL_casing : PAD_T + Math.max(0, top) * scaleY;
+    let   yBot  = PAD_T + Math.min(maxDepth, bot) * scaleY;
+    // On a very deep well the datum lines are spread apart by a min-gap, which can
+    // push the GL/seabed line below a shallow below-ground casing's true pixel
+    // depth — keep such a casing a thin sliver just below GL rather than inverting.
+    if (belowGL && yBot < yTop + 2) yBot = yTop + 2;
     const color = WALL[row.def] || '#2a7fa8';
     const isOH  = row.def === 'Open Hole';
 
