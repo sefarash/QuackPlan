@@ -198,10 +198,12 @@ function drawSchematic(survey) {
     const top   = +(row.top  || 0);
     const bot   = +(row.bot  || maxDepth);
     const halfW = (size / 2) * odScale;
-    // top=0 casings start at GL (onshore) or seabed (offshore) when they are
-    // actually set BELOW that line; a casing whose shoe is above it (e.g. a
-    // conductor above the mudline) draws normally from RKB instead.
-    const belowGL = (top === 0 && y_GL_casing > PAD_T && bot > glCasingMD);
+    // Casings whose top is at/above ground level (top ≤ GL/seabed MD — e.g. run
+    // from the wellhead: top 0 at RKB, or top = air-gap depth at GL) start at the
+    // GL/seabed line, not at RKB. Only when their shoe is actually below that line
+    // (bot > GL) — a casing entirely above it (a conductor above the mudline)
+    // draws normally from RKB instead.
+    const belowGL = (top <= glCasingMD && y_GL_casing > PAD_T && bot > glCasingMD);
     const yTop  = belowGL ? y_GL_casing : PAD_T + Math.max(0, top) * scaleY;
     let   yBot  = PAD_T + Math.min(maxDepth, bot) * scaleY;
     // On a very deep well the datum lines are spread apart by a min-gap, which can
