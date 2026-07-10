@@ -102,58 +102,46 @@ async function _importScenarioDoc(doc) {
     return;
   }
 
-  const sid = qpState.currentScenarioId;
-  if (!sid) {
-    alert('Select or create a scenario first, then import into it.');
-    return;
+  const meta = doc.meta   || {};
+  const inp  = doc.inputs || {};
+
+  setStatus('Importing…');
+  try {
+    // Import creates a NEW project → field → well → borehole → scenario chain from
+    // the file's meta — it does NOT merge into whatever scenario is currently open.
+    const projId = await dbAdd({ parentId: null,   name: meta.project  || 'Imported Project', type: 'project' });
+    const fldId  = await dbAdd({ parentId: projId,  name: meta.field    || 'Field',            type: 'field'   });
+    const wellId = await dbAdd({ parentId: fldId,   name: meta.well     || 'Well',             type: 'well',
+      data: {
+        environment: meta.environment || 'onshore',
+        rkb:         meta.rkb != null ? +meta.rkb : 0,
+        gl:          meta.gl  != null ? +meta.gl  : 0,
+        seaBedDepth: meta.seaBedDepth != null ? +meta.seaBedDepth : 0,
+      } });
+    const bhId   = await dbAdd({ parentId: wellId,  name: meta.borehole || 'Borehole',         type: 'borehole' });
+
+    // Build the scenario's full data (inputs + output controls + casing ratings)
+    // and create the scenario node in one shot.
+    const data = {};
+    Object.entries(inp).forEach(([k, v]) => { data[k] = v; });
+    if (doc.outputControls && Object.keys(doc.outputControls).length) data.outputControls = doc.outputControls;
+    if (doc.casingRatings  && Object.keys(doc.casingRatings).length)  data.cdRatings      = doc.casingRatings;
+    const scId = await dbAdd({ parentId: bhId, name: meta.scenario || 'Scenario', type: 'scenario', data });
+
+    // Refresh the tree and open the newly-imported scenario.
+    if (typeof hierarchyRefresh === 'function') await hierarchyRefresh();
+    if (typeof _selectNode === 'function') {
+      _selectNode({ id: scId, type: 'scenario', parentId: bhId });
+    }
+    localStorage.setItem('qp_lastScenarioId', scId);
+    if (typeof hierarchyRefresh === 'function') await hierarchyRefresh();
+
+    setStatus(`Imported new project: ${meta.project || 'Imported Project'}`);
+  } catch (e) {
+    console.error('import failed:', e);
+    setStatus('Import failed — ' + (e.message || e), true);
+    alert('Import failed: ' + (e.message || e));
   }
-
-  const inp = doc.inputs || {};
-
-  // Clear frozen chart snapshots / annotations from the previous scenario
-  if (typeof CI !== 'undefined' && CI.clearAll) CI.clearAll();
-
-  // Clear all input tables (same as _loadScenario)
-  ['traj1Body','traj2Body','tortBody','schematicBody','bhaBody',
-   'nozzleBody','mwdBody','activityBody','servicesBody',
-   'casingCostBody','handoverBody'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = '';
-  });
-
-  if (inp.traj1?.length)   trajLoadRows(inp.traj1);
-  if (inp.traj2?.length)   traj2LoadRows(inp.traj2);
-  if (inp.tort?.length)    tortLoadState(inp.tort);
-  if (inp.schematic)       schematicLoadRows(inp.schematic);
-  if (inp.fluid)           fluidLoadState(inp.fluid);
-  if (inp.bha)             bhaLoadState(inp.bha);
-  if (inp.nozzles)         nozzleLoadState(inp.nozzles);
-                           mwdLoadState(inp.mwd);
-  if (inp.activity)        activityLoadState(inp.activity);
-                           handoverLoadState(inp.handover);
-  if (inp.ppfg)            ppfgLoadState(inp.ppfg);
-
-  // Restore output controls into the DOM and persist to the target scenario
-  if (doc.outputControls && Object.keys(doc.outputControls).length) {
-    if (typeof loadOutputControls === 'function') loadOutputControls(doc.outputControls);
-    dbSaveScenarioData(sid, 'outputControls', doc.outputControls);
-  }
-
-  // Restore casing ratings
-  if (doc.casingRatings && Object.keys(doc.casingRatings).length) {
-    cdRatingsLoadState(doc.casingRatings);
-    dbSaveScenarioData(sid, 'cdRatings', doc.casingRatings);
-  }
-
-  // Persist all inputs to IndexedDB
-  const savePromises = Object.entries(inp).map(([key, val]) =>
-    dbSaveScenarioData(sid, key, val)
-  );
-  await Promise.all(savePromises);
-
-  // Trigger full recompute so charts update
-  qpCompute();
-  setStatus(`Imported: ${doc.meta?.scenario || file?.name || 'scenario'}`);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
