@@ -125,12 +125,17 @@ function drawSchematic(survey) {
   const _d = qpState.wellDatums;
   const _MIN_GAP = 16;
   let y_GL_casing = PAD_T; // default: no adjustment
+  let glCasingMD  = 0;     // ground-level MD (seabed offshore / GL onshore); the
+                           // top=0 → GL clamp only applies to casing set BELOW this,
+                           // else a casing shallower than the mudline would invert.
   if (_d && _d.environment === 'offshore') {
     // Offshore: top=0 casings start at seabed (or at MSL if no water depth set)
     const seabedMD  = (_d.rkb || 0) + (_d.seaBedDepth || 0);
+    glCasingMD      = seabedMD;
     const _ySB_sc   = PAD_T + Math.min(seabedMD, maxDepth) * scaleY;
     y_GL_casing = Math.max(_ySB_sc, PAD_T + _MIN_GAP);
   } else if (_d && _d.environment !== 'offshore' && (_d.rkb || 0) > 0) {
+    glCasingMD      = _d.rkb;
     const _yGL_sc = PAD_T + Math.min(_d.rkb, maxDepth) * scaleY;
     y_GL_casing = Math.max(_yGL_sc, PAD_T + _MIN_GAP);
   }
@@ -193,8 +198,10 @@ function drawSchematic(survey) {
     const top   = +(row.top  || 0);
     const bot   = +(row.bot  || maxDepth);
     const halfW = (size / 2) * odScale;
-    // top=0 casings start at GL (onshore) or seabed (offshore), not at RKB
-    const yTop  = (top === 0 && y_GL_casing > PAD_T)
+    // top=0 casings start at GL (onshore) or seabed (offshore), not at RKB —
+    // but only if the shoe is actually BELOW that line, otherwise the clamp would
+    // invert the casing (draw it upward above the mudline).
+    const yTop  = (top === 0 && y_GL_casing > PAD_T && bot > glCasingMD)
       ? y_GL_casing
       : PAD_T + Math.max(0, top) * scaleY;
     const yBot  = PAD_T + Math.min(maxDepth, bot) * scaleY;
