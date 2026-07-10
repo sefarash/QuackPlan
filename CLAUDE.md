@@ -2,15 +2,44 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠ RULE #1 — USER DATA IS SACRED
+
+**No code change may ever affect, delete, overwrite, or strand user data.** Users store real
+well-planning work (projects → wells → scenarios) in the production D1 database — and, for the
+pre-server era, in browser IndexedDB/localStorage. This rule applies to EVERY change:
+
+- **DB schema:** additive migrations only (`migrations/000N_*.sql`, new `if`-guarded steps).
+  NEVER `DROP`/`DELETE`/rewrite existing tables or edit an already-shipped migration.
+  Never run destructive SQL against the remote DB.
+- **API/Worker:** endpoints must never mass-delete or overwrite nodes beyond exactly what the
+  user asked for (deletes are scoped to the node + its descendants, per owner).
+- **Client:** load/init paths must never auto-save empty/default state over stored data; saves go
+  through `dbSaveScenarioData` (atomic per-key). Imports/restores are ADDITIVE — create new
+  nodes, never replace or merge-over existing ones.
+- **Serialization/rename:** never rename or repurpose stored data keys (`traj1`, `bha`, `fluid`,
+  `schematic`, …) without a migration that carries the old data forward.
+- **localStorage:** keys like `qp_token`, `qp_lastScenarioId`, `qp_sch_offsets_*`,
+  `qp_fd_offsets_*` may be added to, but not cleared or repurposed.
+- **Verify before deploy:** any change that touches persistence must be proven data-safe
+  (round-trip test: existing data still loads unchanged after the change).
+
+When in doubt, prefer leaving stale data unread over migrating it destructively — unread data is
+recoverable, deleted data is not.
+
 ## Running the app
 
-No build step, no npm, no server required. Open directly in a browser:
+Local dev needs the Worker (the app is served by a Cloudflare Worker with a D1-backed API):
 
 ```
-open index.html
+npm install                    # once — installs wrangler (dev tooling only; client stays framework-free)
+npx wrangler d1 migrations apply quackplan-db --local   # once per fresh checkout
+npx wrangler dev --local       # serves app + API at http://localhost:8787
 ```
 
-All files are plain HTML/CSS/JS. There are no tests, no linter, and no package.json. Syntax-check JS files with:
+Production: `npx wrangler deploy` (after `wrangler login`). Live at https://quackplan.com.
+
+All client files are plain HTML/CSS/JS — no build step, no bundler, no framework. There are no
+tests and no linter. Syntax-check JS files with:
 
 ```
 node -e "const fs=require('fs'); new Function(fs.readFileSync('js/filename.js','utf8'))"
@@ -118,7 +147,7 @@ Torque and Overpull draw functions call `tdCompute()` directly for each FF sensi
 
 ### Unit system (`js/units.js`)
 
-`QP_UNITS` holds the active system (`imperial` | `metric`, persisted in localStorage; header toggle). **Imperial is canonical**: everything stored in IndexedDB, in `qpState`, and inside every compute engine is imperial. Conversion happens *only* at the display/input boundary:
+`QP_UNITS` holds the active system (`imperial` | `metric`, persisted in localStorage; header toggle). **Imperial is canonical**: everything stored in the database (D1 via the API), in `qpState`, and inside every compute engine is imperial. Conversion happens *only* at the display/input boundary:
 
 - `QP_UNITS.fromDisplay(qty, v)` — input field (display) → imperial, at read/save time
 - `QP_UNITS.toDisplay(qty, v)` — imperial → display, when rendering cells/labels/charts
@@ -131,9 +160,20 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 
 ### Persistence
 
-- `db-engine.js` — IndexedDB for hierarchy tree and all scenario inputs (survey, BHA, schematic, fluid, trajectory options). Persisted automatically on every change.
-- `js/output-controls.js` — `localStorage` for output panel control values (FF sliders, TAB, block weight, MW, flow rate). Restored on page load; a single delegated listener on `document.body` saves on every `change`/`input` event.
+**See RULE #1 at the top — no change may ever affect user data.**
+
+- `db-engine.js` — thin client for the Worker API (`/api/nodes`, `/api/auth`); data lives in
+  **Cloudflare D1** (`worker/index.js`, `migrations/`), private per user account. Function names
+  and promise contracts are unchanged from the old IndexedDB engine, so callers didn't change.
+  Per-key scenario saves are atomic (`json_set`) — no read-modify-write races.
+- `js/auth-ui.js` — login/signup overlay; session token in localStorage `qp_token`;
+  `hierarchyBoot()` loads the tree only after auth.
+- Output-panel controls are saved per-scenario into the scenario node (`outputControls` key).
+- `localStorage` also holds: unit system, theme, `qp_lastScenarioId`, label-drag offsets
+  (`qp_sch_offsets_*`, `qp_fd_offsets_*`).
 - Freeze snapshots and annotation state (CI) are in-memory only and lost on page refresh.
+- Safety nets: per-scenario ⬇ Export / ⬆ Import (import creates a NEW project) and whole-tree
+  ⬇ Backup / ⬆ Restore (additive, id-remapped) — in the toolbar next to the Well Schematic.
 
 ### Catalogue and custom overrides
 
