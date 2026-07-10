@@ -158,8 +158,6 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | `js/output-controls.js` | Output panel control persistence (localStorage) |
 | `js/hierarchy-ui.js` | Project/well/scenario tree — collapsible, persists collapse state |
 | `js/bha-catalogue.js` | Drill pipe, drill collar, HWDP catalogue data + lookup helpers |
-| `js/anticollision-engine.js` | Min-distance + separation-factor vs offset well — `acCompute()` |
-| `js/error-model.js` | Reduced ISCWSA-style positional covariance — `emCovariance()` / `emProject()` |
 
 ---
 
@@ -179,7 +177,6 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | BHA table (DP / DC / HWDP catalogue + custom OD override) | Done |
 | Casing design (burst / collapse SF) | Done |
 | AFE cost estimation | Done |
-| Anti-collision proximity (min distance + separation factor vs offset well) | Done |
 | Trajectory plan view + VS plot | Done |
 | Project / well / scenario hierarchy (collapsible, IndexedDB) | Done |
 | Output panel control persistence (localStorage) | Done |
