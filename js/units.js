@@ -39,6 +39,7 @@ const QP_UNITS = (() => {
     mass:   { factor: 0.4535924,  imp: 'lbs',     met: 'kg'    },
     volume: { factor: 0.1589873,  imp: 'bbl',     met: 'm³'    },
     pgrad:  { factor: 22.62060,   imp: 'psi/ft',  met: 'kPa/m' }, // pressure gradient
+    speed:  { factor: 0.3048,     imp: 'ft/min',  met: 'm/min' }, // trip speed
   };
 
   function _factor(qty, sys) {

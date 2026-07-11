@@ -20,6 +20,8 @@ const _OC_IDS = [
   'bsBlock', 'bsDPwt', 'bsMW', 'bsFFlo', 'bsFFmid', 'bsFFhi', 'bsMaxHL',
   // Hydraulics
   'hydMWmin', 'hydMWslider', 'hydMWmax', 'hydFlowMin', 'hydFlowSlider', 'hydFlowMax',
+  // Surge / Swab
+  'ssSpeedMin', 'ssSpeedMax', 'ssShowData', 'ssShowPP', 'ssShowFP',
   // Casing design
   'cdSFBurst', 'cdSFCollapse',
   // NOTE: the kick-tolerance model inputs (ktSafety/ktSurfTemp/ktGeoGrad/
@@ -40,6 +42,8 @@ const _OC_UNITS = {
   buckWOB: 'force',
   ovpBlock: 'force', ovpDPwt: 'linwt', ovpMW: 'mw',
   bsBlock: 'force',  bsDPwt: 'linwt',  bsMW: 'mw',  bsMaxHL: 'force',
+  // Surge / Swab trip speeds
+  ssSpeedMin: 'speed', ssSpeedMax: 'speed',
 };
 const _OC_SLIDER_SET = new Set(['hydMWmin','hydMWslider','hydMWmax','hydFlowMin','hydFlowSlider','hydFlowMax']);
 

@@ -636,15 +636,15 @@
       <div class="chart-controls" style="margin-top:8px;margin-bottom:4px">
         <label style="display:flex;align-items:center;gap:6px;font-size:12px">
           Min Speed
-          <input type="number" id="ssSpeedMin" value="20" step="5" min="5" max="500"
+          <input type="number" id="ssSpeedMin" value="20" step="5" min="1" max="500"
             style="width:64px" onchange="drawSurgeSwab()">
-          ft/min
+          <span id="uSsSpeedMin">ft/min</span>
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px">
           Max Speed
-          <input type="number" id="ssSpeedMax" value="100" step="5" min="5" max="500"
+          <input type="number" id="ssSpeedMax" value="100" step="5" min="1" max="500"
             style="width:64px" onchange="drawSurgeSwab()">
-          ft/min
+          <span id="uSsSpeedMax">ft/min</span>
         </label>
         <div class="header-sep" style="height:20px;margin:0 4px"></div>
         <label style="display:flex;align-items:center;gap:4px;font-size:12px">

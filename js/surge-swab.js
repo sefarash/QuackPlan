@@ -145,6 +145,11 @@ function _ssDrawTable(ctx, C, rows, reverse, x, y, title) {
   const TW  = CW.reduce((s, w) => s + w, 0) + 8;
   const TH  = RH * (display.length + 2) + 6;
 
+  // Rows hold imperial values (ft, ft/min) — convert at render only
+  const toD    = v => Math.round(QP_UNITS.toDisplay('depth', v)).toLocaleString();
+  const metric = QP_UNITS.isMetric();
+  const fmtSpd = v => metric ? (Math.round(QP_UNITS.toDisplay('speed', v) * 10) / 10) : v;
+
   ctx.fillStyle = 'rgba(20,30,45,0.82)';
   ctx.fillRect(x, y, TW, TH);
 
@@ -155,15 +160,15 @@ function _ssDrawTable(ctx, C, rows, reverse, x, y, title) {
   ctx.font = '8px sans-serif';
   const hdrY = y + RH + 2;
   ctx.fillStyle = C.dim;
-  ctx.fillText('From ft', x + 4 + CW[0] / 2, hdrY);
-  ctx.fillText('To ft',   x + 4 + CW[0] + CW[1] / 2, hdrY);
-  ctx.fillText('ft/min',  x + 4 + CW[0] + CW[1] + CW[2] / 2, hdrY);
+  ctx.fillText(`From ${QP_UNITS.label('depth')}`, x + 4 + CW[0] / 2, hdrY);
+  ctx.fillText(`To ${QP_UNITS.label('depth')}`,   x + 4 + CW[0] + CW[1] / 2, hdrY);
+  ctx.fillText(QP_UNITS.label('speed'),           x + 4 + CW[0] + CW[1] + CW[2] / 2, hdrY);
 
   display.forEach((row, i) => {
     const ry = hdrY + (i + 1) * RH;
     ctx.fillStyle = C.text;
-    ctx.fillText(Math.round(row.from).toLocaleString(), x + 4 + CW[0] / 2, ry);
-    ctx.fillText(Math.round(row.to).toLocaleString(),   x + 4 + CW[0] + CW[1] / 2, ry);
+    ctx.fillText(toD(row.from), x + 4 + CW[0] / 2, ry);
+    ctx.fillText(toD(row.to),   x + 4 + CW[0] + CW[1] / 2, ry);
     if (row.maxSpeed === 'N.R.') {
       ctx.fillStyle = '#8bc34a';
       ctx.fillText('N.R.', x + 4 + CW[0] + CW[1] + CW[2] / 2, ry);
@@ -173,7 +178,7 @@ function _ssDrawTable(ctx, C, rows, reverse, x, y, title) {
     } else {
       const ci = SS_SPEEDS.indexOf(row.maxSpeed);
       ctx.fillStyle = ci >= 0 ? SS_COLORS[ci] : C.text;
-      ctx.fillText(row.maxSpeed, x + 4 + CW[0] + CW[1] + CW[2] / 2, ry);
+      ctx.fillText(fmtSpd(row.maxSpeed), x + 4 + CW[0] + CW[1] + CW[2] / 2, ry);
     }
   });
 }
@@ -194,10 +199,26 @@ function drawSurgeSwab() {
   const maxMD  = survey[survey.length - 1].md;
   const maxTVD = survey[survey.length - 1].tvd;
 
-  // ── Input values ─────────────────────────────────────────────────────────────
-  const vMin = Math.max(5,  +(document.getElementById('ssSpeedMin')?.value || 20));
-  const vMax = Math.max(vMin + 4, +(document.getElementById('ssSpeedMax')?.value || 100));
-  // 5 equal increments from vMin to vMax
+  // ── Display converters (engine stays imperial: ppg, ft, ft/min) ─────────────
+  const toMW  = v => QP_UNITS.toDisplay('mw',    v);
+  const toD   = v => QP_UNITS.toDisplay('depth', v);
+  const toSpd = v => QP_UNITS.toDisplay('speed', v);
+  const uMW   = QP_UNITS.label('mw');
+  const uD    = QP_UNITS.label('depth');
+  const uSpd  = QP_UNITS.label('speed');
+  const metric = QP_UNITS.isMetric();
+  const fmtEcd = v => metric ? v.toFixed(0) : v.toFixed(2);          // axis ticks (display units)
+  const fmtSpd = v => metric ? (Math.round(toSpd(v) * 10) / 10) : v; // legend/table (display units)
+
+  // ── Input values — speed fields are display units → imperial (empty falls
+  //    back to the imperial HTML defaults un-converted) ────────────────────────
+  const _vMinRaw = document.getElementById('ssSpeedMin')?.value;
+  const _vMaxRaw = document.getElementById('ssSpeedMax')?.value;
+  const vMin = Math.max(5,
+    (_vMinRaw === '' || _vMinRaw == null) ? 20 : QP_UNITS.fromDisplay('speed', +_vMinRaw));
+  const vMax = Math.max(vMin + 4,
+    (_vMaxRaw === '' || _vMaxRaw == null) ? 100 : QP_UNITS.fromDisplay('speed', +_vMaxRaw));
+  // 5 equal increments from vMin to vMax (imperial ft/min internally)
   SS_SPEEDS = Array.from({ length: 5 }, (_, i) => Math.round(vMin + i * (vMax - vMin) / 4));
   const mwBase   = g.mwFluid;
   const showPP   = document.getElementById('ssShowPP')?.checked;
@@ -223,10 +244,13 @@ function drawSurgeSwab() {
   if (showFP && ppfgPts.length) {
     for (const pt of ppfgPts) xMax = Math.max(xMax, pt.fg + 0.1);
   }
-  // Symmetric padding, round to 0.05 increments
-  const span = xMax - xMin;
-  xMin = Math.floor((xMin - span * 0.06) * 20) / 20;
-  xMax = Math.ceil( (xMax + span * 0.06) * 20) / 20;
+  // Convert the axis range to display units, pad symmetrically, and round to a
+  // unit-appropriate step (0.05 ppg / 5 kg/m³)
+  let xMinD = toMW(xMin), xMaxD = toMW(xMax);
+  const spanD = xMaxD - xMinD, stepD = metric ? 5 : 0.05;
+  xMinD = Math.floor((xMinD - spanD * 0.06) / stepD) * stepD;
+  xMaxD = Math.ceil( (xMaxD + spanD * 0.06) / stepD) * stepD;
+  const yMaxD = toD(maxMD);
 
   // ── Layout ───────────────────────────────────────────────────────────────────
   // R must fit the right-hand TVD tick labels ("17,100" ≈ 40px) plus the rotated
@@ -234,37 +258,37 @@ function drawSurgeSwab() {
   const L = 62, T = 78, R = 60, B = 36;
   const pw = W - L - R, ph = H - T - B;
 
-  // Coordinate mappers
-  const cx = ecd => L + (ecd - xMin) / (xMax - xMin) * pw;
-  const cy = md  => T + (md  / maxMD) * ph;
+  // Coordinate mappers (display units in, pixels out)
+  const cx = ecdD => L + (ecdD - xMinD) / (xMaxD - xMinD) * pw;
+  const cy = mdD  => T + (mdD  / yMaxD) * ph;
 
   // ── Grid ──────────────────────────────────────────────────────────────────────
   const N_X = 6, N_Y = 6;
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= N_X; i++) {
-    const ecd = xMin + (xMax - xMin) * i / N_X;
-    const gx  = cx(ecd);
+    const ecdD = xMinD + (xMaxD - xMinD) * i / N_X;
+    const gx   = cx(ecdD);
     ctx.beginPath(); ctx.moveTo(gx, T); ctx.lineTo(gx, T + ph); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(ecd.toFixed(2), gx, T + ph + 3);
+    ctx.fillText(fmtEcd(ecdD), gx, T + ph + 3);
     // Skip the top-axis label at the left corner — it collided with the MD "0" tick
     if (i > 0) {
       ctx.textBaseline = 'bottom';
-      ctx.fillText(ecd.toFixed(2), gx, T - 2);
+      ctx.fillText(fmtEcd(ecdD), gx, T - 2);
     }
   }
   for (let i = 0; i <= N_Y; i++) {
-    const md = maxMD * i / N_Y;
-    const gy = cy(md);
+    const mdImp = maxMD * i / N_Y;          // imperial for the survey lookup
+    const gy    = cy(toD(mdImp));
     ctx.beginPath(); ctx.moveTo(L, gy); ctx.lineTo(L + pw, gy); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText(Math.round(md).toLocaleString(), L - 4, gy);
+    ctx.fillText(Math.round(toD(mdImp)).toLocaleString(), L - 4, gy);
     // TVD labels on right
-    const tvd = _tvdAt(survey, md);
+    const tvd = _tvdAt(survey, mdImp);
     ctx.textAlign = 'left';
-    ctx.fillText(Math.round(tvd).toLocaleString(), L + pw + 4, gy);
+    ctx.fillText(Math.round(toD(tvd)).toLocaleString(), L + pw + 4, gy);
   }
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(L, T, pw, ph);
@@ -272,13 +296,13 @@ function drawSurgeSwab() {
   // Axis titles
   ctx.fillStyle = C.text; ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  ctx.fillText('ECD at Bottom [ppg]', L + pw / 2, T + ph + 20);
+  ctx.fillText(`ECD at Bottom [${uMW}]`, L + pw / 2, T + ph + 20);
 
   ctx.save();
   ctx.translate(12, T + ph / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   ctx.fillStyle = C.text;
-  ctx.fillText('MD (ft)', 0, 0);
+  ctx.fillText(`MD (${uD})`, 0, 0);
   ctx.restore();
 
   // Right axis label (TVD)
@@ -286,21 +310,21 @@ function drawSurgeSwab() {
   ctx.translate(W - 10, T + ph / 2); ctx.rotate(Math.PI / 2);
   ctx.font = '10px sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   ctx.fillStyle = C.dim;
-  ctx.fillText('TVD (ft)', 0, 0);
+  ctx.fillText(`TVD (${uD})`, 0, 0);
   ctx.restore();
 
-  // ── CI storage — both fans, so freeze/tooltip see swab too ──────────────────
+  // ── CI storage — both fans, so freeze/tooltip see swab too (display coords) ─
   CI.storeLive(CID, SS_SPEEDS.flatMap((v, i) => [
-    { pts: surgeProfs[i].map(pt => ({ x: pt.ecdSurge - xMin, y: pt.md })),
-      color: SS_COLORS[i], label: `${v} ft/min surge` },
-    { pts: swabProfs[i].map(pt => ({ x: pt.ecdSwab - xMin, y: pt.md })),
-      color: SS_COLORS[i], label: `${v} ft/min swab` },
+    { pts: surgeProfs[i].map(pt => ({ x: toMW(pt.ecdSurge) - xMinD, y: toD(pt.md) })),
+      color: SS_COLORS[i], label: `${fmtSpd(v)} ${uSpd} surge` },
+    { pts: swabProfs[i].map(pt => ({ x: toMW(pt.ecdSwab) - xMinD, y: toD(pt.md) })),
+      color: SS_COLORS[i], label: `${fmtSpd(v)} ${uSpd} swab` },
   ]));
   CI.register(CID, {
     pad: { l: L, t: T, pw, ph },
-    xMax: xMax - xMin, yMax: maxMD,
-    xLabel: 'ECD (ppg)', yLabel: 'MD (ft)',
-    depthDown: true, xOffset: xMin,
+    xMax: xMaxD - xMinD, yMax: yMaxD,
+    xLabel: `ECD (${uMW})`, yLabel: `MD (${uD})`,
+    depthDown: true, xOffset: xMinD,
   });
   CI.drawFrozen(ctx, CID);
 
@@ -318,7 +342,7 @@ function drawSurgeSwab() {
       for (const st of survey) {
         if (st.tvd <= 0) continue;
         const ecd = _ppfgInterp(ppfgPts, st.tvd, field);
-        const x = cx(ecd), y = cy(st.md);
+        const x = cx(toMW(ecd)), y = cy(toD(st.md));
         first ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         first = false;
       }
@@ -331,7 +355,7 @@ function drawSurgeSwab() {
   // ── MW reference line ─────────────────────────────────────────────────────────
   ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
   ctx.strokeStyle = '#7a4aa0';
-  ctx.beginPath(); ctx.moveTo(cx(mwBase), T); ctx.lineTo(cx(mwBase), T + ph); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx(toMW(mwBase)), T); ctx.lineTo(cx(toMW(mwBase)), T + ph); ctx.stroke();
   ctx.setLineDash([]);
 
   // ── Speed curves ─────────────────────────────────────────────────────────────
@@ -342,7 +366,7 @@ function drawSurgeSwab() {
       ctx.beginPath();
       let first = true;
       for (const pt of pts) {
-        const x = cx(pt[field]), y = cy(pt.md);
+        const x = cx(toMW(pt[field])), y = cy(toD(pt.md));
         first ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         first = false;
       }
@@ -377,9 +401,22 @@ function drawSurgeSwab() {
     ctx.fillRect(lx, T - 22, 16, 4);
     ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`${v} ft/min`, lx + 20, T - 20);
+    ctx.fillText(`${fmtSpd(v)} ${uSpd}`, lx + 20, T - 20);
     lx += 76;
   });
 
   CI.drawAnnotations(ctx, CID);
 }
+
+// ── Unit-label spans on the speed inputs ──────────────────────────────────────
+// Field-value conversion on a unit toggle is handled centrally by
+// output-controls.js (_OC_UNITS has ssSpeedMin/ssSpeedMax), which also redraws
+// the active panel afterwards — this only relabels the spans.
+function _ssUpdateControlLabels() {
+  ['uSsSpeedMin', 'uSsSpeedMax'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = QP_UNITS.label('speed');
+  });
+}
+document.addEventListener('DOMContentLoaded', _ssUpdateControlLabels);
+if (typeof QP_UNITS !== 'undefined') QP_UNITS.onChange(_ssUpdateControlLabels);
