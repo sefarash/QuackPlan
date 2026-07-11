@@ -230,6 +230,7 @@ function _applyWellDatums(wellNode) {
     qpState.wellDatums = null;
   }
   if (qpState.survey?.length > 1) drawSchematic(qpState.survey);
+  if (typeof drawDatumDiagram === 'function') drawDatumDiagram();
 }
 
 function _loadScenario(id) {

@@ -399,74 +399,41 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   }
   _drawRigIcon(ctx, cx, yRKB, yLegBottom);
 
-  // ── Always draw RKB marker ────────────────────────────────────────────────
-  ctx.strokeStyle = '#1a5f7a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-  ctx.beginPath(); ctx.moveTo(X0, yRKB); ctx.lineTo(X1, yRKB); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#1a5f7a'; ctx.font = 'bold 9px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  ctx.fillText('RKB', LBL, yRKB - 1);
-
   if (!datums) return;
 
-  const gl     = datums.gl  || 0;
+  // NOTE: RKB/GL/MSL datum LABELS, dashed lines and brackets are no longer drawn
+  // here — they live in the dedicated datum diagram (js/datum-diagram.js) below
+  // the toolbar. The main schematic keeps only the PHYSICAL context: seabed line
+  // + water fill offshore, ground surface + fill onshore.
   const seaBed = datums.seaBedDepth || 0;
 
   if (env === 'offshore') {
-    const yMSL = yMSL_off;
-    const ySB  = ySB_off;
-
-    if (yMSL !== null && yMSL < yBot) {
-      ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-      ctx.beginPath(); ctx.moveTo(X0, yMSL); ctx.lineTo(X1, yMSL); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#0055aa'; ctx.font = 'bold 9px sans-serif';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-      ctx.fillText('MSL', LBL, yMSL - 1);
-      _drawBracket(ctx, BRKT, yRKB, yMSL, _bd(rkb), '#1a5f7a');
-    }
+    const ySB = ySB_off;
     if (ySB !== null && ySB < yBot && seaBed > 0) {
-      ctx.strokeStyle = '#b8976a'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-      ctx.beginPath(); ctx.moveTo(X0, ySB); ctx.lineTo(X1, ySB); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#b8976a'; ctx.font = 'bold 9px sans-serif';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-      ctx.fillText('SB', LBL, ySB - 1);
-      if (yMSL !== null && yMSL < yBot) _drawBracket(ctx, BRKT, yMSL, ySB, _bd(seaBed), '#0055aa');
+      // Seabed surface + formation fill below it
+      ctx.fillStyle = 'rgba(150, 120, 70, 0.13)';
+      ctx.fillRect(0, ySB, W, Math.min(yBot, H) - ySB);
+      ctx.strokeStyle = '#8a7040'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(0, ySB); ctx.lineTo(W, ySB); ctx.stroke();
+      ctx.lineWidth = 1;
+      for (let gx = 4; gx < W; gx += 9) {
+        ctx.beginPath(); ctx.moveTo(gx, ySB); ctx.lineTo(gx - 4, ySB + 4); ctx.stroke();
+      }
     }
   } else {
-    // Onshore: RKB → GL → MSL
-    const yGL_sc  = PAD_T + Math.min(rkb,      maxDepth) * scaleY;
-    const yMSL_sc = PAD_T + Math.min(rkb + gl, maxDepth) * scaleY;
-    const yGL  = Math.max(yGL_sc,  yRKB + MIN_GAP);
-    const yMSL = Math.max(yMSL_sc, yGL  + MIN_GAP);
-
+    const yGL_sc = PAD_T + Math.min(rkb, maxDepth) * scaleY;
+    const yGL    = Math.max(yGL_sc, yRKB + MIN_GAP);
     if (yGL < yBot) {
-      // Ground fill below GL — makes the GL line read as the ground surface
-      // (the region above GL, between the rig floor/RKB and the ground, is the
-      // air gap the rig substructure spans).
+      // Ground surface + fill below GL (the air gap above it is spanned by the
+      // rig substructure)
       ctx.fillStyle = 'rgba(150, 120, 70, 0.13)';
       ctx.fillRect(0, yGL, W, Math.min(yBot, H) - yGL);
-      // Ground-surface line (solid, earth tone) + hatch ticks
       ctx.strokeStyle = '#8a7040'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
       ctx.beginPath(); ctx.moveTo(0, yGL); ctx.lineTo(W, yGL); ctx.stroke();
       ctx.lineWidth = 1;
       for (let gx = 4; gx < W; gx += 9) {
         ctx.beginPath(); ctx.moveTo(gx, yGL); ctx.lineTo(gx - 4, yGL + 4); ctx.stroke();
       }
-      ctx.fillStyle = '#6f5a30'; ctx.font = 'bold 9px sans-serif';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-      ctx.fillText('GL', LBL, yGL - 1);
-      _drawBracket(ctx, BRKT, yRKB, yGL, _bd(rkb), '#1a5f7a');
-    }
-    if (yMSL < yBot && gl > 0) {
-      ctx.strokeStyle = '#0055aa'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-      ctx.beginPath(); ctx.moveTo(X0, yMSL); ctx.lineTo(X1, yMSL); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#0055aa'; ctx.font = 'bold 9px sans-serif';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-      ctx.fillText('MSL', LBL, yMSL - 1);
-      if (yGL < yBot) _drawBracket(ctx, BRKT, yGL, yMSL, _bd(gl), '#2a7a2a');
     }
   }
 }

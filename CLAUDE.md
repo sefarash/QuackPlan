@@ -195,6 +195,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | `js/state.js` | `qpState`, `switchOutputTab()`, `redrawOutputPanel()` |
 | `js/compute-engine.js` | `qpCompute()` orchestrator + hydraulics calculation |
 | `js/well-schematic-draw.js` | Right-panel schematic canvas + `_readSchematicRows()` |
+| `js/datum-diagram.js` | Fixed-scale RKB/GL/MSL datum mini-diagram (bottom of right panel) — `drawDatumDiagram()` |
 | `js/output-controls.js` | Output panel control persistence (localStorage) |
 | `js/hierarchy-ui.js` | Project/well/scenario tree — collapsible, persists collapse state |
 | `js/bha-catalogue.js` | Drill pipe, drill collar, HWDP catalogue data + lookup helpers |
