@@ -17,15 +17,33 @@ function _ssGeom() {
   const pv  = fluid.pv  || 16;
   const yp  = fluid.yp  || 13;
   const dpOD = bha.topDpOD_in ?? 5.0;
+  const tdMD = survey[survey.length - 1].md;
+
+  // Build a NON-OVERLAPPING innermost-geometry profile vs MD. Schematic rows are
+  // concentric strings whose MD ranges overlap (surface / intermediate /
+  // production casing all start near 0) — the pipe only sees the INNERMOST
+  // string at each depth. Summing every row (as before) counted the shallow
+  // intervals 3–4× and wildly overstated surge/swab. WellPlan integrates over
+  // the innermost wellbore diameter per depth; do the same via a boundary sweep.
   let segs = [];
   if (schRows.length) {
-    for (const row of schRows) {
-      const id = row.id_in ? +row.id_in : (+row.size * 0.88);
-      segs.push({ mdTop: +row.top || 0, mdBot: +row.bot || survey[survey.length - 1].md, dh: id });
+    const rows = schRows.map(r => ({
+      top: +r.top || 0,
+      bot: +r.bot || tdMD,
+      // Open hole IS its drilled diameter; casing flow bore is its ID (from the
+      // catalogue spec when present, else ≈ 0.88 × OD).
+      id:  r.def === 'Open Hole' ? +r.size
+         : (r.id_in ? +r.id_in : (+r.size * 0.88)),
+    })).filter(r => r.bot > r.top && r.id > 0);
+    const bounds = [...new Set(rows.flatMap(r => [r.top, r.bot]))].sort((a, b) => a - b);
+    for (let i = 0; i < bounds.length - 1; i++) {
+      const a = bounds[i], b = bounds[i + 1], mid = (a + b) / 2;
+      const covering = rows.filter(r => r.top <= mid && mid < r.bot);
+      if (!covering.length) continue;
+      segs.push({ mdTop: a, mdBot: b, dh: Math.min(...covering.map(r => r.id)) });
     }
-  } else {
-    segs.push({ mdTop: 0, mdBot: survey[survey.length - 1].md, dh: 8.5 });
   }
+  if (!segs.length) segs.push({ mdTop: 0, mdBot: tdMD, dh: 8.5 });
   return { survey, pv, yp, dpOD, segs, mwFluid: fluid.mudWeight || 10 };
 }
 
@@ -34,14 +52,17 @@ function _ssGeom() {
 function _ssSegPsi(v_ftmin, dh, dpOD, pv, yp, L) {
   if (L <= 0 || dh <= dpOD + 0.1) return 0;
   const ann = dh - dpOD; // annular clearance (in)
-  // Clamp-model annular velocity (ft/min, Burkhardt 0.45 factor)
-  const v_ann = v_ftmin * (dpOD * dpOD) / (dh * dh - dpOD * dpOD) * 0.45;
-  if (v_ann <= 0) return 0;
-  // Bingham plastic laminar annular pressure drop (psi) — Bourgoyne et al. eq. 4.44:
-  //   dP/dL = μ_p·v/(1000·(d2−d1)²) + τ_y/(200·(d2−d1))   [psi/ft, v in ft/min]
-  // The viscous denominator was 144000 (an erroneous ×144 factor) which made the
-  // viscous term negligible and understated surge/swab — trip limits too permissive.
-  return Math.max(pv * v_ann * L / (1000 * ann * ann) + yp * L / (200 * ann), 0);
+  // Burkhardt closed-pipe effective annular velocity (Bourgoyne eq. 4.94):
+  //   v̄_e = v_pipe · (K + A_p / A_a),  clinging constant K ≈ 0.45
+  // K ADDS to the displacement ratio (it was previously multiplied, understating
+  // the effective velocity ~4× for typical DP/hole geometry).
+  const ve_fps = v_ftmin * (0.45 + (dpOD * dpOD) / (dh * dh - dpOD * dpOD)) / 60; // → ft/s
+  if (ve_fps <= 0) return 0;
+  // Bingham plastic laminar annular pressure drop (Bourgoyne eq. 4.53, v̄ in FT/S):
+  //   dP/dL = μ_p·v̄/(1000·(d2−d1)²) + τ_y/(200·(d2−d1))   [psi/ft]
+  // The velocity fed here was previously in ft/min against the /1000 form, which
+  // overstated the viscous term 60×.
+  return Math.max(pv * ve_fps * L / (1000 * ann * ann) + yp * L / (200 * ann), 0);
 }
 
 // ── Per-station ECD profile ───────────────────────────────────────────────────
@@ -88,17 +109,26 @@ function _ssIntervals(surgeProfs, swabProfs, ppfgPts, survey) {
     const fg = _ppfgInterp(ppfgPts, tvd, 'fg');
     const pp = _ppfgInterp(ppfgPts, tvd, 'pp');
 
-    // Max surge speed: highest speed where ECD_surge ≤ FG at deepest point
-    let maxIn = 'N.R.';
+    // Max surge speed: FASTEST tested speed whose ECD_surge stays ≤ FG at the
+    // interval's deepest point. (Previously this broke on the first violating
+    // speed and reported the next slower one WITHOUT checking it — if 80 and
+    // 100 ft/min both violated, it reported 80 as safe.)
+    let maxIn = 0;                                   // none pass → STOP
     for (let si = SS_SPEEDS.length - 1; si >= 0; si--) {
       const pt = surgeProfs[si].find(p => p.md >= toMD) || surgeProfs[si][surgeProfs[si].length - 1];
-      if (pt.ecdSurge > fg) { maxIn = si > 0 ? SS_SPEEDS[si - 1] : 0; break; }
+      if (pt.ecdSurge <= fg) {
+        maxIn = (si === SS_SPEEDS.length - 1) ? 'N.R.' : SS_SPEEDS[si];
+        break;
+      }
     }
-    // Max swab speed: highest speed where ECD_swab ≥ PP at deepest point
-    let maxOut = 'N.R.';
+    // Max swab speed: FASTEST tested speed whose ECD_swab stays ≥ PP.
+    let maxOut = 0;
     for (let si = SS_SPEEDS.length - 1; si >= 0; si--) {
       const pt = swabProfs[si].find(p => p.md >= toMD) || swabProfs[si][swabProfs[si].length - 1];
-      if (pt.ecdSwab < pp) { maxOut = si > 0 ? SS_SPEEDS[si - 1] : 0; break; }
+      if (pt.ecdSwab >= pp) {
+        maxOut = (si === SS_SPEEDS.length - 1) ? 'N.R.' : SS_SPEEDS[si];
+        break;
+      }
     }
     inRows.push({ from: fromMD, to: toMD, maxSpeed: maxIn });
     outRows.push({ from: fromMD, to: toMD, maxSpeed: maxOut });
@@ -199,7 +229,9 @@ function drawSurgeSwab() {
   xMax = Math.ceil( (xMax + span * 0.06) * 20) / 20;
 
   // ── Layout ───────────────────────────────────────────────────────────────────
-  const L = 62, T = 78, R = 22, B = 36;
+  // R must fit the right-hand TVD tick labels ("17,100" ≈ 40px) plus the rotated
+  // axis title — 22px clipped/mangled them into the title.
+  const L = 62, T = 78, R = 60, B = 36;
   const pw = W - L - R, ph = H - T - B;
 
   // Coordinate mappers
@@ -216,8 +248,11 @@ function drawSurgeSwab() {
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(ecd.toFixed(2), gx, T + ph + 3);
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(ecd.toFixed(2), gx, T - 2);
+    // Skip the top-axis label at the left corner — it collided with the MD "0" tick
+    if (i > 0) {
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(ecd.toFixed(2), gx, T - 2);
+    }
   }
   for (let i = 0; i <= N_Y; i++) {
     const md = maxMD * i / N_Y;
@@ -254,11 +289,13 @@ function drawSurgeSwab() {
   ctx.fillText('TVD (ft)', 0, 0);
   ctx.restore();
 
-  // ── CI storage ────────────────────────────────────────────────────────────────
-  CI.storeLive(CID, SS_SPEEDS.map((v, i) => ({
-    pts: surgeProfs[i].map(pt => ({ x: pt.ecdSurge - xMin, y: pt.md })),
-    color: SS_COLORS[i], label: `${v} ft/min`,
-  })));
+  // ── CI storage — both fans, so freeze/tooltip see swab too ──────────────────
+  CI.storeLive(CID, SS_SPEEDS.flatMap((v, i) => [
+    { pts: surgeProfs[i].map(pt => ({ x: pt.ecdSurge - xMin, y: pt.md })),
+      color: SS_COLORS[i], label: `${v} ft/min surge` },
+    { pts: swabProfs[i].map(pt => ({ x: pt.ecdSwab - xMin, y: pt.md })),
+      color: SS_COLORS[i], label: `${v} ft/min swab` },
+  ]));
   CI.register(CID, {
     pad: { l: L, t: T, pw, ph },
     xMax: xMax - xMin, yMax: maxMD,
