@@ -7,9 +7,11 @@
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create quackplan-db",
     "db:migrate": "wrangler d1 migrations apply quackplan-db --remote",
-    "db:migrate:local": "wrangler d1 migrations apply quackplan-db --local"
+    "db:migrate:local": "wrangler d1 migrations apply quackplan-db --local",
+    "test:datasafety": "node test/data-safety.mjs"
   },
   "devDependencies": {
-    "wrangler": "^3.90.0"
+    "wrangler": "^3.90.0",
+    "puppeteer-core": "^22.0.0"
   }
 }

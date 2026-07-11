@@ -135,16 +135,30 @@ async function handleApi(req, env, url) {
   }
 
   // --- nodes ---
+  // RULE #1 defense in depth: every mutation snapshots the node's PRIOR state
+  // into node_history first (same atomic batch), deletes are soft (deleted_at),
+  // and history can be listed/restored — so no future bug can make data
+  // unrecoverable.
+  const HIST_KEEP = 20;
+  const snapStmt = (nodeId, op) => env.DB.prepare(
+    `INSERT INTO node_history (node_id,owner_id,parent_id,name,type,data,op,saved_at)
+     SELECT id,owner_id,parent_id,name,type,data,?,? FROM nodes WHERE id=? AND owner_id=?`)
+    .bind(op, Date.now(), nodeId, user.uid);
+  const pruneStmt = nodeId => env.DB.prepare(
+    `DELETE FROM node_history WHERE node_id=?1 AND id NOT IN (
+       SELECT id FROM node_history WHERE node_id=?1 ORDER BY id DESC LIMIT ${HIST_KEEP})`)
+    .bind(nodeId);
+
   const listMatch = path === '/api/nodes';
   if (listMatch && method === 'GET') {
     let rows;
     if (url.searchParams.get('roots') === '1') {
-      rows = await env.DB.prepare('SELECT * FROM nodes WHERE owner_id=? AND parent_id IS NULL').bind(user.uid).all();
+      rows = await env.DB.prepare('SELECT * FROM nodes WHERE owner_id=? AND parent_id IS NULL AND deleted_at IS NULL').bind(user.uid).all();
     } else if (url.searchParams.has('parent')) {
-      rows = await env.DB.prepare('SELECT * FROM nodes WHERE owner_id=? AND parent_id=?')
+      rows = await env.DB.prepare('SELECT * FROM nodes WHERE owner_id=? AND parent_id=? AND deleted_at IS NULL')
         .bind(user.uid, +url.searchParams.get('parent')).all();
     } else {
-      rows = await env.DB.prepare('SELECT * FROM nodes WHERE owner_id=?').bind(user.uid).all();
+      rows = await env.DB.prepare('SELECT * FROM nodes WHERE owner_id=? AND deleted_at IS NULL').bind(user.uid).all();
     }
     return json((rows.results || []).map(rowToNode));
   }
@@ -158,47 +172,90 @@ async function handleApi(req, env, url) {
     return json({ id: res.meta.last_row_id });
   }
 
-  const m = path.match(/^\/api\/nodes\/(\d+)(\/data|\/name)?$/);
+  const m = path.match(/^\/api\/nodes\/(\d+)(\/data|\/name|\/history(?:\/\d+\/restore)?)?$/);
   if (m) {
     const id = +m[1], sub = m[2];
 
     if (!sub && method === 'GET') {
-      const r = await env.DB.prepare('SELECT * FROM nodes WHERE id=? AND owner_id=?').bind(id, user.uid).first();
+      const r = await env.DB.prepare('SELECT * FROM nodes WHERE id=? AND owner_id=? AND deleted_at IS NULL').bind(id, user.uid).first();
       return r ? json(rowToNode(r)) : err('Not found', 404);
     }
     if (!sub && method === 'PUT') {
       const b = await req.json().catch(() => ({}));
-      const r = await env.DB.prepare(
-        'UPDATE nodes SET name=?,type=?,parent_id=?,data=?,updated_at=? WHERE id=? AND owner_id=?')
-        .bind(b.name ?? null, b.type ?? null, b.parentId ?? null,
-              JSON.stringify(b.data || {}), Date.now(), id, user.uid).run();
+      const [, , r] = await env.DB.batch([
+        snapStmt(id, 'update'), pruneStmt(id),
+        env.DB.prepare(
+          'UPDATE nodes SET name=?,type=?,parent_id=?,data=?,updated_at=? WHERE id=? AND owner_id=? AND deleted_at IS NULL')
+          .bind(b.name ?? null, b.type ?? null, b.parentId ?? null,
+                JSON.stringify(b.data || {}), Date.now(), id, user.uid),
+      ]);
       return r.meta.changes ? json({ ok: true }) : err('Not found', 404);
     }
     if (sub === '/data' && method === 'PATCH') {
       const { key, value } = await req.json().catch(() => ({}));
       if (!key) return err('key required');
-      // Atomic per-key update — no read-modify-write race.
-      const r = await env.DB.prepare(
-        "UPDATE nodes SET data=json_set(COALESCE(data,'{}'), '$.'||?, json(?)), updated_at=? WHERE id=? AND owner_id=?")
-        .bind(key, JSON.stringify(value ?? null), Date.now(), id, user.uid).run();
+      // Snapshot prior state + atomic per-key json_set, in one transaction.
+      const [, , r] = await env.DB.batch([
+        snapStmt(id, 'data:' + key), pruneStmt(id),
+        env.DB.prepare(
+          "UPDATE nodes SET data=json_set(COALESCE(data,'{}'), '$.'||?, json(?)), updated_at=? WHERE id=? AND owner_id=? AND deleted_at IS NULL")
+          .bind(key, JSON.stringify(value ?? null), Date.now(), id, user.uid),
+      ]);
       return r.meta.changes ? json({ ok: true }) : err('Not found', 404);
     }
     if (sub === '/name' && method === 'PATCH') {
       const { name } = await req.json().catch(() => ({}));
-      const r = await env.DB.prepare('UPDATE nodes SET name=?,updated_at=? WHERE id=? AND owner_id=?')
-        .bind(name ?? null, Date.now(), id, user.uid).run();
+      const [, , r] = await env.DB.batch([
+        snapStmt(id, 'rename'), pruneStmt(id),
+        env.DB.prepare('UPDATE nodes SET name=?,updated_at=? WHERE id=? AND owner_id=? AND deleted_at IS NULL')
+          .bind(name ?? null, Date.now(), id, user.uid),
+      ]);
       return r.meta.changes ? json({ ok: true }) : err('Not found', 404);
     }
     if (!sub && method === 'DELETE') {
-      // Cascade: delete the node and all its descendants (owned by this user).
-      await env.DB.prepare(
-        `DELETE FROM nodes WHERE owner_id=?1 AND id IN (
-           WITH RECURSIVE sub(id) AS (
+      // SOFT delete the node + descendants (recoverable); snapshot them first.
+      const subtree = `WITH RECURSIVE sub(id) AS (
              SELECT ?2
              UNION SELECT n.id FROM nodes n JOIN sub ON n.parent_id=sub.id WHERE n.owner_id=?1
-           ) SELECT id FROM sub)`)
-        .bind(user.uid, id).run();
+           ) SELECT id FROM sub`;
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT INTO node_history (node_id,owner_id,parent_id,name,type,data,op,saved_at)
+           SELECT id,owner_id,parent_id,name,type,data,'delete',?3 FROM nodes
+           WHERE owner_id=?1 AND deleted_at IS NULL AND id IN (${subtree})`)
+          .bind(user.uid, id, Date.now()),
+        env.DB.prepare(
+          `UPDATE nodes SET deleted_at=?3 WHERE owner_id=?1 AND deleted_at IS NULL AND id IN (${subtree})`)
+          .bind(user.uid, id, Date.now()),
+      ]);
       return json({ ok: true });
+    }
+
+    // --- history: list prior versions / restore one ---
+    if (sub === '/history' && method === 'GET') {
+      const rows = await env.DB.prepare(
+        'SELECT id,op,saved_at,parent_id,name,type,data FROM node_history WHERE node_id=? AND owner_id=? ORDER BY id DESC LIMIT ?')
+        .bind(id, user.uid, HIST_KEEP).all();
+      return json((rows.results || []).map(h => ({
+        histId: h.id, op: h.op, savedAt: h.saved_at,
+        parentId: h.parent_id, name: h.name, type: h.type,
+        data: h.data ? JSON.parse(h.data) : {},
+      })));
+    }
+    const rm = sub && sub.match(/^\/history\/(\d+)\/restore$/);
+    if (rm && method === 'POST') {
+      const hid = +rm[1];
+      const h = await env.DB.prepare('SELECT * FROM node_history WHERE id=? AND node_id=? AND owner_id=?')
+        .bind(hid, id, user.uid).first();
+      if (!h) return err('History version not found', 404);
+      // Snapshot the current state too, then restore (also revives soft-deleted).
+      const [, , r] = await env.DB.batch([
+        snapStmt(id, 'pre-restore'), pruneStmt(id),
+        env.DB.prepare(
+          'UPDATE nodes SET name=?,type=?,parent_id=?,data=?,deleted_at=NULL,updated_at=? WHERE id=? AND owner_id=?')
+          .bind(h.name, h.type, h.parent_id, h.data, Date.now(), id, user.uid),
+      ]);
+      return r.meta.changes ? json({ ok: true, restored: hid }) : err('Not found', 404);
     }
   }
 

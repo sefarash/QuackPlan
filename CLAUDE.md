@@ -26,6 +26,31 @@ pre-server era, in browser IndexedDB/localStorage. This rule applies to EVERY ch
 When in doubt, prefer leaving stale data unread over migrating it destructively — unread data is
 recoverable, deleted data is not.
 
+### Enforcement — the data-safety net (do not weaken any layer)
+
+1. **Load guard** — `qpState.loadingScenario` is set around `_loadScenario`'s table rebuild and
+   `dbSaveScenarioData` drops all writes while it's set. Loads never write. (A real incident:
+   loaders fire per-row saves via the AddRow helpers; out-of-order PATCH arrival truncated a
+   user's casing table — commit 025d0b2.)
+2. **Write serialization** — `dbSaveScenarioData` chains saves per scenario so PATCHes can never
+   be reordered by the network.
+3. **Undo log** — the Worker snapshots a node's PRIOR state into `node_history` before every
+   mutation (same atomic batch, last 20 versions kept). List/restore:
+   `dbHistory(id)` / `dbRestoreVersion(id, histId)` from the console, or
+   `GET/POST /api/nodes/:id/history[/:hid/restore]`.
+4. **Soft delete** — `DELETE /api/nodes/:id` sets `deleted_at` on the subtree (after
+   snapshotting it); nothing is physically erased. `dbRestoreVersion` revives a deleted node.
+5. **Regression test (REQUIRED)** — before deploying ANY change touching persistence
+   (`db-engine.js`, `worker/`, `migrations/`, load/save paths):
+   `npx wrangler dev --local` then **`npm run test:datasafety`** — it replays the corruption
+   incident end-to-end (zero writes on load, serialized saves, round-trip, undo log, soft
+   delete) and must print PASS.
+6. **Last resort** — Cloudflare D1 Time Travel can rewind the whole database up to 30 days
+   (`wrangler d1 time-travel`); it affects ALL users, so use per-node history first.
+
+Deploy order for schema changes: `wrangler d1 migrations apply quackplan-db --remote` **before**
+`wrangler deploy` (the new Worker may query new columns).
+
 ## Running the app
 
 Local dev needs the Worker (the app is served by a Cloudflare Worker with a D1-backed API):

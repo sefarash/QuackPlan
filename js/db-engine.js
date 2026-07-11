@@ -100,3 +100,12 @@ function dbLoadScenarioData(scenarioId, key) {
 }
 
 function dbRename(id, newName) { return _api('PATCH', '/nodes/' + id + '/name', { name: newName }); }
+
+// ── Recovery (RULE #1 undo log) ───────────────────────────────────────────────
+// The server snapshots a node's prior state before every mutation and soft-
+// deletes instead of erasing. List a node's versions / restore one:
+//   dbHistory(id).then(console.table)          — last 20 prior versions
+//   dbRestoreVersion(id, histId)               — roll the node back (also
+//                                                 revives a soft-deleted node)
+function dbHistory(id)               { return _api('GET',  '/nodes/' + id + '/history'); }
+function dbRestoreVersion(id, histId){ return _api('POST', '/nodes/' + id + '/history/' + histId + '/restore'); }
