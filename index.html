@@ -101,6 +101,12 @@
     <div id="hierarchyTree">
       <div class="tree-empty">No projects yet.<br>Click + to create one.</div>
     </div>
+    <div class="datum-diagram">
+      <div class="schematic-header">Datum Elevations</div>
+      <div class="datum-canvas-wrap">
+        <canvas id="datumCanvas"></canvas>
+      </div>
+    </div>
   </div>
 
   <!-- CENTER — Input + Output panels -->
@@ -768,30 +774,22 @@
 
   <!-- RIGHT — Well Schematic -->
   <div class="panel-schematic">
-    <div class="schematic-top">
-      <div class="schematic-main">
-        <div class="schematic-header">Well Schematic</div>
-        <div class="schematic-canvas-wrap">
-          <canvas id="schematicCanvas"></canvas>
-        </div>
-      </div>
-      <div class="schematic-toolbar">
-        <button class="tool-btn" onclick="generateReport()" title="Generate a printable well-program report (print to PDF)">📄 Report</button>
-        <button class="tool-btn" onclick="exportScenario()" title="Export current scenario as JSON">⬇ Export</button>
-        <label  class="tool-btn" title="Import a QuackPlan JSON scenario file">⬆ Import
-          <input type="file" accept=".json" style="display:none" onchange="importScenarioFile(this)">
-        </label>
-        <button class="tool-btn" onclick="backupAll()" title="Back up ALL projects/wells/scenarios to one file">⬇ Backup</button>
-        <label  class="tool-btn" title="Restore a full-hierarchy backup file (adds to current wells)">⬆ Restore
-          <input type="file" accept=".json" style="display:none" onchange="restoreBackupFile(this)">
-        </label>
+    <div class="schematic-main">
+      <div class="schematic-header">Well Schematic</div>
+      <div class="schematic-canvas-wrap">
+        <canvas id="schematicCanvas"></canvas>
       </div>
     </div>
-    <div class="datum-diagram">
-      <div class="schematic-header">Datum Elevations</div>
-      <div class="datum-canvas-wrap">
-        <canvas id="datumCanvas"></canvas>
-      </div>
+    <div class="schematic-toolbar">
+      <button class="tool-btn" onclick="generateReport()" title="Generate a printable well-program report (print to PDF)">📄 Report</button>
+      <button class="tool-btn" onclick="exportScenario()" title="Export current scenario as JSON">⬇ Export</button>
+      <label  class="tool-btn" title="Import a QuackPlan JSON scenario file">⬆ Import
+        <input type="file" accept=".json" style="display:none" onchange="importScenarioFile(this)">
+      </label>
+      <button class="tool-btn" onclick="backupAll()" title="Back up ALL projects/wells/scenarios to one file">⬇ Backup</button>
+      <label  class="tool-btn" title="Restore a full-hierarchy backup file (adds to current wells)">⬆ Restore
+        <input type="file" accept=".json" style="display:none" onchange="restoreBackupFile(this)">
+      </label>
     </div>
   </div>
 
@@ -973,6 +971,8 @@
     btn.textContent = collapsed ? '▶' : '◀';
     btn.title = collapsed ? 'Expand panel' : 'Collapse panel';
     localStorage.setItem('qp_hierarchy_collapsed', collapsed ? '1' : '0');
+    // Panel width changed — re-fit the datum canvas after layout settles
+    if (typeof drawDatumDiagram === 'function') setTimeout(drawDatumDiagram, 0);
   }
 </script>
 </body>

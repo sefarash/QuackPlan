@@ -166,8 +166,16 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 .panel-hierarchy {
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;      /* header · tree (scrolls) · datum diagram (pinned) */
+  overflow: hidden;
+  padding: 8px 0 0;
+}
+
+#hierarchyTree {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  padding: 8px 0;
 }
 
 .hierarchy-header {
@@ -431,14 +439,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   background: var(--bg-panel);
   border-left: 1px solid var(--border);
   display: flex;
-  flex-direction: column;       /* top: schematic + toolbar row · bottom: datum diagram */
-  overflow: hidden;
-}
-
-.schematic-top {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
   flex-direction: row;          /* schematic on the left, vertical toolbar on the right */
   overflow: hidden;
 }
@@ -451,16 +451,20 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   overflow: hidden;
 }
 
-/* Datum elevations mini-diagram (RKB / GL / MSL) — bottom of the right panel */
+/* Datum elevations mini-diagram (RKB / GL / MSL) — pinned at the bottom of the
+   left hierarchy panel (keeps the Well Schematic at full height) */
 .datum-diagram {
   flex: 0 0 178px;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--bg-card);
 }
 .datum-canvas-wrap { flex: 1; position: relative; }
 .datum-canvas-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* Hidden when the hierarchy panel is collapsed to its 28px rail */
+.qp-app.hierarchy-collapsed .datum-diagram { display: none; }
 
 /* Vertical stack of data/file actions on the right edge of the schematic. */
 .schematic-toolbar {
