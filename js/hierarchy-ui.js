@@ -238,45 +238,55 @@ function _loadScenario(id) {
     if (!node || !node.data) return;
     const d = node.data;
 
-    // Clear frozen chart snapshots / annotations so one well's overlays don't
-    // ghost onto the next scenario's charts
-    if (typeof CI !== 'undefined' && CI.clearAll) CI.clearAll();
+    // RULE #1: the loaders below rebuild the tables via the same AddRow helpers
+    // the user clicks, and those fire saves — a load must NEVER write back over
+    // the stored data (a burst of partial per-row saves arriving out of order
+    // at the server truncated arrays). dbSaveScenarioData drops all writes
+    // while this flag is set.
+    qpState.loadingScenario = true;
+    try {
+      // Clear frozen chart snapshots / annotations so one well's overlays don't
+      // ghost onto the next scenario's charts
+      if (typeof CI !== 'undefined' && CI.clearAll) CI.clearAll();
 
-    // Clear all tables first so stale rows don't persist
-    document.getElementById('traj1Body').innerHTML      = '';
-    document.getElementById('traj2Body').innerHTML      = '';
-    document.getElementById('tortBody').innerHTML       = '';
-    document.getElementById('schematicBody').innerHTML  = '';
-    document.getElementById('bhaBody').innerHTML        = '';
-    document.getElementById('nozzleBody').innerHTML     = '';
-    document.getElementById('mwdBody').innerHTML        = '';
-    document.getElementById('activityBody').innerHTML   = '';
-    document.getElementById('servicesBody').innerHTML   = '';
-    document.getElementById('casingCostBody').innerHTML = '';
-    document.getElementById('handoverBody').innerHTML   = '';
+      // Clear all tables first so stale rows don't persist
+      document.getElementById('traj1Body').innerHTML      = '';
+      document.getElementById('traj2Body').innerHTML      = '';
+      document.getElementById('tortBody').innerHTML       = '';
+      document.getElementById('schematicBody').innerHTML  = '';
+      document.getElementById('bhaBody').innerHTML        = '';
+      document.getElementById('nozzleBody').innerHTML     = '';
+      document.getElementById('mwdBody').innerHTML        = '';
+      document.getElementById('activityBody').innerHTML   = '';
+      document.getElementById('servicesBody').innerHTML   = '';
+      document.getElementById('casingCostBody').innerHTML = '';
+      document.getElementById('handoverBody').innerHTML   = '';
 
-    if (d.traj1 && d.traj1.length) {
-      trajLoadRows(d.traj1);
-    } else {
-      // No saved trajectory — seed with two default stations
-      traj1AddRow({ md: 0,    inc: 0, azi: 0 });
-      traj1AddRow({ md: 5000, inc: 0, azi: 0 });
+      if (d.traj1 && d.traj1.length) {
+        trajLoadRows(d.traj1);
+      } else {
+        // No saved trajectory — seed with two default stations
+        traj1AddRow({ md: 0,    inc: 0, azi: 0 });
+        traj1AddRow({ md: 5000, inc: 0, azi: 0 });
+      }
+      if (d.traj2 && d.traj2.length) traj2LoadRows(d.traj2);
+      if (d.schematic) schematicLoadRows(d.schematic);
+      if (d.fluid)     fluidLoadState(d.fluid);
+      if (d.bha)       bhaLoadState(d.bha);
+      if (d.nozzles)   nozzleLoadState(d.nozzles);
+                       mwdLoadState(d.mwd);
+      if (d.tort)      tortLoadState(d.tort);
+      if (d.activity)  activityLoadState(d.activity);
+                       handoverLoadState(d.handover);
+      if (d.ppfg)      ppfgLoadState(d.ppfg);
+      cdRatingsLoadState(d.cdRatings);
+
+      // Restore this scenario's output-panel control values (FF sliders, WOB,
+      // MW/flow, casing SFs); resets to defaults when the scenario has none saved
+      if (typeof loadOutputControls === 'function') loadOutputControls(d.outputControls);
+    } finally {
+      qpState.loadingScenario = false;   // an exception must not leave saves suppressed
     }
-    if (d.traj2 && d.traj2.length) traj2LoadRows(d.traj2);
-    if (d.schematic) schematicLoadRows(d.schematic);
-    if (d.fluid)     fluidLoadState(d.fluid);
-    if (d.bha)       bhaLoadState(d.bha);
-    if (d.nozzles)   nozzleLoadState(d.nozzles);
-                     mwdLoadState(d.mwd);
-    if (d.tort)      tortLoadState(d.tort);
-    if (d.activity)  activityLoadState(d.activity);
-                     handoverLoadState(d.handover);
-    if (d.ppfg)      ppfgLoadState(d.ppfg);
-    cdRatingsLoadState(d.cdRatings);
-
-    // Restore this scenario's output-panel control values (FF sliders, WOB,
-    // MW/flow, casing SFs); resets to defaults when the scenario has none saved
-    if (typeof loadOutputControls === 'function') loadOutputControls(d.outputControls);
 
     // Persist last-used scenario ID so reload restores it
     localStorage.setItem('qp_lastScenarioId', id);

@@ -67,10 +67,33 @@ function dbChildren(pid)  { return _api('GET', '/nodes?parent=' + encodeURICompo
 function dbRoots()        { return _api('GET', '/nodes?roots=1'); }
 function dbAllNodes()     { return _api('GET', '/nodes'); }
 
-// Per-key scenario save — atomic on the server (json_set), so the old
-// read-modify-write lost-update race is gone entirely.
+// Per-key scenario save — atomic on the server (json_set), so a single PATCH
+// can't do a read-modify-write race. Two extra protections (RULE #1):
+//
+// 1. LOAD GUARD — while a scenario is being loaded into the UI
+//    (qpState.loadingScenario, set by _loadScenario), all scenario-data saves
+//    are DROPPED. The table loaders rebuild rows via the same AddRow helpers
+//    users click, and those fire per-row saves — so merely OPENING a scenario
+//    used to emit a burst of partial saves (1 row, 2 rows, …) over the stored
+//    data. If those PATCHes arrived out of order at the server, the LAST
+//    partial one won and silently truncated the stored array (users saw
+//    casings/rows vanish). Loads must never write.
+//
+// 2. PER-SCENARIO WRITE CHAIN — saves for the same scenario are issued
+//    strictly one-after-another (each PATCH starts only after the previous
+//    one resolved), so concurrent user-time saves can't be reordered by the
+//    network. Different scenarios still save in parallel.
+const _dbWriteChains = {};
 function dbSaveScenarioData(scenarioId, key, value) {
-  return _api('PATCH', '/nodes/' + scenarioId + '/data', { key, value });
+  if (typeof qpState !== 'undefined' && qpState.loadingScenario) {
+    return Promise.resolve();            // load paths never write (RULE #1)
+  }
+  const prev = _dbWriteChains[scenarioId] || Promise.resolve();   // stored tails never reject
+  const next = prev.then(() => _api('PATCH', '/nodes/' + scenarioId + '/data', { key, value }));
+  const tail = next.catch(() => {});     // a failed save must not break the chain
+  _dbWriteChains[scenarioId] = tail;
+  tail.then(() => { if (_dbWriteChains[scenarioId] === tail) delete _dbWriteChains[scenarioId]; });
+  return next;                           // callers still observe failures
 }
 function dbLoadScenarioData(scenarioId, key) {
   return dbGet(scenarioId).then(node => (node && node.data) ? node.data[key] : null);
