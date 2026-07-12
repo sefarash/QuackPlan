@@ -78,25 +78,64 @@ function qpAuthExpired() {
 }
 
 function _bootApp() {
-  if (_qpBooted) { if (typeof hierarchyBoot === 'function') hierarchyBoot(); return; }
-  _qpBooted = true;
-  if (typeof hierarchyBoot === 'function') hierarchyBoot();
+  // Replay any locally-queued saves first, so the tree/scenario loads reflect
+  // the user's last edits (e.g. made just before a shutdown), then boot.
+  const flush = (typeof qpFlushPendingSaves === 'function')
+    ? qpFlushPendingSaves() : Promise.resolve();
+  flush.finally(() => {
+    if (_qpBooted) { if (typeof hierarchyBoot === 'function') hierarchyBoot(); return; }
+    _qpBooted = true;
+    if (typeof hierarchyBoot === 'function') hierarchyBoot();
+  });
 }
 
-// On load: if we have a token, verify it; else show login.
-document.addEventListener('DOMContentLoaded', async () => {
+// Reconnect banner — shown while the server is unreachable at boot. The session
+// token is KEPT: a laptop waking before Wi-Fi reconnects must not get logged
+// out (that read as "all my data is gone" — the data was on the server all
+// along). Only a definite 401 clears the session.
+function _connBanner(show, attempt) {
+  let el = document.getElementById('connBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'connBanner';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:6000;background:#b07800;' +
+      'color:#fff;font:600 12px sans-serif;text-align:center;padding:6px;display:none';
+    document.body.appendChild(el);
+  }
+  el.style.display = show ? 'block' : 'none';
+  if (show) el.textContent = '⚠ Reconnecting to the server — your data is safe' +
+    (attempt > 1 ? ` (attempt ${attempt})` : '') + '…';
+}
+
+async function _bootCheck(attempt = 1) {
+  try {
+    const me = await dbMe();
+    _connBanner(false);
+    _setAccountLabel(me.email);
+    _authShow(false);
+    // Replay any saves that didn't reach the server before the last shutdown
+    if (typeof qpFlushPendingSaves === 'function') await qpFlushPendingSaves();
+    _bootApp();
+  } catch (e) {
+    if (e && e.message === 'unauthorized') {
+      // Real auth rejection — session actually expired
+      qpSetToken(null);
+      _connBanner(false);
+      _authShow(true);
+      return;
+    }
+    // Network / server hiccup: keep the session, keep retrying
+    _connBanner(true, attempt);
+    setTimeout(() => _bootCheck(attempt + 1), Math.min(2000 * attempt, 10000));
+  }
+}
+
+// On load: if we have a token, verify it (resiliently); else show login.
+document.addEventListener('DOMContentLoaded', () => {
   _authSetMode('login');
   document.getElementById('authPassword').addEventListener('keydown', e => { if (e.key === 'Enter') authSubmit(); });
   document.getElementById('authEmail').addEventListener('keydown', e => { if (e.key === 'Enter') authSubmit(); });
 
   if (!qpToken()) { _authShow(true); return; }
-  try {
-    const me = await dbMe();
-    _setAccountLabel(me.email);
-    _authShow(false);
-    _bootApp();
-  } catch (_) {
-    qpSetToken(null);
-    _authShow(true);
-  }
+  _bootCheck();
 });

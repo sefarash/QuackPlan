@@ -120,6 +120,65 @@ const res = await page.evaluate(async () => {
   return out;
 });
 
+// ── Laptop-off / offline resilience (the 2026-07-12 incident) ────────────────
+// 6. Edits made while offline are kept in a localStorage write-ahead log and
+//    replayed when the network returns — nothing is lost to a shutdown.
+// 7. Booting while the server is unreachable keeps the session token and shows
+//    a reconnect banner — it must NOT log the user out into an empty app.
+await page.setOfflineMode(true);
+const off = await page.evaluate(async () => {
+  const inputs = document.getElementById('schematicBody').rows[2].querySelectorAll('input[type=number]');
+  inputs[2].value = '5500';
+  schematicSave();
+  await new Promise(r => setTimeout(r, 600));
+  hierarchyRefresh();                                    // failed tree fetch
+  await new Promise(r => setTimeout(r, 600));
+  return {
+    walLen: JSON.parse(localStorage.getItem('qp_pending_saves') || '[]').length,
+    indicator: document.getElementById('saveIndicator').textContent,
+    treeText: document.getElementById('hierarchyTree').textContent,
+  };
+});
+await page.setOfflineMode(false);
+await new Promise(r => setTimeout(r, 800));
+const on = await page.evaluate(async (scName) => {
+  await qpFlushPendingSaves();
+  await new Promise(r => setTimeout(r, 400));
+  const roots = await dbRoots();
+  const proj  = roots.find(n => n.name === 'DS-P');
+  // find the scenario again to read the flushed value
+  const all = await dbAllNodes();
+  const sc  = all.find(n => n.name === scName);
+  return {
+    walLen: JSON.parse(localStorage.getItem('qp_pending_saves') || '[]').length,
+    indicator: document.getElementById('saveIndicator').textContent,
+    flushedBot: +sc.data.schematic[2].bot,
+    treeOk: !!proj,
+  };
+}, 'DS-S');
+
+// 7) Boot with the API unreachable: token must survive, app must recover
+let blockMe = 2;                       // fail the first 2 /auth/me probes
+await page.setRequestInterception(true);
+page.on('request', req => {
+  if (req.url().includes('/api/auth/me') && blockMe > 0) { blockMe--; req.abort(); return; }
+  req.continue();
+});
+await page.reload({ waitUntil: 'networkidle0' });
+await new Promise(r => setTimeout(r, 800));
+const during = await page.evaluate(() => ({
+  tokenKept: !!localStorage.getItem('qp_token'),
+  banner: (document.getElementById('connBanner') || {}).style?.display === 'block',
+  loginShown: getComputedStyle(document.getElementById('authOverlay')).display !== 'none',
+}));
+await new Promise(r => setTimeout(r, 7000));            // retries: +2s, +4s
+const recovered = await page.evaluate(() => ({
+  bootedTree: document.getElementById('hierarchyTree').textContent.includes('DS-P'),
+  bannerGone: (document.getElementById('connBanner') || {}).style?.display !== 'block',
+  loginHidden: getComputedStyle(document.getElementById('authOverlay')).display === 'none',
+}));
+await page.setRequestInterception(false);
+
 console.log('\nDATA-SAFETY REGRESSION —', BASE);
 check('load fires zero data writes',        res.patchesDuringLoad === 0, `${res.patchesDuringLoad} PATCHes`);
 check('rows survive repeated opens (6/6)',  res.rowsAfterOpens === 6,    `${res.rowsAfterOpens} rows`);
@@ -132,6 +191,16 @@ check('restore rolls data back',            res.restoredBot === 5368 && res.rest
       `bot=${res.restoredBot}`);
 check('soft delete hides the node',         res.deletedHidden === true);
 check('deleted node snapshotted + revivable', res.deleteSnapshotted === true && res.revived === true);
+check('offline edit lands in the WAL',      off.walLen > 0 && /Offline|unsaved/i.test(off.indicator),
+      `wal=${off.walLen}, "${off.indicator}"`);
+check('offline tree says data is safe',     /data is safe/i.test(off.treeText) && !/No projects yet/.test(off.treeText));
+check('reconnect flushes the WAL',          on.walLen === 0 && on.flushedBot === 5500 && /saved/i.test(on.indicator),
+      `wal=${on.walLen}, bot=${on.flushedBot}`);
+check('tree recovers after reconnect',      on.treeOk === true);
+check('offline boot keeps the session',     during.tokenKept === true && during.loginShown === false,
+      `token=${during.tokenKept}, login=${during.loginShown}, banner=${during.banner}`);
+check('boot recovers once server returns',  recovered.bootedTree === true && recovered.loginHidden === true,
+      `tree=${recovered.bootedTree}, bannerGone=${recovered.bannerGone}`);
 check('no page errors',                     pageErrors.length === 0, pageErrors.join('; '));
 
 await browser.close();

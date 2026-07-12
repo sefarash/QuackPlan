@@ -76,8 +76,10 @@ function _saveCollapsed() {
 
 // ── Tree rendering ────────────────────────────────────────────────────────────
 
+let _treeRetryTimer = null;
 function hierarchyRefresh() {
-  dbRoots().then(roots => {
+  return dbRoots().then(roots => {
+    if (_treeRetryTimer) { clearTimeout(_treeRetryTimer); _treeRetryTimer = null; }
     const container = document.getElementById('hierarchyTree');
     container.innerHTML = '';
     if (!roots.length) {
@@ -85,7 +87,19 @@ function hierarchyRefresh() {
       return;
     }
     roots.forEach(r => _renderNode(container, r, 0));
-  }).catch(err => console.error('hierarchyRefresh error:', err));
+  }).catch(err => {
+    // NEVER show "No projects yet" because a fetch failed — that reads as
+    // "all my data is gone". Say the truth and keep retrying.
+    console.error('hierarchyRefresh error:', err);
+    const container = document.getElementById('hierarchyTree');
+    if (container) {
+      container.innerHTML = '<div class="tree-empty" style="color:#b07800">⚠ Can\'t reach the server.<br>' +
+        'Your data is safe — retrying…</div>';
+    }
+    if (!_treeRetryTimer) {
+      _treeRetryTimer = setTimeout(() => { _treeRetryTimer = null; hierarchyRefresh(); }, 5000);
+    }
+  });
 }
 
 function _renderNode(parent, node, depth) {
@@ -292,6 +306,11 @@ function _loadScenario(id) {
     localStorage.setItem('qp_lastScenarioId', id);
 
     setStatus('Scenario loaded');
+  }).catch(err => {
+    // A failed load must say so and retry — never leave silently-empty panels.
+    console.error('_loadScenario failed:', err);
+    setStatus('⚠ Couldn\'t load the scenario — your data is safe, retrying…', true);
+    setTimeout(() => { if (qpState.currentScenarioId === id) _loadScenario(id); }, 4000);
   });
 }
 

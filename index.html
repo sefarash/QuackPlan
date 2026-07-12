@@ -810,7 +810,10 @@
     <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
     <button class="output-tab" onclick="switchOutputTab('finaldiagram',this)">Final Diagram</button>
   </nav>
-  <div class="footer-right" id="footerStatus">Ready</div>
+  <div class="footer-right">
+    <span id="saveIndicator" title="Save state — unsaved changes are kept locally and retried automatically"></span>
+    <span id="footerStatus" style="margin-left:12px">Ready</span>
+  </div>
 </footer>
 
 <!-- ═══════════════════════ MODALS ═══════════════════════ -->
