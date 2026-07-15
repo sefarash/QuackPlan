@@ -133,16 +133,17 @@ function _ktGasTolerance(o) {
 }
 
 function drawKickTolerance() {
-  const fluid = fluidGet();
+  // Phase-aware: the active drilling stage's fluid, survey and casing program
+  const fluid = (typeof qpPhaseFluid === 'function') ? qpPhaseFluid() : fluidGet();
   const mw    = fluid.mudWeight || 10;   // imperial ppg (canonical)
   const el    = document.getElementById('ktMWdisplay');
   if (el) el.textContent = QP_UNITS.toDisplay('mw', mw).toFixed(QP_UNITS.isMetric() ? 0 : 1);
   const uMWel = document.getElementById('ktMWunit');
   if (uMWel) uMWel.textContent = QP_UNITS.label('mw');
 
-  const survey   = qpState.survey || [];
+  const survey   = ((typeof qpSurveyForAnalysis === 'function') ? qpSurveyForAnalysis() : qpState.survey) || [];
   const maxTVD   = survey.length ? survey[survey.length - 1].tvd : 10000;
-  const allRows  = _readSchematicRows();
+  const allRows  = (typeof qpPhaseRows === 'function') ? qpPhaseRows() : _readSchematicRows();
   const ppfgPts  = _readPPFG();
   const bha      = bhaGet();
   const dpOD     = bha.topDpOD_in || 5.0;

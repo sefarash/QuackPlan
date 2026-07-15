@@ -11,6 +11,16 @@ const _TD_CONTROL_UNITS = {
   uOvpBlock: 'force', uOvpDPwt: 'linwt', uOvpMW: 'mw',
   uBsBlock: 'force', uBsDPwt: 'linwt', uBsMW: 'mw', uBsMaxHL: 'force',
 };
+
+// Phase-aware inputs for the chart engines: the survey truncated to the active
+// drilling phase and that section's fluid ('full' phase = unchanged behaviour).
+function _tdSurvey() {
+  return (typeof qpSurveyForAnalysis === 'function') ? qpSurveyForAnalysis() : qpState.survey;
+}
+function _tdFluid() {
+  return (typeof qpPhaseFluid === 'function') ? qpPhaseFluid() : fluidGet();
+}
+
 function _tdUpdateControlLabels() {
   Object.keys(_TD_CONTROL_UNITS).forEach(id => {
     const el = document.getElementById(id);
@@ -121,7 +131,7 @@ function drawTorque(r) {
 
   const bha = bhaGet();
   const makeFF = (ff) => {
-    const res = tdCompute(qpState.survey, bha, null, fluidGet().mudWeight,
+    const res = tdCompute(_tdSurvey(), bha, null, _tdFluid().mudWeight,
       { ffCased: ff, ffOpen: ff, wob_klbs: wob / 1000, overpullMargin_lbf: 100000 });
     return res?.modes?.rotOn?.ffSensitivity?.mid?.stations || [];
   };
@@ -130,7 +140,8 @@ function drawTorque(r) {
   const stMid = makeFF(ffMid);
   const stHi  = makeFF(ffHi);
 
-  const maxMD = qpState.survey[qpState.survey.length - 1].md;
+  const _sv = _tdSurvey();
+  const maxMD = _sv[_sv.length - 1].md;
 
   // Build MUT step segments — DP rows are listed surface→bit, so cumulative length = MD
   const mutSegs = [];
@@ -230,11 +241,11 @@ function drawBuckling(r) {
   const _wobRaw  = document.getElementById('buckWOB')?.value;
   const wob_klbs = (_wobRaw === '' || _wobRaw == null ? 15 : QP_UNITS.fromDisplay('force', +_wobRaw));
   const ffMid    = +(document.getElementById('buckFFmid')?.value || 0.30);
-  const mw       = fluidGet().mudWeight;
+  const mw       = _tdFluid().mudWeight;
 
-  if (!qpState.survey?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
+  if (!_tdSurvey()?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
-  const res = tdCompute(qpState.survey, bhaGet(), null, mw,
+  const res = tdCompute(_tdSurvey(), bhaGet(), null, mw,
     { ffCased: ffMid, ffOpen: ffMid, wob_klbs, overpullMargin_lbf: 100000 });
 
   const bk = res?.buckling;
@@ -242,7 +253,8 @@ function drawBuckling(r) {
 
   const rotAllSt   = res.modes?.rotOn?.ffSensitivity?.mid?.stations   || [];
   const slideAllSt = res.modes?.slideOn?.ffSensitivity?.mid?.stations || [];
-  const maxMD      = qpState.survey[qpState.survey.length - 1].md;
+  const _sv = _tdSurvey();
+  const maxMD      = _sv[_sv.length - 1].md;
 
   const yMax = toD(maxMD);   // display depth axis
   // Effective axial load — signed (+ tension, − compression); plotted in display
@@ -319,7 +331,7 @@ function drawOverpull(r) {
   const _mwRaw  = document.getElementById('ovpMW')?.value;
   const blockWt  = (_blkRaw==='' || _blkRaw==null) ? 35   : QP_UNITS.fromDisplay('force', +_blkRaw);  // klbf (canonical)
   const dpWt     = (_dpRaw ==='' || _dpRaw ==null) ? 19.5 : QP_UNITS.fromDisplay('linwt', +_dpRaw);   // lb/ft
-  const mw       = (_mwRaw ==='' || _mwRaw ==null) ? fluidGet().mudWeight : QP_UNITS.fromDisplay('mw', +_mwRaw); // ppg
+  const mw       = (_mwRaw ==='' || _mwRaw ==null) ? _tdFluid().mudWeight : QP_UNITS.fromDisplay('mw', +_mwRaw); // ppg
   const ffLo     = +(document.getElementById('ovpFFlo')?.value     || 0.20);
   const ffMid    = +(document.getElementById('ovpFFmid')?.value    || 0.30);
   const ffHi     = +(document.getElementById('ovpFFhi')?.value     || 0.40);
@@ -327,7 +339,7 @@ function drawOverpull(r) {
   const BF       = 1 - mw / 65.5;
 
   const bha = bhaGet();
-  const run = ff => tdCompute(qpState.survey, bha, null, mw,
+  const run = ff => tdCompute(_tdSurvey(), bha, null, mw,
     { ffCased: ff, ffOpen: ff, wob_klbs: 15, dpWt_ppf: dpWt, overpullMargin_lbf: 100000 });
 
   const resLo  = run(ffLo);
@@ -341,7 +353,8 @@ function drawOverpull(r) {
   const poohMid = get(resMid, 'pooh');
   const poohHi  = get(resHi,  'pooh');
 
-  const maxMD = qpState.survey[qpState.survey.length - 1].md;
+  const _sv = _tdSurvey();
+  const maxMD = _sv[_sv.length - 1].md;
   const toV   = s => s.axialLoad_lbf / 1000 + blockWt;
 
   // Build tensile yield step segments — DP rows listed surface→bit
@@ -454,7 +467,7 @@ function drawBroomstick(r) {
   const _hlRaw  = document.getElementById('bsMaxHL')?.value;
   const blockWt = (_blkRaw==='' || _blkRaw==null) ? 35   : QP_UNITS.fromDisplay('force', +_blkRaw);  // klbf (canonical)
   const dpWt  = (_dpRaw==='' || _dpRaw==null) ? 22.5 : QP_UNITS.fromDisplay('linwt', +_dpRaw);       // lb/ft
-  const mw    = (_mwRaw==='' || _mwRaw==null) ? (fluidGet().mudWeight || 10.0) : QP_UNITS.fromDisplay('mw', +_mwRaw); // ppg
+  const mw    = (_mwRaw==='' || _mwRaw==null) ? (_tdFluid().mudWeight || 10.0) : QP_UNITS.fromDisplay('mw', +_mwRaw); // ppg
   const maxHL = (_hlRaw==='' || _hlRaw==null) ? 0    : QP_UNITS.fromDisplay('force', +_hlRaw);       // rig hook-load limit, klbf (canonical)
   const ffLo  = +(document.getElementById('bsFFlo')?.value  || 0.20);
   const ffMid = +(document.getElementById('bsFFmid')?.value || 0.30);
@@ -462,7 +475,7 @@ function drawBroomstick(r) {
   const BF    = 1 - mw / 65.5;
 
   // 3 runs: FF lo/mid/hi at single MW and DP weight
-  const run = ff => tdCompute(qpState.survey, bhaGet(), null, mw,
+  const run = ff => tdCompute(_tdSurvey(), bhaGet(), null, mw,
     { ffCased: ff, ffOpen: ff, wob_klbs: 25, dpWt_ppf: dpWt, overpullMargin_lbf: 100000 });
 
   const resLo  = run(ffLo);
@@ -480,7 +493,8 @@ function drawBroomstick(r) {
   const poohMid= st(resMid, 'pooh');
   const poohHi = st(resHi,  'pooh');
 
-  const maxMD = qpState.survey[qpState.survey.length - 1].md;
+  const _sv = _tdSurvey();
+  const maxMD = _sv[_sv.length - 1].md;
 
   // Broomstick hookload when bit is at depth D:
   //   = blockWt + accumulated (weight ± friction) from surface down to D

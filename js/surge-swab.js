@@ -9,11 +9,13 @@ let SS_SPEEDS = [20, 40, 60, 80, 100]; // updated by drawSurgeSwab() from speed 
 // ── Geometry helper ───────────────────────────────────────────────────────────
 
 function _ssGeom() {
-  const survey = qpState.survey;
+  // Phase-aware: the active drilling stage's survey, fluid and hole configuration
+  const survey = (typeof qpSurveyForAnalysis === 'function') ? qpSurveyForAnalysis() : qpState.survey;
   if (!survey || survey.length < 2) return null;
-  const fluid   = fluidGet();
+  const fluid   = (typeof qpPhaseFluid === 'function') ? qpPhaseFluid() : fluidGet();
   const bha     = bhaGet();
-  const schRows = typeof _readSchematicRows === 'function' ? _readSchematicRows() : [];
+  const schRows = (typeof qpPhaseRows === 'function') ? qpPhaseRows()
+                : (typeof _readSchematicRows === 'function' ? _readSchematicRows() : []);
   const pv  = fluid.pv  || 16;
   const yp  = fluid.yp  || 13;
   const dpOD = bha.topDpOD_in ?? 5.0;

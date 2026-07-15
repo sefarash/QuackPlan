@@ -6,7 +6,11 @@
 let _qpComputeGen = 0;
 
 async function qpCompute() {
-  const survey = qpState.survey;
+  // Phase-aware inputs: the survey truncated to the active drilling phase's TD
+  // and that section's fluid ('full' = final program + global fluid — identical
+  // to pre-phase behaviour).
+  const survey = (typeof qpSurveyForAnalysis === 'function')
+    ? qpSurveyForAnalysis() : qpState.survey;
   if (!survey || survey.length < 2) {
     setStatus('No trajectory — add stations first'); return;
   }
@@ -17,7 +21,7 @@ async function qpCompute() {
   // Guard the whole pipeline: a throw in T&D, hydraulics or a draw function must
   // not leave the status stuck on "Computing…" with stale panels and no message.
   try {
-    const fluid = fluidGet();
+    const fluid = (typeof qpPhaseFluid === 'function') ? qpPhaseFluid() : fluidGet();
     const bha   = bhaGet();
 
     // ── Torque & Drag (off the main thread when a Worker is available) ──────────
@@ -81,12 +85,15 @@ function _computeHyd(survey, fluid, bha) {
           tauY = 8, nHB = 0.7, kHB = 120, flowRate = 280,
           pumpEff = 90 } = fluid;
 
-  // Override flow rate / MW from the hydraulics sliders (display units) if active,
-  // converting back to imperial (canonical) for the calculations below.
+  // Override flow rate / MW from the hydraulics sliders (display units) — but
+  // only for the 'full' analysis. When a drilling phase is selected, that
+  // section's programmed fluid must win, or phase ECD would silently use the
+  // slider's what-if value instead.
+  const _phase   = (typeof qpState !== 'undefined' && qpState.activePhase && qpState.activePhase !== 'full');
   const _fSl = document.getElementById('hydFlowSlider')?.value;
   const _mSl = document.getElementById('hydMWslider')?.value;
-  const activeFlow = (_fSl != null && _fSl !== '') ? QP_UNITS.fromDisplay('flow', +_fSl) : flowRate;
-  const activeMW   = (_mSl != null && _mSl !== '') ? QP_UNITS.fromDisplay('mw',   +_mSl) : mudWeight;
+  const activeFlow = (!_phase && _fSl != null && _fSl !== '') ? QP_UNITS.fromDisplay('flow', +_fSl) : flowRate;
+  const activeMW   = (!_phase && _mSl != null && _mSl !== '') ? QP_UNITS.fromDisplay('mw',   +_mSl) : mudWeight;
 
   const dpOD       = bha.topDpOD_in   ?? 5.0;
   const dpID       = bha.topDpID_in   ?? 4.276;
@@ -99,8 +106,9 @@ function _computeHyd(survey, fluid, bha) {
   const rheolParams = { pv, yp, n: plN, K: plK, tauY, nHB, kHB,
                         mudWeight: activeMW };
 
-  // Annular sections — use schematic rows if available, else 3-section fallback
-  const schRows  = _readSchematicRows();
+  // Annular sections — the active phase's hole configuration (set strings +
+  // current open hole); falls back to the full program / 3-section default
+  const schRows  = (typeof qpPhaseRows === 'function') ? qpPhaseRows() : _readSchematicRows();
   const sections = [];
   let cumAnn     = 0;
 

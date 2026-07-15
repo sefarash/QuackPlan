@@ -1077,3 +1077,17 @@ body.dark .chart-controls select                  { color: var(--text); backgrou
   font-size: 10px; font-weight: 700; letter-spacing: .02em;
   cursor: default; flex: 0 0 auto; user-select: none;
 }
+
+/* ── Analysis-phase selector (footer) ─────────────────────────────── */
+.phase-select {
+  flex: 0 0 auto;
+  margin-right: 8px;
+  padding: 4px 8px;
+  border: 1.5px solid var(--border-dk);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 260px;
+}

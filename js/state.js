@@ -24,6 +24,7 @@ let qpState = {
   survey:          [],
   tdResult:        null,
   hydResult:       null,
+  activePhase:     'full',   // analysis phase key ('full' = final program)
 };
 
 // ── Input tab switching ─────────────────────────────────────────────────────

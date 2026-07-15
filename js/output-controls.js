@@ -22,6 +22,8 @@ const _OC_IDS = [
   'hydMWmin', 'hydMWslider', 'hydMWmax', 'hydFlowMin', 'hydFlowSlider', 'hydFlowMax',
   // Surge / Swab
   'ssSpeedMin', 'ssSpeedMax', 'ssShowData', 'ssShowPP', 'ssShowFP',
+  // Analysis phase (footer selector — value is the phase key, no unit)
+  'phaseSelect',
   // Casing design
   'cdSFBurst', 'cdSFCollapse',
   // NOTE: the kick-tolerance model inputs (ktSafety/ktSurfTemp/ktGeoGrad/

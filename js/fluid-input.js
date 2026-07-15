@@ -80,6 +80,11 @@ function _fluidUpdateLabels() {
   set('uTauY',      QP_UNITS.label('yieldstress'));
   set('uFlow',      QP_UNITS.label('flow'));
   set('uSPP',       QP_UNITS.label('press'));
+  // Fluid-program table headers
+  set('uFpMW',   QP_UNITS.label('mw'));
+  set('uFpPV',   QP_UNITS.label('visc'));
+  set('uFpYP',   QP_UNITS.label('yieldstress'));
+  set('uFpFlow', QP_UNITS.label('flow'));
 }
 
 function _fluidConvertFields(fromSys, toSys) {
@@ -95,6 +100,85 @@ function _fluidConvertFields(fromSys, toSys) {
   conv('flow',        'flowRate');
   conv('press',       'rigSppLimit');
   // pv (visc) has factor 1 → no change
+
+  // Fluid-program rows: [MW, PV, YP, Flow] per section
+  const body = document.getElementById('fluidProgBody');
+  if (body) {
+    const Q = ['mw', null, 'yieldstress', 'flow'];   // null = PV, factor 1
+    for (const tr of body.rows) {
+      [...tr.querySelectorAll('input')].forEach((inp, i) => {
+        if (Q[i] && inp.value !== '') {
+          inp.value = +QP_UNITS.convert(Q[i], +inp.value, fromSys, toSys).toFixed(4);
+        }
+      });
+    }
+  }
+}
+
+// ── Per-section fluid program ─────────────────────────────────────────────────
+// One row per hole section (sections derive from the Well Schematic via
+// qpPhaseList). Values are shown in display units; fluidProgramGet() returns
+// imperial (canonical). Stored under the NEW additive key 'fluidProgram' —
+// the existing 'fluid' key is untouched (RULE #1) and remains the well default.
+
+function fluidProgramSync() {
+  const body = document.getElementById('fluidProgBody');
+  if (!body || typeof qpPhaseList !== 'function') return;
+  const phases = qpPhaseList();
+
+  // Preserve current display values by section key across rebuilds
+  const cur = {};
+  for (const tr of body.rows) cur[tr.dataset.key] = [...tr.querySelectorAll('input')].map(i => i.value);
+
+  const g = id => document.getElementById(id)?.value ?? '';
+  body.innerHTML = '';
+  phases.forEach(p => {
+    const vals = cur[p.key] || [g('mudWeight'), g('pv'), g('yp'), g('flowRate')];
+    const tr = document.createElement('tr');
+    tr.dataset.key = p.key;
+    tr.innerHTML =
+      `<td style="text-align:left">${p.label}</td>` +
+      vals.map(v => `<td class="editable"><input type="number" step="0.1" value="${v}" onchange="fluidProgSave()"></td>`).join('');
+    body.appendChild(tr);
+  });
+}
+
+function fluidProgramGet() {
+  const body = document.getElementById('fluidProgBody');
+  const out = [];
+  if (!body) return out;
+  for (const tr of body.rows) {
+    const i = [...tr.querySelectorAll('input')];
+    out.push({
+      key:  tr.dataset.key,
+      mw:   QP_UNITS.fromDisplay('mw',          +(i[0]?.value || 0)),
+      pv:   +(i[1]?.value || 0),
+      yp:   QP_UNITS.fromDisplay('yieldstress', +(i[2]?.value || 0)),
+      flow: QP_UNITS.fromDisplay('flow',        +(i[3]?.value || 0)),
+    });
+  }
+  return out;
+}
+
+function fluidProgSave() {
+  if (!qpState.currentScenarioId) return;
+  dbSaveScenarioData(qpState.currentScenarioId, 'fluidProgram', fluidProgramGet());
+  if (typeof qpCompute === 'function') qpCompute();
+}
+
+function fluidProgramLoadState(data) {
+  fluidProgramSync();                                  // rows from current schematic
+  const body = document.getElementById('fluidProgBody');
+  if (!body || !Array.isArray(data)) return;
+  for (const tr of body.rows) {
+    const row = data.find(r => String(r.key) === tr.dataset.key);
+    if (!row) continue;
+    const i = [...tr.querySelectorAll('input')];
+    if (row.mw   > 0 && i[0]) i[0].value = +QP_UNITS.toDisplay('mw',          row.mw).toFixed(3);
+    if (row.pv   > 0 && i[1]) i[1].value = row.pv;
+    if (row.yp   > 0 && i[2]) i[2].value = +QP_UNITS.toDisplay('yieldstress', row.yp).toFixed(3);
+    if (row.flow > 0 && i[3]) i[3].value = +QP_UNITS.toDisplay('flow',        row.flow).toFixed(1);
+  }
 }
 
 QP_UNITS.onChange((newSys, oldSys) => {

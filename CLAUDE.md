@@ -221,6 +221,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | `js/compute-engine.js` | `qpCompute()` orchestrator + hydraulics calculation |
 | `js/well-schematic-draw.js` | Right-panel schematic canvas + `_readSchematicRows()` |
 | `js/datum-diagram.js` | Fixed-scale RKB/GL/MSL datum mini-diagram (bottom of right panel) — `drawDatumDiagram()` |
+| `js/phase.js` | Analysis phases (drilling stages from the schematic) — `qpPhaseList()`, `qpPhaseRows()`, `qpSurveyForAnalysis()`, `qpPhaseFluid()`. Engines consume these ('full' = final program, pre-phase behaviour). Per-section fluids live in the Fluid Program table (`fluidProgram*` in fluid-input.js, additive key `fluidProgram`) |
 | `js/output-controls.js` | Output panel control persistence (localStorage) |
 | `js/hierarchy-ui.js` | Project/well/scenario tree — collapsible, persists collapse state |
 | `js/bha-catalogue.js` | Drill pipe, drill collar, HWDP catalogue data + lookup helpers |
@@ -242,6 +243,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | Well schematic canvas (grade, weight, TVD, MD labels at shoe) | Done |
 | BHA table (DP / DC / HWDP catalogue + custom OD override) | Done |
 | Casing design (burst / collapse SF) | Done |
+| Analysis phases (footer selector; engines see each drilling stage's geometry + per-section fluid program) | Done |
 | AFE cost estimation | Done |
 | Trajectory plan view + VS plot | Done |
 | Project / well / scenario hierarchy (collapsible, IndexedDB) | Done |

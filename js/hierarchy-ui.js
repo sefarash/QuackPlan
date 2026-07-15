@@ -295,9 +295,18 @@ function _loadScenario(id) {
       if (d.ppfg)      ppfgLoadState(d.ppfg);
       cdRatingsLoadState(d.cdRatings);
 
+      // Analysis phases derive from the schematic just loaded; the fluid
+      // program (additive key) fills its per-section rows from stored data
+      if (typeof qpPhaseRebuildSelector === 'function') qpPhaseRebuildSelector();
+      if (typeof fluidProgramLoadState === 'function') fluidProgramLoadState(d.fluidProgram);
+
       // Restore this scenario's output-panel control values (FF sliders, WOB,
       // MW/flow, casing SFs); resets to defaults when the scenario has none saved
       if (typeof loadOutputControls === 'function') loadOutputControls(d.outputControls);
+      // loadOutputControls restored the saved phase selection — validate + mirror
+      const _ps = document.getElementById('phaseSelect');
+      if (_ps && ![..._ps.options].some(o => o.value === _ps.value)) _ps.value = 'full';
+      qpState.activePhase = _ps?.value || 'full';
     } finally {
       qpState.loadingScenario = false;   // an exception must not leave saves suppressed
     }

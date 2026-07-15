@@ -370,6 +370,25 @@
           </div>
         </div>
       </div>
+
+      <!-- Per-section fluid program (sections derive from the Well Schematic) -->
+      <div class="fluid-program" style="margin-top:16px">
+        <h3 style="margin:0 0 4px;font-size:13px">Fluid Program — per hole section</h3>
+        <div class="text-dim" style="font-size:11px;margin-bottom:6px">
+          Sections come from the Well Schematic. When an analysis phase is selected in the
+          footer, that section's values are used; the form above stays the well default.
+        </div>
+        <table class="qp-table" style="max-width:720px">
+          <thead><tr>
+            <th style="text-align:left">Section</th>
+            <th>MW <span id="uFpMW">ppg</span></th>
+            <th>PV <span id="uFpPV">cP</span></th>
+            <th>YP <span id="uFpYP">lb/100ft²</span></th>
+            <th>Flow <span id="uFpFlow">gpm</span></th>
+          </tr></thead>
+          <tbody id="fluidProgBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Activity -->
@@ -797,6 +816,11 @@
 
 <!-- ═══════════════════════ FOOTER ═══════════════════════ -->
 <footer class="qp-footer">
+  <select id="phaseSelect" class="phase-select"
+    title="Analysis phase — which drilling stage the outputs represent (derived from the Well Schematic)"
+    onchange="qpPhaseChanged(this.value)">
+    <option value="full">Full well (final)</option>
+  </select>
   <nav id="outputTabs">
     <button class="output-tab" onclick="switchOutputTab('trajplot',this)">Profile</button>
     <button class="output-tab" onclick="switchOutputTab('torque',this)">Torque</button>
@@ -891,6 +915,7 @@
 <script src="js/td-engine.js"></script>
 <script src="js/td-worker-client.js"></script>
 <script src="js/state.js"></script>
+<script src="js/phase.js"></script>
 <script src="js/db-engine.js"></script>
 <script src="js/hierarchy-ui.js"></script>
 <script src="js/auth-ui.js"></script>
