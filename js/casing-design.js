@@ -36,6 +36,8 @@ function drawCasingDesign() {
 
   const survey     = qpState.survey || [];
   const allRows    = _readSchematicRows();
+  const uCem = document.getElementById('uCdCementMW');
+  if (uCem) uCem.textContent = QP_UNITS.label('mw');
 
   const casingRows = allRows
     .filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0)
@@ -121,7 +123,7 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
       <td style="font-size:11px;padding:4px 4px">
         <strong>${row.size}" ${row.def}</strong><br>
         <span style="color:var(--text-dim);font-size:10px">${specLine}</span><br>
-        <span style="color:var(--text-dim);font-size:10px">${shoeTVD.toLocaleString()} ${uD} TVD</span>
+        <span style="color:var(--text-dim);font-size:10px">${shoeTVD.toLocaleString()} ${uD} TVD${(row.toc != null && +row.toc < +row.bot) ? ` · TOC ${Math.round(QP_UNITS.toDisplay('depth', +row.toc)).toLocaleString()} ${uD}` : ''}</span>
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="100" value="${bVal}" placeholder="${uP}"

@@ -155,6 +155,19 @@ function drawCasingTriaxial() {
   const topTVD  = _tvdAt(survey, topMD);
   const nomWt   = row.nomWt_ppf || 0;
 
+  // ── Cement / TOC (Well Schematic) → collapse backup ────────────────────────
+  // Mud the string was run in (this section's fluid from the Fluid Program if
+  // it has one, else the well default) above the TOC; cement slurry below it.
+  const secFluid = (typeof fluidForSection === 'function') ? fluidForSection(String(shoeMD)) : null;
+  const mwRun    = (secFluid && secFluid.mudWeight) || mw;
+  const cemMW    = QP_UNITS.fromDisplay('mw', +(document.getElementById('cdCementMW')?.value || 15.8));
+  const hasTOC   = row.toc != null && +row.toc < shoeMD;
+  const tocMD    = hasTOC ? Math.max(+row.toc, +(row.top || 0)) : null;
+  const tocTVD   = hasTOC ? _tvdAt(survey, tocMD) : null;
+  const P_ext_shoe = hasTOC
+    ? 0.052 * (mwRun * tocTVD + cemMW * (shoeTVD - tocTVD))
+    : 0.052 * mwRun * shoeTVD;
+
   // ── Bending stress from max DLS along this casing section ─────────────────
   // σ_b = E × r_o_ft × DLS_rad/ft  (outer fibre, most stressed)
   // F_bend = σ_b × A_s (converts to equivalent axial load, shifts op. points ±)
@@ -186,10 +199,11 @@ function drawCasingTriaxial() {
   const Ai = Math.PI * r_i * r_i; // inner cross-section area (in²)
   const ν  = 0.3;                 // Poisson ratio for steel
 
-  // Fixed Mud Drop Collapse: gas gradient (GAS_GRAD) inside, full MW outside at shoe
+  // Fixed Mud Drop Collapse: gas gradient (GAS_GRAD) inside; outside at the shoe
+  // = mud (run-in fluid) to TOC + cement slurry below TOC (full mud when no TOC)
   // Ballooning: internal pressure drops → pipe elongates (axial tension increases)
-  const Δp_fmd = -(mw * 0.052 - GAS_GRAD) * shoeTVD;
-  const F_fmd  = F_above + 2 * ν * Ai * (mw * 0.052 - GAS_GRAD) * shoeTVD / 1000;
+  const Δp_fmd = -(P_ext_shoe - GAS_GRAD * shoeTVD);
+  const F_fmd  = F_above + 2 * ν * Ai * (P_ext_shoe - GAS_GRAD * shoeTVD) / 1000;
 
   // MASP Burst: surface pressure = (FG - MW) × 0.052 × TVD_shoe; uniform ΔP (same fluid gradients)
   // Ballooning: internal pressure rises → pipe shortens (axial compression increases)
@@ -399,12 +413,14 @@ function drawCasingTriaxial() {
     `σ_y = ${_dStress(σy)} ${_uStress}  ·  Body Yield = ${_dF(bodyYield_klbf)} ${_uF}${jointStr}  ·  ID = ${id_in.toFixed(3)}"`,
     g.l + g.pw / 2, g.t - 28
   );
-  if (F_bend > 0.1) {
-    ctx.fillText(
-      `Bending: Max DLS = ${QP_UNITS.toDisplay('dls', DLS_max_deg).toFixed(2)} ${QP_UNITS.label('dls')}  ·  σ_b = ${_dStress1(σ_bend)} ${_uStress}  ·  ±${_dF(F_bend)} ${_uF} (dashed bars)`,
-      g.l + g.pw / 2, g.t - 46
-    );
-  }
+  const _uMW = QP_UNITS.label('mw'), _uD = QP_UNITS.label('depth');
+  const cemStr = hasTOC
+    ? `FMD backup: ${QP_UNITS.toDisplay('mw', mwRun).toFixed(2)} ${_uMW} mud to TOC ${Math.round(QP_UNITS.toDisplay('depth', tocMD)).toLocaleString()} ${_uD}, ${QP_UNITS.toDisplay('mw', cemMW).toFixed(1)} ${_uMW} cement below`
+    : `FMD backup: ${QP_UNITS.toDisplay('mw', mwRun).toFixed(2)} ${_uMW} mud to shoe (no TOC in Well Schematic)`;
+  const bendStr = F_bend > 0.1
+    ? `Bending: Max DLS = ${QP_UNITS.toDisplay('dls', DLS_max_deg).toFixed(2)} ${QP_UNITS.label('dls')}  ·  σ_b = ${_dStress1(σ_bend)} ${_uStress}  ·  ±${_dF(F_bend)} ${_uF} (dashed bars)`
+    : '';
+  ctx.fillText([bendStr, cemStr].filter(Boolean).join('  ·  '), g.l + g.pw / 2, g.t - 46);
 
   // ── Legend ──────────────────────────────────────────────────────────────────
   const legendLabels = ['DF 1.0 (yield)', 'DF 1.1 (design)'];

@@ -225,6 +225,7 @@
             <th>OD (in)</th>
             <th id="hdrSchTop">MD Top (ft)</th>
             <th id="hdrSchBot">MD Bottom (ft)</th>
+            <th id="hdrSchToc" title="Top of cement (measured depth). Blank = not cemented / unknown. Drawn on the schematic and used as the collapse backup in Casing Design.">TOC (ft)</th>
             <th class="row-act"></th>
           </tr>
         </thead>
@@ -766,6 +767,13 @@
           <input type="number" id="cdPtest" value="0" step="100" min="0"
             style="width:72px" onchange="drawCasingDesign()">
           <span style="font-size:10px;color:var(--text-dim)">psi</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px"
+               title="Cement slurry density behind the casing below the Top of Cement (Well Schematic). Collapse backup: mud above TOC, slurry below.">
+          Cement
+          <input type="number" id="cdCementMW" value="15.8" step="0.1" min="8" max="22"
+            style="width:60px" onchange="drawCasingDesign()">
+          <span style="font-size:10px;color:var(--text-dim)" id="uCdCementMW">ppg</span>
         </label>
         <button class="hdr-btn" onclick="drawCasingDesign()">Compute</button>
         <button class="hdr-btn" onclick="exportChartPNG('cdTriaxialCanvas','triaxial.png')">⬇ PNG</button>

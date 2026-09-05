@@ -129,6 +129,7 @@ function _schUpdateHeaders() {
   const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
   set('hdrSchTop', `MD Top (${d})`);
   set('hdrSchBot', `MD Bottom (${d})`);
+  set('hdrSchToc', `TOC (${d})`);
 }
 
 // Convert the schematic MD Top/Bottom input fields between unit systems in place
@@ -136,8 +137,8 @@ function _schConvertFields(fromSys, toSys) {
   const body = document.getElementById('schematicBody');
   if (!body) return;
   for (const tr of body.rows) {
-    const nums = tr.querySelectorAll('input[type=number]');   // [0]=OD (inches), [1]=top, [2]=bot
-    [1, 2].forEach(i => {
+    const nums = tr.querySelectorAll('input[type=number]');   // [0]=OD (inches), [1]=top, [2]=bot, [3]=TOC
+    [1, 2, 3].forEach(i => {
       const inp = nums[i];
       if (inp && inp.value !== '') inp.value = +QP_UNITS.convert('depth', +inp.value, fromSys, toSys).toFixed(2);
     });
@@ -557,6 +558,9 @@ function schematicAddRow(preset) {
     </td>
     <td class="editable"><input type="number" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.top ?? 0).toFixed(2)}" onchange="schematicSave()"></td>
     <td class="editable"><input type="number" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.bot ?? 5000).toFixed(2)}" onchange="schematicSave()"></td>
+    <td class="editable"><input type="number" class="sch-toc" step="1" min="0" placeholder="—"
+      title="Top of cement (MD). Blank = not cemented / unknown."
+      value="${(preset?.toc != null && preset.toc !== '') ? +QP_UNITS.toDisplay('depth', +preset.toc).toFixed(2) : ''}" onchange="schematicSave()"></td>
     <td class="row-act"><button onclick="this.closest('tr').remove();schematicSave()">✕</button></td>`;
   body.appendChild(tr);
   schematicSave();
@@ -666,7 +670,7 @@ function schematicLoadRows(data) {
   const body = document.getElementById('schematicBody');
   body.innerHTML = '';
   (data || []).forEach(row => {
-    schematicAddRow({ size: row.size, top: row.top, bot: row.bot });
+    schematicAddRow({ size: row.size, top: row.top, bot: row.bot, toc: row.toc });
     const tr     = body.rows[body.rows.length - 1];
     const selDef = tr.querySelector('select');
     const odSel  = tr.querySelector('.sch-od');
@@ -745,6 +749,8 @@ function schematicSave() {
       // MD top/bot fields are display units → store imperial (canonical)
       top:         inputs[1]?.value !== '' ? +QP_UNITS.fromDisplay('depth', +inputs[1].value).toFixed(4) : inputs[1]?.value,
       bot:         inputs[2]?.value !== '' ? +QP_UNITS.fromDisplay('depth', +inputs[2].value).toFixed(4) : inputs[2]?.value,
+      // Top of cement (MD, imperial) — additive key; '' = not cemented / unknown
+      toc:         (inputs[3] && inputs[3].value !== '') ? +QP_UNITS.fromDisplay('depth', +inputs[3].value).toFixed(4) : '',
       od:          odSel?.value  || '',
       odCustom:    odTxt?.value  || '',
       wt:          wtSel?.value  || '',

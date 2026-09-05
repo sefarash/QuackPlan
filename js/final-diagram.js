@@ -262,6 +262,20 @@ function drawFinalDiagram() {
       _fdStrokeLine(ctx, idR, wCol + '88', 0.75);
     }
 
+    // Cement sheath (TOC → shoe) along the path, hatched grey
+    if (!isOH && row.def !== 'Tubing' && row.toc != null && +row.toc < botMD && typeof _schCementSegments === 'function') {
+      const pat = _schCementPattern(ctx);
+      for (const seg of _schCementSegments(row, schRows)) {
+        const cpts = _fdSamplePath(survey, seg.from, seg.to, toX, toY);
+        if (!cpts || cpts.length < 2) continue;
+        const outHW = Math.max(inToPx(seg.outerDia) / 2, odHW + 1.5);
+        const { left: cOdL, right: cOdR } = _fdTubeWalls(cpts, odHW);
+        const { left: cOutL, right: cOutR } = _fdTubeWalls(cpts, outHW);
+        _fdFillBand(ctx, cOutL, cOdL, pat);
+        _fdFillBand(ctx, cOdR, cOutR, pat);
+      }
+    }
+
     // Shoe triangles — flare OUTWARD from the outer wall, hugging the casing and
     // pointing up-hole, exactly like the well-schematic shoe (but oriented to the
     // local wellpath tangent).

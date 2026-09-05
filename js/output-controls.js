@@ -25,7 +25,7 @@ const _OC_IDS = [
   // Analysis phase (footer selector — value is the phase key, no unit)
   'phaseSelect',
   // Casing design
-  'cdSFBurst', 'cdSFCollapse',
+  'cdSFBurst', 'cdSFCollapse', 'cdCementMW',
   // NOTE: the kick-tolerance model inputs (ktSafety/ktSurfTemp/ktGeoGrad/
   // ktInflux/ktInfluxGrad) are intentionally NOT persisted here — they are
   // display-unit (incl. temperature, an offset conversion) and output-controls
@@ -46,6 +46,8 @@ const _OC_UNITS = {
   bsBlock: 'force',  bsDPwt: 'linwt',  bsMW: 'mw',  bsMaxHL: 'force',
   // Surge / Swab trip speeds
   ssSpeedMin: 'speed', ssSpeedMax: 'speed',
+  // Casing design cement slurry density
+  cdCementMW: 'mw',
 };
 const _OC_SLIDER_SET = new Set(['hydMWmin','hydMWslider','hydMWmax','hydFlowMin','hydFlowSlider','hydFlowMax']);
 

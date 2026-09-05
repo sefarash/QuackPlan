@@ -232,6 +232,35 @@ function drawSchematic(survey) {
       ctx.beginPath(); ctx.moveTo(cx + halfW, yTop); ctx.lineTo(cx + halfW, yBot); ctx.stroke();
     }
 
+    // Cement sheath from TOC down to the shoe: OD → enclosing casing ID above
+    // the previous shoe, OD → hole size below it (hatched grey).
+    if (!isOH && row.def !== 'Tubing' && row.toc != null && +row.toc < bot) {
+      const yOf = md => (md <= glCasingMD && y_GL_casing > PAD_T) ? y_GL_casing
+                                                                   : PAD_T + Math.min(maxDepth, Math.max(0, md)) * scaleY;
+      ctx.fillStyle = _schCementPattern(ctx);
+      for (const seg of _schCementSegments(row, schRows)) {
+        const y1 = yOf(seg.from), y2 = yOf(seg.to);
+        if (y2 <= y1) continue;
+        const outerHW = Math.max((seg.outerDia / 2) * odScale, halfW + 1.5);
+        ctx.fillRect(cx - outerHW, y1, outerHW - halfW, y2 - y1);
+        ctx.fillRect(cx + halfW,   y1, outerHW - halfW, y2 - y1);
+      }
+      // TOC tick + label on the left
+      const yToc = yOf(Math.max(+row.toc, top));
+      ctx.strokeStyle = '#6b6b6b'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx - halfW - 14, yToc); ctx.lineTo(cx - halfW, yToc); ctx.stroke();
+      // Label sits just above the tick with a light backing so it stays legible
+      // over the depth-axis ticks when a wide casing pushes it left.
+      const tocTxt = `TOC ${Math.round(_toD(+row.toc)).toLocaleString()}${_uTick}`;
+      ctx.font = '8px sans-serif';
+      const tw = ctx.measureText(tocTxt).width;
+      ctx.fillStyle = 'rgba(248,251,253,0.85)';
+      ctx.fillRect(cx - halfW - 16 - tw - 2, yToc - 11, tw + 4, 10);
+      ctx.fillStyle = '#6b6b6b';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+      ctx.fillText(tocTxt, cx - halfW - 16, yToc - 1);
+    }
+
     // Shoe triangles — never taller than the casing body, so a sliver casing's
     // shoe can't poke up above its own top (e.g. above the GL/mudline line).
     if (!isOH) {
@@ -499,6 +528,42 @@ function _drawBracket(ctx, x, y1, y2, label, color) {
   ctx.fillText(label, x + TS + 3, MID);
 }
 
+// ── Cement sheath geometry (shared with the final diagram) ───────────────────
+// Depth segments of the cement column behind `row` from its TOC to its shoe,
+// each with the outer diameter the cement fills against: the ID of the innermost
+// enclosing casing where one exists at that depth, else the drilled hole size.
+function _schCementSegments(row, schRows) {
+  const size = +(row.size || 0), bot = +(row.bot || 0), top = +(row.top || 0);
+  const toc  = Math.max(+row.toc, top);
+  if (!(toc < bot)) return [];
+  const enclosing = schRows.filter(r => r !== row && r.def !== 'Open Hole' && r.def !== 'Tubing'
+                                   && +r.size > size && +(r.bot || 0) > toc && +(r.top || 0) < bot);
+  const holeDia = (typeof _qpHoleSizeFor === 'function') ? _qpHoleSizeFor(size) : size + 1.5;
+  const idOf = r => (r.id_in ? +r.id_in : (typeof _rowID === 'function' ? _rowID(r) : +r.size * 0.87));
+  const cuts = [...new Set([toc, bot, ...enclosing.flatMap(r => [+r.top || 0, +r.bot]).filter(d => d > toc && d < bot)])]
+    .sort((a, b) => a - b);
+  const segs = [];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const from = cuts[i], to = cuts[i + 1], mid = (from + to) / 2;
+    const inside = enclosing.filter(r => +(r.top || 0) <= mid && mid < +r.bot)
+                            .sort((a, b) => +a.size - +b.size)[0];
+    segs.push({ from, to, outerDia: inside ? Math.max(idOf(inside), size + 0.5) : Math.max(holeDia, size + 0.5) });
+  }
+  return segs;
+}
+
+let _schCemPat = null;
+function _schCementPattern(ctx) {
+  if (_schCemPat) return _schCemPat;
+  const c = document.createElement('canvas'); c.width = 6; c.height = 6;
+  const p = c.getContext('2d');
+  p.fillStyle = 'rgba(150,150,150,0.45)'; p.fillRect(0, 0, 6, 6);
+  p.strokeStyle = 'rgba(80,80,80,0.6)'; p.lineWidth = 1;
+  p.beginPath(); p.moveTo(0, 6); p.lineTo(6, 0); p.stroke();
+  _schCemPat = ctx.createPattern(c, 'repeat');
+  return _schCemPat;
+}
+
 function _readSchematicRows() {
   const rows  = [];
   const tbody = document.getElementById('schematicBody');
@@ -519,6 +584,8 @@ function _readSchematicRows() {
       // MD top/bot fields are display units → imperial (canonical) for all consumers
       top:  QP_UNITS.fromDisplay('depth', +(inputs[1]?.value || 0)),
       bot:  QP_UNITS.fromDisplay('depth', +(inputs[2]?.value || 5000)),
+      // Top of cement (MD, imperial); null when blank
+      toc:  (inputs[3] && inputs[3].value !== '') ? QP_UNITS.fromDisplay('depth', +inputs[3].value) : null,
       ...(spec ? {
         nomWt_ppf:  spec.nomWt_ppf,
         grade:      spec.grade,
