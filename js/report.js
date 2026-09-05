@@ -140,8 +140,7 @@ function generateReport() {
   ${kv([
     ['Type / model', `${esc(fluid.mudType)} · ${esc(fluid.model)}`],
     ['Mud weight', `${n(D('mw', fluid.mudWeight), 1)} ${uMW}`],
-    ['Plastic viscosity', `${n(fluid.pv, 0)} cP`],
-    ['Yield point', `${n(D('yieldstress', fluid.yp), 0)} ${L('yieldstress')}`],
+    ['Rheology', esc((typeof rheoParams === 'function') ? rheoLabel(rheoParams(fluid)) : `PV ${fluid.pv} cP · YP ${fluid.yp}`)],
     ['Flow rate', `${n(D('flow', fluid.flowRate), 0)} ${uFl}`],
   ])}
 </section>

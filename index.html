@@ -316,16 +316,6 @@
             <span class="unit" id="uMudWeight">ppg</span>
           </div>
           <div class="form-row">
-            <label>Plastic Viscosity (PV)</label>
-            <input type="number" id="pv" value="16" onchange="fluidChanged()">
-            <span class="unit" id="uPV">cP</span>
-          </div>
-          <div class="form-row">
-            <label>Yield Point (YP)</label>
-            <input type="number" id="yp" value="13" onchange="fluidChanged()">
-            <span class="unit" id="uYP">lb/100ft²</span>
-          </div>
-          <div class="form-row">
             <label>Gel Strength (10s)</label>
             <input type="number" id="gel10s" value="5" onchange="fluidChanged()">
             <span class="unit" id="uGel10s">lb/100ft²</span>
@@ -335,23 +325,71 @@
             <input type="number" id="gel10m" value="10" onchange="fluidChanged()">
             <span class="unit" id="uGel10m">lb/100ft²</span>
           </div>
+
+          <!-- Model parameters — only the selected model's inputs are shown
+               (_fluidModelChanged). Every field keeps its value and is saved
+               whichever model is active, so switching back loses nothing. -->
+          <div class="section-label mt12" id="rheoBlockLabel">Bingham Plastic Parameters</div>
+          <div class="rheo-model" data-rheo="BP">
+            <div class="form-row">
+              <label>Plastic Viscosity (PV)</label>
+              <input type="number" id="pv" value="16" onchange="fluidChanged()">
+              <span class="unit" id="uPV">cP</span>
+            </div>
+            <div class="form-row">
+              <label>Yield Point (YP)</label>
+              <input type="number" id="yp" value="13" onchange="fluidChanged()">
+              <span class="unit" id="uYP">lb/100ft²</span>
+            </div>
+          </div>
+          <div class="rheo-model" data-rheo="PL" hidden>
+            <div class="form-row">
+              <label>n (flow index)</label>
+              <input type="number" id="nPL" step="0.01" min="0.2" max="1" placeholder="from PV/YP" onchange="fluidChanged()">
+            </div>
+            <div class="form-row">
+              <label>K (consistency)</label>
+              <input type="number" id="kPL" placeholder="from PV/YP" onchange="fluidChanged()">
+              <span class="unit">eq.cP</span>
+            </div>
+            <div class="text-dim" id="kPLHint" style="margin:-4px 0 8px 148px"></div>
+          </div>
+          <div class="rheo-model" data-rheo="HB" hidden>
+            <div class="form-row">
+              <label>τ₀ (yield stress)</label>
+              <input type="number" id="tauY" value="8" step="0.1" onchange="fluidChanged()">
+              <span class="unit" id="uTauY">lb/100ft²</span>
+            </div>
+            <div class="form-row">
+              <label>n (flow index)</label>
+              <input type="number" id="nHB" value="0.7" step="0.01" min="0.2" max="1" onchange="fluidChanged()">
+            </div>
+            <div class="form-row">
+              <label>K (consistency)</label>
+              <input type="number" id="kHB" value="120" onchange="fluidChanged()">
+              <span class="unit">eq.cP</span>
+            </div>
+            <div class="text-dim" id="kHBHint" style="margin:-4px 0 8px 148px"></div>
+          </div>
+          <div class="text-dim" id="rheoSummary" style="margin-top:4px"></div>
         </div>
         <div>
-          <div class="section-label">HB Parameters (if model = HB)</div>
-          <div class="form-row">
-            <label>τ₀ (yield stress)</label>
-            <input type="number" id="tauY" value="8" step="0.1" onchange="fluidChanged()">
-            <span class="unit" id="uTauY">lb/100ft²</span>
+          <div class="section-label">Fann Viscometer Readings</div>
+          <div class="text-dim" style="margin-bottom:6px">
+            Dial readings (°) from the mud report. <em>Fit model</em> fills the selected
+            model's parameters from them (θ6 / θ3 give the HB yield stress).
           </div>
-          <div class="form-row">
-            <label>n (flow index)</label>
-            <input type="number" id="nHB" value="0.7" step="0.01" onchange="fluidChanged()">
+          <div class="fann-grid">
+            <label>θ600 <input type="number" id="fann600" step="0.5" min="0"></label>
+            <label>θ300 <input type="number" id="fann300" step="0.5" min="0"></label>
+            <label>θ200 <input type="number" id="fann200" step="0.5" min="0"></label>
+            <label>θ100 <input type="number" id="fann100" step="0.5" min="0"></label>
+            <label>θ6 <input type="number" id="fann6" step="0.5" min="0"></label>
+            <label>θ3 <input type="number" id="fann3" step="0.5" min="0"></label>
           </div>
-          <div class="form-row">
-            <label>K (consistency)</label>
-            <input type="number" id="kHB" value="120" onchange="fluidChanged()">
-            <span class="unit">eq.cP</span>
-          </div>
+          <button class="add-row-btn" onclick="fluidFitFann()">Fit model from readings</button>
+          <div class="text-dim" id="fannFitNote" style="margin-top:4px"></div>
+
           <div class="section-label mt12">Pump Parameters</div>
           <div class="form-row">
             <label>Flow Rate</label>
@@ -378,8 +416,10 @@
           Sections come from the Well Schematic. When an analysis phase is selected in the
           footer, that section's values are used; the form above stays the well default.
         </div>
-        <table class="qp-table" style="max-width:720px">
-          <thead><tr>
+        <!-- Columns follow the rheology model (fluidProgramSync builds the header):
+             MW · model parameters (PV/YP · n/K · τ₀/n/K) · Flow -->
+        <table class="qp-table" style="max-width:820px">
+          <thead id="fluidProgHead"><tr>
             <th style="text-align:left">Section</th>
             <th>MW <span id="uFpMW">ppg</span></th>
             <th>PV <span id="uFpPV">cP</span></th>

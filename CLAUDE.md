@@ -204,6 +204,8 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 
 **Well Schematic** (`trajectory-input.js`): Size (OD), Weight, and Grade dropdowns each include a `Custom…` option. Selecting it reveals a text input in the same cell. Custom values are saved as `odCustom`, `wtCustom`, `gradeCustom` fields alongside the select values. `_readSchematicRows()` in `well-schematic-draw.js` checks for custom values and uses them in canvas labels when no catalogue spec is present.
 
+**Drilling fluid** (`fluid-input.js`): the form shows only the selected rheology model's parameters (Bingham PV/YP, Power Law n/K, HB τ₀/n/K — `_fluidModelChanged`); hidden fields keep their values and are always saved. Stored keys `model, pv, yp, tauY, nHB, kHB, …` are unchanged; `nPL`, `kPL` (eq.cP) and `fann` are additive (absent → Power Law derives n/K from PV/YP, so old scenarios compute as before). A Fann-readings block fits the selected model (`fluidFitFann`). The Fluid Program table's columns follow the model; each row record carries every column (`mw, pv, yp, flow, tauY, n, K`, 0 = inherit the form) under the additive key `fluidProgram`, and `qpPhaseFluid` overlays them per phase.
+
 **BHA** (`bha-input.js`): Drill Pipe, Drill Collar, and HWDP OD dropdowns include `Custom…`. Selecting it reveals a number input; typing updates the hidden `.bha-od-n` value via `_bhaOdCustomInput()`. Grade/Connection cascade clears when custom OD is active. The `catOD='custom'` value is persisted so the row restores correctly on reload.
 
 ---
@@ -214,14 +216,14 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 |------|---------|
 | `js/td-engine.js` | Johancsik soft-string T&D model — `tdCompute()` is the main entry point |
 | `js/survey-engine.js` | Minimum curvature — `computeSurvey()` |
-| `js/rheology-engine.js` | HB / BP / PL rheology — `computeRheology()` |
+| `js/rheology-engine.js` | The single rheology model. `rheoParams(fluid)` resolves the fluid record for the SELECTED model (HB / BP / PL) into Herschel-Bulkley form in field units; `rheoAnnularGrad(v̄, gap, rheo)` is the one annular-loss model (exact HB slot laminar solution → Bourgoyne annular Reynolds number → API 13D transition → Dodge–Metzner turbulent) used by Hydraulics (`computeRheology`, legacy contract kept) and Surge/Swab; `rheoPipeVisc` feeds the drill-pipe bore loss; `rheoFit*` fit Bingham / Power Law / HB from Fann readings. `npm run test:rheology` |
 | `js/trajectory-solver.js` | Option 2 mixed-criteria solver + `applyTortuosity()` |
 | `js/chart-interaction.js` | Crosshair, freeze, annotation layer — `CI` object |
 | `js/state.js` | `qpState`, `switchOutputTab()`, `redrawOutputPanel()` |
 | `js/compute-engine.js` | `qpCompute()` orchestrator + hydraulics calculation |
 | `js/well-schematic-draw.js` | Right-panel schematic canvas + `_readSchematicRows()` |
 | `js/datum-diagram.js` | Fixed-scale RKB/GL/MSL datum mini-diagram (bottom of right panel) — `drawDatumDiagram()` |
-| `js/surge-swab.js` | Surge/swab panel — closed-pipe Burkhardt effective velocity → exact Herschel-Bulkley slot laminar solution (`_ssSlotTauW`) → Bourgoyne annular Reynolds check with an API 13D / Dodge–Metzner turbulent branch (`_ssSegLoss`); string OD steps come from the BHA table (bit-first). Rheology follows the fluid form's model (HB / BP / PL), same as Hydraulics. Reference cases vs published WellPlan / SurgeMOD runs: `npm run test:surgeswab` (pure Node, no server) |
+| `js/surge-swab.js` | Surge/swab panel — closed-pipe Burkhardt effective velocity → shared `rheoAnnularGrad` (`_ssSegLoss`); string OD steps come from the BHA table (bit-first). Reference cases vs published WellPlan / SurgeMOD runs: `npm run test:surgeswab` (pure Node, no server) |
 | `js/phase.js` | Analysis phases (drilling stages from the schematic) — `qpPhaseList()`, `qpPhaseRows()`, `qpSurveyForAnalysis()`, `qpPhaseFluid()`. Engines consume these ('full' = final program, pre-phase behaviour). Per-section fluids live in the Fluid Program table (`fluidProgram*` in fluid-input.js, additive key `fluidProgram`) |
 | `js/output-controls.js` | Output panel control persistence (localStorage) |
 | `js/hierarchy-ui.js` | Project/well/scenario tree — collapsible, persists collapse state |

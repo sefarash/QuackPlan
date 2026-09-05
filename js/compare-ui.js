@@ -186,7 +186,7 @@ function _cmpComputeHyd(survey, fluid, bha) {
   });
 
   const vPipe    = flowRate / (2.448 * dpID * dpID);
-  const rePipe   = 928 * mudWeight * vPipe * dpID / (pv || 1);
+  const rePipe   = 928 * mudWeight * vPipe * dpID / rheoPipeVisc(rheoParams(rheol), vPipe, dpID);
   const fPipe    = 0.0791 / Math.pow(Math.max(rePipe, 100), 0.25);
   const pipeLoss = fPipe * mudWeight * vPipe * vPipe / (21.1 * dpID) * totalMD_ft / 100;
   const nozzVel  = tfa > 0 ? flowRate / (3.117 * tfa) : 0;

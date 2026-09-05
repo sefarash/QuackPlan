@@ -143,7 +143,8 @@ function _computeHyd(survey, fluid, bha) {
 
   // Pipe loss (Fanning friction)
   const vPipe  = activeFlow / (2.448 * dpID * dpID);
-  const rePipe = 928 * activeMW * vPipe * dpID / (pv || 1);
+  const rheoRes = rheoParams(rheolParams);      // resolved model for the pipe-bore viscosity
+  const rePipe = 928 * activeMW * vPipe * dpID / rheoPipeVisc(rheoRes, vPipe, dpID);
   const fPipe  = 0.0791 / Math.pow(Math.max(rePipe, 100), 0.25);
   // v in ft/s; standard field-unit Fanning pipe loss: f × MW × v² × L / (25.8 × d)
   const pipeLoss = fPipe * activeMW * vPipe * vPipe * totalMD_ft / (25.8 * dpID);
@@ -171,7 +172,7 @@ function _computeHyd(survey, fluid, bha) {
   if (!sweepRates.includes(activeFlow)) { sweepRates.push(activeFlow); sweepRates.sort((a, b) => a - b); }
   const sweep      = sweepRates.map(q => {
     const vP  = q / (2.448 * dpID * dpID);
-    const reP = 928 * activeMW * vP * dpID / (pv || 1);
+    const reP = 928 * activeMW * vP * dpID / rheoPipeVisc(rheoRes, vP, dpID);
     const fP  = 0.0791 / Math.pow(Math.max(reP, 100), 0.25);
     const pL  = fP * activeMW * vP * vP * totalMD_ft / (25.8 * dpID);
     const nV  = tfa > 0 ? q / (3.117 * tfa) : 0;

@@ -404,31 +404,36 @@ Project
 <table>
   <tr><th>Field</th><th>Units</th><th>Notes</th></tr>
   <tr><td>Mud Type</td><td>—</td><td>WBM, OBM, or SBM — informational only, does not change calculation method</td></tr>
-  <tr><td>Rheology Model</td><td>—</td><td>Select Herschel-Bulkley (recommended), Bingham Plastic, or Power Law</td></tr>
-  <tr><td>Mud Weight</td><td>ppg</td><td>Used in T&amp;D (buoyancy), hydraulics (ECD, hydrostatic), and overpull calibration</td></tr>
-  <tr><td>Plastic Viscosity (PV)</td><td>cP</td><td>From FANN 600–300 rpm reading difference</td></tr>
-  <tr><td>Yield Point (YP)</td><td>lb/100ft²</td><td>From FANN 300 rpm reading minus PV</td></tr>
-  <tr><td>Gel Strength (10s / 10m)</td><td>lb/100ft²</td><td>For surge/swab estimates (not yet in output — informational)</td></tr>
+  <tr><td>Rheology Model</td><td>—</td><td>Herschel-Bulkley (recommended), Bingham Plastic, or Power Law. The parameter block below the gels changes with the selection — only the chosen model's inputs are shown; hidden fields keep their values</td></tr>
+  <tr><td>Mud Weight</td><td>ppg</td><td>Used in T&amp;D (buoyancy), hydraulics (ECD, hydrostatic), surge/swab and overpull calibration</td></tr>
+  <tr><td>Gel Strength (10s / 10m)</td><td>lb/100ft²</td><td>Informational (not yet used by an engine)</td></tr>
   <tr><td>Flow Rate</td><td>gpm</td><td>Default operating flow rate — also adjustable via slider on Hydraulics tab</td></tr>
   <tr><td>Pump Efficiency</td><td>%</td><td>Used to calculate hydraulic horsepower</td></tr>
   <tr><td>Rig SPP Limit</td><td>psi</td><td>Maximum allowable standpipe pressure — shown as red dashed line on Hydraulics chart</td></tr>
 </table>
 
-<h3>Rheology Models</h3>
+<h3>Rheology Models and their inputs</h3>
 <table>
-  <tr><th>Model</th><th>Parameters</th><th>Best for</th></tr>
-  <tr><td>Herschel-Bulkley (recommended)</td><td>τ₀, n, K</td><td>Most accurate for OBM and polymer muds with a yield stress</td></tr>
-  <tr><td>Bingham Plastic</td><td>PV, YP</td><td>Simple field calculations; well-matched to FANN readings</td></tr>
-  <tr><td>Power Law</td><td>n, K</td><td>Shear-thinning fluids without significant yield stress</td></tr>
+  <tr><th>Model</th><th>Inputs shown</th><th>Best for</th></tr>
+  <tr><td>Herschel-Bulkley (recommended)</td><td>τ₀ (lb/100ft²), n, K (eq.cP)</td><td>Most accurate for OBM and polymer muds with a yield stress</td></tr>
+  <tr><td>Bingham Plastic</td><td>PV (cP), YP (lb/100ft²)</td><td>Simple field calculations; PV = θ600 − θ300, YP = θ300 − PV</td></tr>
+  <tr><td>Power Law</td><td>n, K (eq.cP)</td><td>Shear-thinning fluids without significant yield stress. Leave n / K blank and they are derived from the PV / YP dial readings (shown as placeholders)</td></tr>
 </table>
+<p>K is entered in equivalent centipoise (eq.cP); the equivalent in lbf·sⁿ/100ft² (÷ 478.8) is shown under the field.
+Hydraulics (annular losses, ECD, drill-pipe bore loss), Surge/Swab and Compare all resolve the fluid through the same
+model, so the summary line under the parameters is exactly what the engines use.</p>
 
-<h3>HB Parameters</h3>
-<p>When Herschel-Bulkley is selected, also enter:</p>
-<ul>
-  <li><strong>τ₀ (yield stress):</strong> typically 5–15 lb/100ft² for OBM</li>
-  <li><strong>n (flow index):</strong> 0.5–0.9 for typical drilling fluids</li>
-  <li><strong>K (consistency index):</strong> fit from rheometer data</li>
-</ul>
+<h3>Fann Viscometer Readings</h3>
+<p>Enter the dial readings from the mud report (θ600, θ300, θ200, θ100, θ6, θ3) and press <em>Fit model from readings</em>.
+The selected model's parameters are filled in: Bingham from θ600/θ300, Power Law n = 3.32·log(θ600/θ300) and
+K = 1.0665·θ600/1022ⁿ, Herschel-Bulkley with τ₀ = 1.0665·(2θ3 − θ6) then n / K from the 600/300 readings with τ₀ removed
+(API RP 13D). The readings are saved with the fluid.</p>
+
+<h3>Fluid Program — per hole section</h3>
+<p>One row per hole section from the Well Schematic. The columns follow the rheology model: MW, then PV / YP (Bingham),
+n / K (Power Law) or τ₀ / n / K (Herschel-Bulkley), then Flow. When an analysis phase is selected in the footer that
+section's row is used by every engine; the form above stays the well default. Each row keeps all of its columns, so
+switching models and back loses nothing.</p>
 </section>
 
 <!-- ════════════════════════════════════════════ -->

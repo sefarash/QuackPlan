@@ -140,6 +140,20 @@ function rheoAnnularGrad(vbar, gap, rheo) {
   return { grad, turb, re, tauW: tw, muA };
 }
 
+// ── Pipe-bore apparent viscosity ─────────────────────────────────────────────
+// For the drill-pipe bore friction loss (Newtonian Blasius form with an apparent
+// viscosity, as Bourgoyne does for Bingham fluids with μa = PV + 6.66·YP·d/v̄).
+// Generalised to the resolved model: wall shear rate γ = 96·v̄/d (v̄ ft/s, d in),
+// leading-order pipe-flow wall stress τw = (4/3)·τ₀ + K·(γ·(3n+1)/(4n))ⁿ,
+// μa = 478.8·τw/γ cP. For Bingham this is Bourgoyne's expression exactly.
+function rheoPipeVisc(rheo, vbar, d) {
+  if (!(vbar > 0) || !(d > 0)) return rheo.pv || 1;
+  const g  = 96 * vbar / d;
+  const n  = rheo.n || 1, K = rheo.K || 0, tauY = rheo.tauY || 0;
+  const tw = (4 / 3) * tauY + K * Math.pow(g * (3 * n + 1) / (4 * n), n);
+  return Math.max(RHEO_EQCP * tw / g, 1);
+}
+
 // ── Circulation helpers (legacy contract) ────────────────────────────────────
 
 // Annular velocity in ft/min
