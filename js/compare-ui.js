@@ -169,7 +169,7 @@ function _cmpComputeHyd(survey, fluid, bha) {
   const bitTVD_ft  = survey[survey.length - 1].tvd;
 
   // 3-section annular fallback (avoids DOM reads)
-  const rheol = { pv, yp, n: 0.65, K: 180, tauY, nHB, kHB, mudWeight };
+  const rheol = { model, pv, yp, tauY, nHB, kHB, nPL: fluid.nPL, kPL: fluid.kPL, mudWeight };
   const segs  = [
     { dh: 13.375, mdBot: totalMD_ft * 0.4  },
     { dh: 9.625,  mdBot: totalMD_ft * 0.75 },

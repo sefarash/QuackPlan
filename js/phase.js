@@ -118,6 +118,11 @@ function qpPhaseFluid() {
   if (row.pv   > 0) out.pv        = row.pv;
   if (row.yp   > 0) out.yp        = row.yp;
   if (row.flow > 0) out.flowRate  = row.flow;
+  // Model-specific rheology columns (additive keys; blank = inherit the form).
+  // The model itself is global, so n/K feed whichever model is selected.
+  if (row.tauY > 0) out.tauY = row.tauY;
+  if (row.n    > 0) { out.nHB = row.n; out.nPL = row.n; }
+  if (row.K    > 0) { out.kHB = row.K; out.kPL = row.K; }
   return out;
 }
 

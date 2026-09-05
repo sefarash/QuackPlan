@@ -1,8 +1,8 @@
 // ===== SURGE / SWAB =====
-// Closed-pipe (Burkhardt) effective annular velocity → Herschel-Bulkley slot-flow
-// pressure loss with a laminar / transitional / turbulent regime check
-// (Bourgoyne annular Reynolds number, API RP 13D transition band, Dodge–Metzner
-// friction factor). surge = +ΔP tripping in, swab = −ΔP tripping out.
+// Closed-pipe (Burkhardt) effective annular velocity → shared annular-loss model
+// in rheology-engine.js (exact Herschel-Bulkley slot laminar solution, Bourgoyne
+// annular Reynolds check, API RP 13D / Dodge–Metzner turbulent branch).
+// surge = +ΔP tripping in, swab = −ΔP tripping out.
 // Chart: ECD at Bottom [ppg] vs MD (ft) — depth-down, five speed curves,
 //        surge fan (right) and swab fan (left) on the same axis.
 // Reference cases + regression: `npm run test:surgeswab` (test/surge-swab-reference.mjs).
@@ -12,66 +12,13 @@ let SS_SPEEDS = [20, 40, 60, 80, 100]; // updated by drawSurgeSwab() from speed 
 const SS_CLING = 0.45;                  // Burkhardt mud-clinging constant, closed pipe
 
 // ── Rheology ─────────────────────────────────────────────────────────────────
-// Herschel-Bulkley parameters in FIELD stress units for the fluid form's selected
-// model, so surge/swab sees the same rheology as the Hydraulics panel:
-//   tauY  lb/100ft²      yield stress          (0 for Power Law)
-//   K     lb·sⁿ/100ft²   consistency index     (fluid form K is eq.cP → ÷478.8)
-//   n     –              flow-behaviour index  (1 for Bingham Plastic)
-// Bingham → (YP, PV/478.8, 1). Power Law → fitted from PV/YP through the
-// θ600/θ300 dial readings (n = 3.32·log(θ600/θ300), K = 1.0665·θ600/1022ⁿ).
-// HB → (τ₀, K, n) straight from the form.
+// Shared with Hydraulics: rheoParams() (rheology-engine.js) resolves the fluid
+// form / fluid-program values for the SELECTED model into Herschel-Bulkley form
+// (τ₀ lb/100ft², K lb·sⁿ/100ft², n) — Bingham → (YP, PV, 1), Power Law → (0, K, n)
+// from nPL/kPL or the PV/YP dial-reading fit, HB → (τ₀, K, n) from the form.
 function _ssRheology(fluid) {
-  const pv = Math.max(+fluid.pv || 16, 0.1), yp = Math.max(+fluid.yp || 0, 0);
-  const model = fluid.model || 'HB';
-  if (model === 'BP') {
-    return { tauY: yp, K: pv / 478.8, n: 1,
-             label: `Bingham PV ${pv} cP · YP ${_ssFmtYS(yp)}` };
-  }
-  if (model === 'PL') {
-    const t600 = 2 * pv + yp, t300 = pv + yp;
-    let n = (t300 > 0 && t600 > 0) ? 3.32 * Math.log10(t600 / t300) : 0.65;
-    n = Math.min(1, Math.max(0.3, n));
-    const K = 1.0665 * Math.max(t600, 0.1) / Math.pow(1022, n);
-    return { tauY: 0, K, n,
-             label: `Power law n ${n.toFixed(2)} · K ${K.toFixed(3)} lb·sⁿ/100ft² (from PV/YP)` };
-  }
-  const n    = Math.min(1, Math.max(0.2, +fluid.nHB || 0.7));
-  const tauY = Math.max(+fluid.tauY || 0, 0);
-  const kEq  = Math.max(+fluid.kHB || 120, 1);
-  return { tauY, K: kEq / 478.8, n,
-           label: `Herschel-Bulkley τ₀ ${_ssFmtYS(tauY)} · n ${n.toFixed(2)} · K ${kEq} eq.cP` };
-}
-function _ssFmtYS(v) {   // yield-stress value for captions, in the display unit
-  if (typeof QP_UNITS === 'undefined') return `${v} lb/100ft²`;
-  return `${(+QP_UNITS.toDisplay('yieldstress', v)).toFixed(1)} ${QP_UNITS.label('yieldstress')}`;
-}
-
-// ── Laminar slot solution ─────────────────────────────────────────────────────
-// Wall shear stress τw (lb/100ft²) of a Herschel-Bulkley fluid with mean velocity
-// v̄ (ft/s) through the annulus treated as a slot of width (d2−d1)/2 (Bourgoyne's
-// slot approximation, valid for d1/d2 > 0.3). Exact slot solution (central plug
-// + sheared layers), solved for τw by bisection:
-//   v̄ = a·(τw−τy)^(m+1) / (τw²·K^m) · [ τy/(m+1) + (τw−τy)/(m+2) ],  m = 1/n,
-//   a = half slot width = (d2−d1)/48 ft.
-// n = 1 gives Buckingham–Reiner, whose small-τy expansion is the familiar
-// Bourgoyne Bingham form dp/dL = PV·v̄/(1000·gap²) + YP/(200·gap); τy = 0 gives
-// the power-law annular result exactly (the seed below IS that solution).
-function _ssSlotTauW(vbar, gap, tauY, K, n) {
-  if (vbar <= 0) return tauY;
-  const a = gap / 48, m = 1 / n;
-  const vOf = tw => {
-    const d = tw - tauY;
-    if (d <= 0) return 0;
-    return a * Math.pow(d, m + 1) / (tw * tw * Math.pow(K, m)) * (tauY / (m + 1) + d / (m + 2));
-  };
-  let lo = tauY;
-  let hi = tauY + K * Math.pow(144 * vbar / gap * (2 * n + 1) / (3 * n), n) + 1e-6;
-  for (let g = 0; g < 60 && vOf(hi) < vbar; g++) hi = tauY + (hi - tauY) * 2;
-  for (let i = 0; i < 48; i++) {
-    const mid = 0.5 * (lo + hi);
-    if (vOf(mid) < vbar) lo = mid; else hi = mid;
-  }
-  return 0.5 * (lo + hi);
+  const r = rheoParams(fluid);
+  return { ...r, label: rheoLabel(r) };
 }
 
 // ── Segment pressure loss ─────────────────────────────────────────────────────
@@ -79,37 +26,16 @@ function _ssSlotTauW(vbar, gap, tauY, K, n) {
 // at v_ftmin. Returns { psi, turb, re }.
 //   1. Burkhardt closed-pipe effective annular velocity (Bourgoyne eq. 4.94):
 //      v̄e = v_pipe · (K_cling + A_p/A_a), K_cling = 0.45.
-//   2. Laminar wall shear stress from the slot solution → dp/dL = τw/(300·gap).
-//   3. Regime: Bourgoyne annular Reynolds number on the wall apparent viscosity
-//      μa = τw/γw (for Bingham this is exactly his μa = PV + 5·YP·gap/v̄),
-//      Re = 757·ρ·v̄e·gap/μa. Laminar below Re1 = 3470−1370n, turbulent above
-//      Re2 = 4270−1370n (API RP 13D), linear blend between, never below laminar
-//      so ΔP is monotonic in trip speed.
-//   4. Turbulent: Dodge–Metzner f = a/Re^b (n = 1 → Blasius 0.079/Re^0.25),
-//      dp/dL = f·ρ·v̄e²/(21.1·gap) (Bourgoyne annular form, D_e = 0.816·gap).
+//   2. rheoAnnularGrad() (rheology-engine.js): exact HB slot laminar solution →
+//      Bourgoyne annular Reynolds number → API 13D transition → Dodge–Metzner
+//      turbulent gradient, monotonic in velocity.
 function _ssSegLoss(v_ftmin, dh, dpOD, L, rheo) {
   if (L <= 0 || dh <= dpOD + 0.1) return { psi: 0, turb: false, re: 0 };
   const gap = dh - dpOD;
   const ve  = v_ftmin * (SS_CLING + (dpOD * dpOD) / (dh * dh - dpOD * dpOD)) / 60; // ft/s
   if (ve <= 0) return { psi: 0, turb: false, re: 0 };
-  const { tauY, K, n } = rheo;
-  const mw  = rheo.mw || 10;
-  const tw  = _ssSlotTauW(ve, gap, tauY, K, n);                 // lb/100ft²
-  const lam = tw / (300 * gap);                                 // psi/ft
-  const gw  = Math.pow(Math.max(tw - tauY, 1e-9) / K, 1 / n);   // wall shear rate, s⁻¹
-  const muA = 478.8 * tw / Math.max(gw, 1e-9);                  // apparent viscosity, cP
-  const re  = 757 * mw * ve * gap / muA;
-  const re1 = 3470 - 1370 * n, re2 = 4270 - 1370 * n;
-  let grad = lam, turb = false;
-  if (re > re1) {
-    const fa = (Math.log10(n) + 3.93) / 50, fb = (1.75 - Math.log10(n)) / 7;
-    const f    = fa / Math.pow(re, fb);
-    const tur  = f * mw * ve * ve / (21.1 * gap);               // psi/ft
-    const w    = Math.min(1, (re - re1) / (re2 - re1));
-    grad = Math.max(lam, lam + w * (tur - lam));
-    turb = grad > lam;
-  }
-  return { psi: grad * L, turb, re };
+  const r = rheoAnnularGrad(ve, gap, rheo);
+  return { psi: r.grad * L, turb: r.turb, re: r.re };
 }
 function _ssSegPsi(v_ftmin, dh, dpOD, L, rheo) {   // scalar convenience (tests)
   return _ssSegLoss(v_ftmin, dh, dpOD, L, rheo).psi;

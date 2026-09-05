@@ -35,7 +35,30 @@ function fluidGet() {
     flowRate:    fd('flow',        'flowRate',    280),
     pumpEff:     raw('pumpEff', 90),
     rigSppLimit: fd('press',       'rigSppLimit', 3500),
+    // Power-Law parameters — NEW additive keys (0 = not entered → derived from PV/YP)
+    nPL:         raw('nPL', 0),
+    kPL:         raw('kPL', 0),                     // eq.cP, same unit as kHB
+    // Fann dial readings behind the "fit" buttons — NEW additive key (0 = not entered)
+    fann:        _fluidFannGet(),
   };
+}
+
+const _FLUID_FANN_IDS = { t600: 'fann600', t300: 'fann300', t200: 'fann200', t100: 'fann100', t6: 'fann6', t3: 'fann3' };
+function _fluidFannGet() {          // undefined (key omitted) until a reading is entered
+  const out = {};
+  let any = false;
+  for (const [k, id] of Object.entries(_FLUID_FANN_IDS)) {
+    out[k] = +(document.getElementById(id)?.value || 0);
+    if (out[k] > 0) any = true;
+  }
+  return any ? out : undefined;
+}
+function _fluidFannSet(f) {
+  if (!f) return;
+  for (const [k, id] of Object.entries(_FLUID_FANN_IDS)) {
+    const el = document.getElementById(id);
+    if (el && f[k] !== undefined) el.value = f[k] || '';
+  }
 }
 
 function fluidLoadState(data) {
@@ -60,6 +83,9 @@ function fluidLoadState(data) {
   setD('yieldstress', 'tauY',        data.tauY);
   setRaw('nHB',       data.nHB);
   setRaw('kHB',       data.kHB);
+  setRaw('nPL',       data.nPL);
+  setRaw('kPL',       data.kPL);
+  _fluidFannSet(data.fann);
   setD('flow',        'flowRate',    data.flowRate);
   setRaw('pumpEff',   data.pumpEff);
   setD('press',       'rigSppLimit', data.rigSppLimit);

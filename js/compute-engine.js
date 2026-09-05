@@ -64,21 +64,6 @@ function qpComputeDebounced(delay = 50) {
   _qpComputeTimer = setTimeout(() => { _qpComputeTimer = null; qpCompute(); }, delay);
 }
 
-// Derive Power-Law n and K from the Bingham PV/YP (standard API RP 13D).
-// The 600/300 rpm Fann dial readings are recovered from PV/YP:
-//   θ600 = 2·PV + YP,   θ300 = PV + YP
-//   n = 3.32·log10(θ600/θ300)     (flow-behaviour index, dimensionless)
-//   K = 5.11·θ600 / 1022^n        (consistency index)
-function _plFromPVYP(pv, yp) {
-  const t600 = 2 * pv + yp;
-  const t300 = pv + yp;
-  if (t300 <= 0 || t600 <= 0) return { n: 0.65, K: 180 };
-  let n = 3.32 * Math.log10(t600 / t300);
-  n = Math.min(1.0, Math.max(0.3, n));         // physical bounds for drilling muds
-  const K = 5.11 * t600 / Math.pow(1022, n);
-  return { n, K };
-}
-
 // ── Simplified hydraulics (field units, feet canonical) ──────────────────────
 function _computeHyd(survey, fluid, bha) {
   const { model = 'HB', mudWeight = 10, pv = 16, yp = 13,
@@ -102,8 +87,9 @@ function _computeHyd(survey, fluid, bha) {
   const totalMD_ft = survey[survey.length - 1].md;
   const bitTVD_ft  = survey[survey.length - 1].tvd;
 
-  const { n: plN, K: plK } = _plFromPVYP(pv, yp);
-  const rheolParams = { pv, yp, n: plN, K: plK, tauY, nHB, kHB,
+  // Full rheology record — rheoParams() (rheology-engine.js) resolves it for
+  // the selected model; nPL/kPL are the additive Power-Law keys (blank → PV/YP fit)
+  const rheolParams = { model, pv, yp, tauY, nHB, kHB, nPL: fluid.nPL, kPL: fluid.kPL,
                         mudWeight: activeMW };
 
   // Annular sections — the active phase's hole configuration (set strings +

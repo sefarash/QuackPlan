@@ -28,8 +28,9 @@ const sandbox = {
   CI: {}, qpState: {}, console,
 };
 vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/rheology-engine.js'), 'utf8'), sandbox, { filename: 'rheology-engine.js' });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/surge-swab.js'), 'utf8') +
-  '\nthis._ssSegLoss = _ssSegLoss; this._ssSegPsi = _ssSegPsi; this._ssSlotTauW = _ssSlotTauW;',
+  '\nthis._ssSegLoss = _ssSegLoss; this._ssSegPsi = _ssSegPsi;',
   sandbox, { filename: 'surge-swab.js' });
 const segLoss = sandbox._ssSegLoss, segPsi = sandbox._ssSegPsi;
 if (typeof segLoss !== 'function') { console.error('❌ _ssSegLoss not found in js/surge-swab.js'); process.exit(1); }
