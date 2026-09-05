@@ -20,7 +20,7 @@ function generateReport() {
   const survey = qpState.survey;
   const td     = qpState.tdResult;
   const hyd    = qpState.hydResult;
-  const fluid  = fluidGet();
+  const fluid  = (typeof fluidBase === 'function') ? fluidBase() : fluidGet();    // well default, not the section shown in the form
   const bha    = bhaGet();
   const sch    = _readSchematicRows();
 

@@ -108,8 +108,11 @@ function qpSurveyForAnalysis() {
 // section's row from the fluid program (MW / PV / YP / flow). 'full' returns
 // the global fluid untouched.
 function qpPhaseFluid() {
-  const base = fluidGet();
   const ph = _qpActivePhase();
+  // fluid-input.js resolves a section's fluid (own record over the well default,
+  // including its own rheology model); the overlay below is the fallback.
+  if (ph && typeof fluidForSection === 'function') return fluidForSection(ph.key);
+  const base = (typeof fluidBase === 'function') ? fluidBase() : fluidGet();
   if (!ph || typeof fluidProgramGet !== 'function') return base;
   const row = fluidProgramGet().find(r => r.key === ph.key);
   if (!row) return base;

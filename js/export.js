@@ -169,7 +169,7 @@ function exportKT() {
   const survey  = qpState.survey || [];
   const allRows = _readSchematicRows();
   const ppfgPts = _readPPFG();
-  const fluid   = fluidGet();
+  const fluid   = (typeof fluidBase === 'function') ? fluidBase() : fluidGet();   // well default, not the section shown in the form
   const mw      = fluid.mudWeight || 10;
   const bha     = bhaGet();
   const dpOD    = bha.topDpOD_in || 5.0;

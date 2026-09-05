@@ -430,10 +430,14 @@ K = 1.0665·θ600/1022ⁿ, Herschel-Bulkley with τ₀ = 1.0665·(2θ3 − θ6) 
 (API RP 13D). The readings are saved with the fluid.</p>
 
 <h3>Fluid Program — per hole section</h3>
-<p>One row per hole section from the Well Schematic. The columns follow the rheology model: MW, then PV / YP (Bingham),
-n / K (Power Law) or τ₀ / n / K (Herschel-Bulkley), then Flow. When an analysis phase is selected in the footer that
-section's row is used by every engine; the form above stays the well default. Each row keeps all of its columns, so
-switching models and back loses nothing.</p>
+<p>The form edits one fluid at a time. <em>Editing fluid for</em> (top of the tab) and the Fluid Program table select
+which: the <strong>Well default</strong>, or one hole section from the Well Schematic. A section without its own
+fluid inherits the well default (shown in grey in the table); editing any field while that section is selected
+gives it its own fluid, including its own rheology model. The table is a read-only summary — model, mud weight,
+rheology parameters and flow rate per section — and the place to pick a section. Pump efficiency and the rig SPP
+limit are well-wide and are edited under Well default. When an analysis phase is selected in the footer, every
+engine (Hydraulics, Surge/Swab, Kick Tolerance) uses that section's fluid; the <em>Full well</em> analysis uses
+the well default.</p>
 </section>
 
 <!-- ════════════════════════════════════════════ -->

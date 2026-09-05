@@ -117,7 +117,7 @@ function drawCasingTriaxial() {
   const { ctx, W, H } = c;
 
   const survey  = qpState.survey || [];
-  const mw      = fluidGet().mudWeight || 10;
+  const mw      = ((typeof fluidBase === 'function') ? fluidBase() : fluidGet()).mudWeight || 10;
   const BF      = 1 - mw / 65.5;
   const ppfgPts = _readPPFG();
   const ratings = _readCDRatings();
