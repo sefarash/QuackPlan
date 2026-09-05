@@ -1,0 +1,210 @@
+{
+  "_readme": [
+    "Reference cases for the Surge/Swab module (js/surge-swab.js: closed-pipe Burkhardt velocity, Herschel-Bulkley slot laminar solution, Bourgoyne/API 13D turbulent branch, BHA OD steps). Run: npm run test:surgeswab",
+    "All lengths ft, diameters in, mud ppg, PV cp, YP lb/100ft2, speed ft/min, pressures psi (imperial = QuackPlan canonical).",
+    "IMPORTANT: no truly public, downloadable PWD trip time-series exists (see 'unavailable' below). The numeric cases here are",
+    "published SIMULATION outputs (Landmark WellPlan, Pegasus SurgeMOD, textbook hand-calcs) that were themselves checked against",
+    "field practice. Use them as sanity/regression targets, not as pass/fail truth. Field-measured (PWD) sources are listed with what",
+    "they contain so you can key the numbers in by hand if you have library access."
+  ],
+  "cases": [
+    {
+      "id": "rumaila-5in-dp-in-12.25-oh",
+      "source": "Salih, Hadi, Al Saba (2024) 'Analysis of Surge and Swab ECD of Herschel Bulkley Fluids in Rumaila Iraqi Oil Field', Iraqi J. Chem. Pet. Eng. 25(1) 141-153, https://doi.org/10.31699/IJCPE.2024.1.14 (open access, Table 2 + Table 3)",
+      "kind": "simulation (Landmark WellPlan steady-state, Herschel-Bulkley)",
+      "notes": [
+        "Well R-A, 12 1/4in section. 13 3/8in casing shoe at 649 m (ID assumed 12.415in, 68 lb/ft); open hole 12.25in to 1957 m (bit at 1957 m MD, opposite Hartha thief zone).",
+        "Mud 9.51 ppg gel/polymer WBM. HB: tau_y = 12 lb/100ft2, n = 0.6, K = 0.03 in the paper's unit 'lb.s^n/ft2' = 3.0 lb.s^n/100ft2 (the only reading that gives a physical mud; the reference script uses that). Bingham PV 20 / YP 12 is a rough equivalent used as a second column.",
+        "Trip speed given as sec/stand; 30 sec/stand = 60 m/min in the paper => stand = 30 m = 98.4 ft => v_ftmin = 5906 / t_sec.",
+        "TVD assumed = MD (paper gives MD only; S-shaped well, section is shallow). ECD 'at bit' = ECD referenced to bit TVD.",
+        "Closed-ended values are the right comparison for QuackPlan (Burkhardt closed-pipe). Open-ended values shown for context."
+      ],
+      "geometry": {
+        "casing": [{ "top": 0, "bot": 2129, "id": 12.415 }],
+        "openHole": [{ "top": 2129, "bot": 6421, "id": 12.25 }],
+        "bitMD": 6421,
+        "string": [
+          { "name": "DP 5in",     "od": 5.0,  "top": 0,    "bot": 5715 },
+          { "name": "HWDP 5in",   "od": 5.0,  "top": 5715, "bot": 6168 },
+          { "name": "DC 6.75in",  "od": 6.75, "top": 6168, "bot": 6228 },
+          { "name": "DC 8in",     "od": 8.0,  "top": 6228, "bot": 6258 },
+          { "name": "Jar 7.75in", "od": 7.75, "top": 6258, "bot": 6280 },
+          { "name": "DC 8in",     "od": 8.0,  "top": 6280, "bot": 6372 },
+          { "name": "Sub/MWD/Stab 8.25in", "od": 8.25, "top": 6372, "bot": 6421 }
+        ]
+      },
+      "fluid": { "mw": 9.51, "pv": 20, "yp": 12, "hb": { "tau_y": 12, "n": 0.6, "K": 0.03 } },
+      "standFt": 98.4,
+      "expected": {
+        "closedEnded": [
+          { "secPerStand": 10,  "ecdSurgeBit": 10.50, "ecdSwabBit": 8.52 },
+          { "secPerStand": 20,  "ecdSurgeBit": 10.06, "ecdSwabBit": 8.96 },
+          { "secPerStand": 30,  "ecdSurgeBit": 9.92,  "ecdSwabBit": 9.10 },
+          { "secPerStand": 40,  "ecdSurgeBit": 9.86,  "ecdSwabBit": 9.16 },
+          { "secPerStand": 50,  "ecdSurgeBit": 9.81,  "ecdSwabBit": 9.21 },
+          { "secPerStand": 70,  "ecdSurgeBit": 9.76,  "ecdSwabBit": 9.26 },
+          { "secPerStand": 80,  "ecdSurgeBit": 9.74,  "ecdSwabBit": 9.28 },
+          { "secPerStand": 100, "ecdSurgeBit": 9.71,  "ecdSwabBit": 9.31 },
+          { "secPerStand": 120, "ecdSurgeBit": 9.69,  "ecdSwabBit": 9.33 },
+          { "secPerStand": 140, "ecdSurgeBit": 9.67,  "ecdSwabBit": 9.35 },
+          { "secPerStand": 170, "ecdSurgeBit": 9.66,  "ecdSwabBit": 9.36 },
+          { "secPerStand": 190, "ecdSurgeBit": 9.65,  "ecdSwabBit": 9.37 },
+          { "secPerStand": 200, "ecdSurgeBit": 9.64,  "ecdSwabBit": 9.38 }
+        ],
+        "openEnded": [
+          { "secPerStand": 10,  "ecdSurgeBit": 10.47, "ecdSwabBit": 8.55 },
+          { "secPerStand": 30,  "ecdSurgeBit": 9.90,  "ecdSwabBit": 9.12 },
+          { "secPerStand": 100, "ecdSurgeBit": 9.71,  "ecdSwabBit": 9.31 },
+          { "secPerStand": 200, "ecdSurgeBit": 9.64,  "ecdSwabBit": 9.38 }
+        ],
+        "porePressureTD_ppg": 9.23,
+        "porePressureAtTD_ppg_casingCase": 9.21,
+        "fractureAt1680m_ppg": 13.81,
+        "fractureAtTD_ppg": 14.0
+      }
+    },
+    {
+      "id": "rumaila-9.625-casing-in-12.25-oh",
+      "source": "Same paper as above, section 3.2 + Table 6 (9 5/8in casing run through the 12 1/4in open hole, same mud)",
+      "kind": "simulation (Landmark WellPlan steady-state)",
+      "notes": [
+        "9.625in casing (ID 8.681), float collar/shoe OD 10.396in, shoe at 1680 m MD (5512 ft). Hole: 13 3/8in casing to 649 m, 12.25in OH below.",
+        "Annular clearance 12.25-9.625 = 2.625in => this is the narrow-annulus stress case for the model.",
+        "Text values: closed-ended surge ECD at 1680 m for 200 -> 20 sec/stand = 10.4 -> 13.0 ppg (FG 13.81). Open-ended at TD 200 -> 10 sec/stand: surge 10.26 -> 15.2, swab 8.76 -> 3.82 ppg.",
+        "Closed vs open at 100 sec/stand: 11.03 vs 10.83 ppg; at 55 sec/stand: 11.69 vs 11.41 ppg (run-depth analysis at TD).",
+        "Stand length assumed 30 m as in the drill-pipe case (paper keeps 'sec/stand'); if WellPlan used single joints (~12 m) the speeds are 2.5x lower."
+      ],
+      "geometry": {
+        "casing": [{ "top": 0, "bot": 2129, "id": 12.415 }],
+        "openHole": [{ "top": 2129, "bot": 6421, "id": 12.25 }],
+        "bitMD": 5512,
+        "string": [
+          { "name": "9 5/8 casing", "od": 9.625,  "top": 0,    "bot": 5380 },
+          { "name": "Float collar", "od": 10.396, "top": 5380, "bot": 5428 },
+          { "name": "9 5/8 casing", "od": 9.625,  "top": 5428, "bot": 5470 },
+          { "name": "Shoe",         "od": 10.396, "top": 5470, "bot": 5512 }
+        ]
+      },
+      "fluid": { "mw": 9.51, "pv": 20, "yp": 12 },
+      "standFt": 98.4,
+      "expected": {
+        "closedEnded": [
+          { "secPerStand": 200, "ecdSurgeBit": 10.40 },
+          { "secPerStand": 100, "ecdSurgeBit": 11.03 },
+          { "secPerStand": 55,  "ecdSurgeBit": 11.69 },
+          { "secPerStand": 20,  "ecdSurgeBit": 13.00 }
+        ]
+      }
+    },
+    {
+      "id": "rumaila-RA-8.5-section-100ftmin",
+      "source": "Salih & Hadi (2024) 'Estimation of Surge and Swab Pressures While Tripping for Minimizing Excessive Drilling Problems', Iraqi Geological Journal 57(1D) 174-200, https://igj-iraq.org/igj/index.php/igj/article/view/2124 (open access, Table 2, Table 5, Fig. 14)",
+      "kind": "simulation (Landmark WellPlan DYNAMIC/transient model) — magnitudes are far above steady-state; treat as an upper bound, NOT a target",
+      "notes": [
+        "Vertical well R-A, 8.5in production section. 9 5/8in casing (ID 8.681) to 1942 m; 8.5in OH to 3290 m.",
+        "Mud 9.96 ppg WBM, Bingham: PV 31 cp, YP 12. Pore ~9.5 ppg; fracture at Shuaibba (2940-3032 m) 7100-7400 psi.",
+        "String: 5in DP (ID 4.276), BHA = 8 x 6.5in DC (~75.6 m) + 2 string stabilizers 8.25in + bit 0.36 m.",
+        "Table 5 (RIH at 100 ft/min): 'Surge Min' equals the static hydrostatic head (0.052*9.96*TVD), 'Surge Max' is the transient peak. deltaP = max - min.",
+        "Text: raising trip speed 40 -> 80 ft/min adds ~300 psi surge; optimum 80 ft/min; at 80 ft/min through Shuaibba surge = 6110-6300 psi (static ~5070-5230 psi).",
+        "These transient peaks (~1000 psi, ~2 ppg) are 5-8x what any steady-state laminar model gives; a Burkhardt-type model is not expected to reproduce them."
+      ],
+      "geometry": {
+        "casing": [{ "top": 0, "bot": 6371, "id": 8.681 }],
+        "openHole": [{ "top": 6371, "bot": 10794, "id": 8.5 }],
+        "string": [
+          { "name": "DP 5in", "od": 5.0, "topFromBit": 10794, "lengthNote": "whole string above BHA" },
+          { "name": "DC 6.5in x8 + stabs", "od": 6.5, "lengthFt": 248 }
+        ]
+      },
+      "fluid": { "mw": 9.96, "pv": 31, "yp": 12 },
+      "expected": {
+        "rih100ftmin": [
+          { "bitMD_m": 1918.00, "surgeMinPsi": 3255.84, "surgeMaxPsi": 4262.85 },
+          { "bitMD_m": 1948.48, "surgeMinPsi": 3307.58, "surgeMaxPsi": 4321.37 },
+          { "bitMD_m": 2161.84, "surgeMinPsi": 3669.76, "surgeMaxPsi": 4598.42 },
+          { "bitMD_m": 2192.32, "surgeMinPsi": 3721.50, "surgeMaxPsi": 4615.40 },
+          { "bitMD_m": 2222.80, "surgeMinPsi": 3773.24, "surgeMaxPsi": 4764.79 },
+          { "bitMD_m": 2253.28, "surgeMinPsi": 3824.98, "surgeMaxPsi": 4907.16 },
+          { "bitMD_m": 2283.76, "surgeMinPsi": 3876.72, "surgeMaxPsi": 4965.51 },
+          { "bitMD_m": 3228.64, "surgeMaxPsi": 6758.43, "fracturePsi": 6752.29 }
+        ],
+        "speedSensitivityDeltaPsi_40to80ftmin": 300
+      }
+    },
+    {
+      "id": "pegasus-liner-run-180ftmin",
+      "source": "Pegasus Vertex white paper 'Surge Pressure Prediction for Running Liners' (SurgeMOD), https://linqx.io/white-paper/Surge-Pressure-Prediction-for-Running-Liners.pdf",
+      "kind": "simulation (SurgeMOD steady-flow with geometry-dependent clinging constant, laminar+turbulent) — narrow-clearance stress case",
+      "notes": [
+        "Vertical well, TD 15000 ft. Riser ID 17.755in to 3500 ft; casing ID 12.715in to 10000 ft; 14.5in OH to 15000 ft.",
+        "11 3/4in 60 lb/ft liner (ID 10.772), 5500 ft long, on drill pipe (DP size not stated; 5in assumed). Radial clearance liner/casing 0.4825in.",
+        "Mud 11 ppg, PV 20, YP 15. Weak zone at 15000 ft: PP 9.5 ppg, FG 12 ppg.",
+        "Closed-ended at 180 ft/min: bottomhole EMW reaches 12 ppg (FG) when liner bottom reaches ~4000 ft (i.e. deltaP >= 0.052*(12-11)*15000 = 780 psi). With auto-fill (TFA 4.91 in2) safe to ~8400 ft.",
+        "Annular velocity in the liner/casing gap is ~19 ft/s at 180 ft/min => fully turbulent. QuackPlan's laminar-only Bingham loss will UNDER-predict here; this case documents that limitation."
+      ],
+      "geometry": {
+        "casing": [{ "top": 0, "bot": 3500, "id": 17.755 }, { "top": 3500, "bot": 10000, "id": 12.715 }],
+        "openHole": [{ "top": 10000, "bot": 15000, "id": 14.5 }],
+        "string": [
+          { "name": "DP 5in (assumed)", "od": 5.0 },
+          { "name": "Liner 11.75in", "od": 11.75, "lengthFt": 5500 }
+        ],
+        "weakZoneTVD": 15000
+      },
+      "fluid": { "mw": 11, "pv": 20, "yp": 15 },
+      "expected": { "closedEnded180ftmin": { "linerBottomFt": 4000, "bottomholeEMW_ppg": 12.0, "deltaPsiAtWeakZone": 780 } }
+    },
+    {
+      "id": "textbook-7in-liner-16.6ppg",
+      "source": "drillingmanual.com worked example (Bourgoyne-style Bingham laminar hand calculation), https://www.drillingmanual.com/surge-and-swab-pressure-calculations-drilling/",
+      "kind": "hand calculation (laminar Bingham, displacement-only annular velocity)",
+      "notes": [
+        "Casing ID 8.5in to 10000 ft, 8.5in OH to 13000 ft. 7in flush-joint liner 3600 ft on 4.5in DP. Mud 16.6 ppg, PV 38, YP 15. FG 17.0 ppg.",
+        "Pipe velocity 93 ft/min (1.55 ft/s). Their result: DP section 110 psi + liner section 168 psi = 278 psi total => ECD 17.13 ppg at 13000 ft (> FG).",
+        "Their annular velocities (0.603 ft/s round DP, 1.349 ft/s round liner) come from a 76.8 gpm displacement flow with NO clinging term, so QuackPlan (clinging 0.45 + displacement) will read higher. Useful to show the clinging-constant sensitivity."
+      ],
+      "geometry": {
+        "casing": [{ "top": 0, "bot": 10000, "id": 8.5 }],
+        "openHole": [{ "top": 10000, "bot": 13000, "id": 8.5 }],
+        "bitMD": 13000,
+        "string": [
+          { "name": "DP 4.5in", "od": 4.5, "top": 0,    "bot": 9400 },
+          { "name": "Liner 7in", "od": 7.0, "top": 9400, "bot": 13000 }
+        ]
+      },
+      "fluid": { "mw": 16.6, "pv": 38, "yp": 15 },
+      "expected": { "speedFtMin": 93, "surgePsi": 278, "surgePsiDP": 110, "surgePsiLiner": 168, "ecdBottom": 17.13 }
+    }
+  ],
+  "measuredPwdSources_paywalled_or_figuresOnly": [
+    {
+      "ref": "Burkhardt (1961) 'Wellbore Pressure Surges Produced by Pipe Movement', JPT 13(6) 595-605, SPE-1546-G",
+      "what": "The classic field test: single casing joint lowered into a mud-filled hole instrumented with 5 downhole gauges; tables of mud properties and measured vs predicted viscous-drag, inertia and gel-break peaks. Origin of the 0.45 clinging constant QuackPlan uses. OnePetro paywall."
+    },
+    {
+      "ref": "Wang & Liu (1994) 'Dynamic model predicts well bore surge and swab pressures', Oil & Gas Journal, https://www.ogj.com/home/article/17234245/dynamic-model-predicts-well-bore-surge-and-swab-pressures",
+      "what": "MEASURED downhole surge/swab in a 3354 ft test well (Zhong Yuan field, China): 9 5/8in casing to 3302 ft, 8.5in bit (nozzle equiv. dia 2.03in), 5in DP + 174 ft DCs. Runs: 13.02 ppg PV37/YP20 at 2954 ft; 12.69 ppg PV34/YP15; swab tests 12.60 ppg PV32/YP13 at 2104 and 3037 ft. Measured peaks are in the figures only (free page, digitise the plots); steady-state Burkhardt over-predicted the peak by 64%."
+    },
+    {
+      "ref": "Rudolf & Suryanarayana (1998) SPE-39395 'Field Validation of Swab Effects While Tripping-In the Hole on Deep, High Temperature Wells'",
+      "what": "Downhole pressure/temperature/trip-speed logs while tripping in deep HT wells (swab on RIH from thermal effects). Paywalled."
+    },
+    {
+      "ref": "Bing, Kaiji et al. (2001/2003) SPE-67717 / SPE-85109-PA 'Field Validation of Transient Swab-Surge Response With Real-Time Downhole Pressure Data'",
+      "what": "PWD records of swab, surge, reciprocation and pump-on tripping from Alaska and North Sea wells, several hole sizes, WBM/OBM, compared to a transient model. The best measured dataset in the literature; paywalled (SPE Drilling & Completion 18(4) 280-288)."
+    },
+    {
+      "ref": "Mohammad, Belayneh, Davidrajuh (2023) 'Physics-Based Swab and Surge Simulations and Machine Learning Modeling of the Field Telemetry Swab Dataset', Appl. Sci. 13, 10252, https://doi.org/10.3390/app131810252 (open access)",
+      "what": "Norwegian-shelf wired-drill-pipe (NOV DWT) trip-out: 8.5in hole, 1060 m -> 330 m, sensor 67 m above bit, 3373 samples of downhole EMW / bit position / trip speed (Fig. 7). Data Availability: 'Not applicable' — plotted only, not distributed."
+    },
+    {
+      "ref": "Amir et al. (2022) SPE/IADC MPD & UBO Conf. 'Calibrating ECD, Surge, and Swab Models Using Downhole Pressure Measurements...'",
+      "what": "PWD-calibrated surge/swab models, MPD context. Paywalled."
+    }
+  ],
+  "unavailable": [
+    "Equinor Volve real-time WITSML logs carry annular pressure/ECD while DRILLING (pumps on, mud-pulse telemetry) but not during trips — mud-pulse PWD is memory-only when pumps are off, so trip surge/swab is not in the public real-time channels.",
+    "NLOG, NOPIMS, NDR: end-of-well reports, no PWD trip records.",
+    "UiS thesis (Equinor Johan Castberg PWD tripping data, https://uis.brage.unit.no/uis-xmlui/handle/11250/3017906) — repository host did not resolve from this machine; worth retrying manually, the data itself is not public."
+  ]
+}

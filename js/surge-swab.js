@@ -1,10 +1,140 @@
 // ===== SURGE / SWAB =====
-// Burkhardt clamp model: surge = +ΔP tripping in, swab = −ΔP tripping out
+// Closed-pipe (Burkhardt) effective annular velocity → Herschel-Bulkley slot-flow
+// pressure loss with a laminar / transitional / turbulent regime check
+// (Bourgoyne annular Reynolds number, API RP 13D transition band, Dodge–Metzner
+// friction factor). surge = +ΔP tripping in, swab = −ΔP tripping out.
 // Chart: ECD at Bottom [ppg] vs MD (ft) — depth-down, five speed curves,
-//        surge fan (right) and swab fan (left) on the same axis
+//        surge fan (right) and swab fan (left) on the same axis.
+// Reference cases + regression: `npm run test:surgeswab` (test/surge-swab-reference.mjs).
 
 const SS_COLORS = ['#e74c3c', '#27ae60', '#2980b9', '#8bc34a', '#f0c040'];
 let SS_SPEEDS = [20, 40, 60, 80, 100]; // updated by drawSurgeSwab() from speed inputs
+const SS_CLING = 0.45;                  // Burkhardt mud-clinging constant, closed pipe
+
+// ── Rheology ─────────────────────────────────────────────────────────────────
+// Herschel-Bulkley parameters in FIELD stress units for the fluid form's selected
+// model, so surge/swab sees the same rheology as the Hydraulics panel:
+//   tauY  lb/100ft²      yield stress          (0 for Power Law)
+//   K     lb·sⁿ/100ft²   consistency index     (fluid form K is eq.cP → ÷478.8)
+//   n     –              flow-behaviour index  (1 for Bingham Plastic)
+// Bingham → (YP, PV/478.8, 1). Power Law → fitted from PV/YP through the
+// θ600/θ300 dial readings (n = 3.32·log(θ600/θ300), K = 1.0665·θ600/1022ⁿ).
+// HB → (τ₀, K, n) straight from the form.
+function _ssRheology(fluid) {
+  const pv = Math.max(+fluid.pv || 16, 0.1), yp = Math.max(+fluid.yp || 0, 0);
+  const model = fluid.model || 'HB';
+  if (model === 'BP') {
+    return { tauY: yp, K: pv / 478.8, n: 1,
+             label: `Bingham PV ${pv} cP · YP ${_ssFmtYS(yp)}` };
+  }
+  if (model === 'PL') {
+    const t600 = 2 * pv + yp, t300 = pv + yp;
+    let n = (t300 > 0 && t600 > 0) ? 3.32 * Math.log10(t600 / t300) : 0.65;
+    n = Math.min(1, Math.max(0.3, n));
+    const K = 1.0665 * Math.max(t600, 0.1) / Math.pow(1022, n);
+    return { tauY: 0, K, n,
+             label: `Power law n ${n.toFixed(2)} · K ${K.toFixed(3)} lb·sⁿ/100ft² (from PV/YP)` };
+  }
+  const n    = Math.min(1, Math.max(0.2, +fluid.nHB || 0.7));
+  const tauY = Math.max(+fluid.tauY || 0, 0);
+  const kEq  = Math.max(+fluid.kHB || 120, 1);
+  return { tauY, K: kEq / 478.8, n,
+           label: `Herschel-Bulkley τ₀ ${_ssFmtYS(tauY)} · n ${n.toFixed(2)} · K ${kEq} eq.cP` };
+}
+function _ssFmtYS(v) {   // yield-stress value for captions, in the display unit
+  if (typeof QP_UNITS === 'undefined') return `${v} lb/100ft²`;
+  return `${(+QP_UNITS.toDisplay('yieldstress', v)).toFixed(1)} ${QP_UNITS.label('yieldstress')}`;
+}
+
+// ── Laminar slot solution ─────────────────────────────────────────────────────
+// Wall shear stress τw (lb/100ft²) of a Herschel-Bulkley fluid with mean velocity
+// v̄ (ft/s) through the annulus treated as a slot of width (d2−d1)/2 (Bourgoyne's
+// slot approximation, valid for d1/d2 > 0.3). Exact slot solution (central plug
+// + sheared layers), solved for τw by bisection:
+//   v̄ = a·(τw−τy)^(m+1) / (τw²·K^m) · [ τy/(m+1) + (τw−τy)/(m+2) ],  m = 1/n,
+//   a = half slot width = (d2−d1)/48 ft.
+// n = 1 gives Buckingham–Reiner, whose small-τy expansion is the familiar
+// Bourgoyne Bingham form dp/dL = PV·v̄/(1000·gap²) + YP/(200·gap); τy = 0 gives
+// the power-law annular result exactly (the seed below IS that solution).
+function _ssSlotTauW(vbar, gap, tauY, K, n) {
+  if (vbar <= 0) return tauY;
+  const a = gap / 48, m = 1 / n;
+  const vOf = tw => {
+    const d = tw - tauY;
+    if (d <= 0) return 0;
+    return a * Math.pow(d, m + 1) / (tw * tw * Math.pow(K, m)) * (tauY / (m + 1) + d / (m + 2));
+  };
+  let lo = tauY;
+  let hi = tauY + K * Math.pow(144 * vbar / gap * (2 * n + 1) / (3 * n), n) + 1e-6;
+  for (let g = 0; g < 60 && vOf(hi) < vbar; g++) hi = tauY + (hi - tauY) * 2;
+  for (let i = 0; i < 48; i++) {
+    const mid = 0.5 * (lo + hi);
+    if (vOf(mid) < vbar) lo = mid; else hi = mid;
+  }
+  return 0.5 * (lo + hi);
+}
+
+// ── Segment pressure loss ─────────────────────────────────────────────────────
+// ΔP (psi) over L ft of annulus dh / pipe OD (in) with the closed-end pipe moving
+// at v_ftmin. Returns { psi, turb, re }.
+//   1. Burkhardt closed-pipe effective annular velocity (Bourgoyne eq. 4.94):
+//      v̄e = v_pipe · (K_cling + A_p/A_a), K_cling = 0.45.
+//   2. Laminar wall shear stress from the slot solution → dp/dL = τw/(300·gap).
+//   3. Regime: Bourgoyne annular Reynolds number on the wall apparent viscosity
+//      μa = τw/γw (for Bingham this is exactly his μa = PV + 5·YP·gap/v̄),
+//      Re = 757·ρ·v̄e·gap/μa. Laminar below Re1 = 3470−1370n, turbulent above
+//      Re2 = 4270−1370n (API RP 13D), linear blend between, never below laminar
+//      so ΔP is monotonic in trip speed.
+//   4. Turbulent: Dodge–Metzner f = a/Re^b (n = 1 → Blasius 0.079/Re^0.25),
+//      dp/dL = f·ρ·v̄e²/(21.1·gap) (Bourgoyne annular form, D_e = 0.816·gap).
+function _ssSegLoss(v_ftmin, dh, dpOD, L, rheo) {
+  if (L <= 0 || dh <= dpOD + 0.1) return { psi: 0, turb: false, re: 0 };
+  const gap = dh - dpOD;
+  const ve  = v_ftmin * (SS_CLING + (dpOD * dpOD) / (dh * dh - dpOD * dpOD)) / 60; // ft/s
+  if (ve <= 0) return { psi: 0, turb: false, re: 0 };
+  const { tauY, K, n } = rheo;
+  const mw  = rheo.mw || 10;
+  const tw  = _ssSlotTauW(ve, gap, tauY, K, n);                 // lb/100ft²
+  const lam = tw / (300 * gap);                                 // psi/ft
+  const gw  = Math.pow(Math.max(tw - tauY, 1e-9) / K, 1 / n);   // wall shear rate, s⁻¹
+  const muA = 478.8 * tw / Math.max(gw, 1e-9);                  // apparent viscosity, cP
+  const re  = 757 * mw * ve * gap / muA;
+  const re1 = 3470 - 1370 * n, re2 = 4270 - 1370 * n;
+  let grad = lam, turb = false;
+  if (re > re1) {
+    const fa = (Math.log10(n) + 3.93) / 50, fb = (1.75 - Math.log10(n)) / 7;
+    const f    = fa / Math.pow(re, fb);
+    const tur  = f * mw * ve * ve / (21.1 * gap);               // psi/ft
+    const w    = Math.min(1, (re - re1) / (re2 - re1));
+    grad = Math.max(lam, lam + w * (tur - lam));
+    turb = grad > lam;
+  }
+  return { psi: grad * L, turb, re };
+}
+function _ssSegPsi(v_ftmin, dh, dpOD, L, rheo) {   // scalar convenience (tests)
+  return _ssSegLoss(v_ftmin, dh, dpOD, L, rheo).psi;
+}
+
+// ── String profile ────────────────────────────────────────────────────────────
+// OD steps of the moving string measured UP from the bit: [{ od, from, to }]
+// with from/to = distance above the bit (ft). Built from the BHA table
+// (bit-first, as documented in the manual) with the top drill-pipe OD extending
+// to surface; a uniform drill pipe when the table is empty. Bits at hole gauge
+// contribute nothing (no annulus).
+function _ssStringSteps(bha) {
+  const dpOD  = bha.topDpOD_in ?? 5.0;
+  const steps = [];
+  let acc = 0;
+  for (const c of (bha.components || [])) {
+    if (c.type === 'Drill Pipe') continue;
+    const len = +c.lengthFt || 0, od = +c.od || 0;
+    if (len <= 0 || od <= 0) continue;
+    steps.push({ od, from: acc, to: acc + len });
+    acc += len;
+  }
+  steps.push({ od: dpOD, from: acc, to: Infinity });
+  return steps;
+}
 
 // ── Geometry helper ───────────────────────────────────────────────────────────
 
@@ -16,10 +146,11 @@ function _ssGeom() {
   const bha     = bhaGet();
   const schRows = (typeof qpPhaseRows === 'function') ? qpPhaseRows()
                 : (typeof _readSchematicRows === 'function' ? _readSchematicRows() : []);
-  const pv  = fluid.pv  || 16;
-  const yp  = fluid.yp  || 13;
-  const dpOD = bha.topDpOD_in ?? 5.0;
-  const tdMD = survey[survey.length - 1].md;
+  const mwFluid = fluid.mudWeight || 10;
+  const rheo    = { ..._ssRheology(fluid), mw: mwFluid };
+  const dpOD    = bha.topDpOD_in ?? 5.0;
+  const steps   = _ssStringSteps(bha);
+  const tdMD    = survey[survey.length - 1].md;
 
   // Build a NON-OVERLAPPING innermost-geometry profile vs MD. Schematic rows are
   // concentric strings whose MD ranges overlap (surface / intermediate /
@@ -46,47 +177,37 @@ function _ssGeom() {
     }
   }
   if (!segs.length) segs.push({ mdTop: 0, mdBot: tdMD, dh: 8.5 });
-  return { survey, pv, yp, dpOD, segs, mwFluid: fluid.mudWeight || 10 };
-}
-
-// ── Segment pressure (psi) ────────────────────────────────────────────────────
-
-function _ssSegPsi(v_ftmin, dh, dpOD, pv, yp, L) {
-  if (L <= 0 || dh <= dpOD + 0.1) return 0;
-  const ann = dh - dpOD; // annular clearance (in)
-  // Burkhardt closed-pipe effective annular velocity (Bourgoyne eq. 4.94):
-  //   v̄_e = v_pipe · (K + A_p / A_a),  clinging constant K ≈ 0.45
-  // K ADDS to the displacement ratio (it was previously multiplied, understating
-  // the effective velocity ~4× for typical DP/hole geometry).
-  const ve_fps = v_ftmin * (0.45 + (dpOD * dpOD) / (dh * dh - dpOD * dpOD)) / 60; // → ft/s
-  if (ve_fps <= 0) return 0;
-  // Bingham plastic laminar annular pressure drop (Bourgoyne eq. 4.53, v̄ in FT/S):
-  //   dP/dL = μ_p·v̄/(1000·(d2−d1)²) + τ_y/(200·(d2−d1))   [psi/ft]
-  // The velocity fed here was previously in ft/min against the /1000 form, which
-  // overstated the viscous term 60×.
-  return Math.max(pv * ve_fps * L / (1000 * ann * ann) + yp * L / (200 * ann), 0);
+  return { survey, rheo, dpOD, steps, segs, mwFluid, rheoLabel: rheo.label };
 }
 
 // ── Per-station ECD profile ───────────────────────────────────────────────────
-
-function _ssProfile(mwBase, speedFtMin) {
-  const g = _ssGeom();
+// Each survey station is treated as the bit depth: the string steps hang from
+// st.md and the loss is summed over every (string step × hole segment) overlap
+// between surface and the bit. `turb` marks stations where any segment left the
+// laminar regime at this speed.
+function _ssProfile(mwBase, speedFtMin, g = _ssGeom()) {
   if (!g) return null;
-  const { survey, pv, yp, dpOD, segs } = g;
+  const { survey, segs, steps, rheo } = g;
   const result = [];
   for (const st of survey) {
     if (st.tvd <= 0) {
-      result.push({ md: st.md, tvd: 0, ecdSurge: mwBase, ecdSwab: mwBase });
+      result.push({ md: st.md, tvd: 0, ecdSurge: mwBase, ecdSwab: mwBase, dp: 0, turb: false });
       continue;
     }
-    let psi = 0;
-    for (const seg of segs) {
-      const top = Math.max(seg.mdTop, 0);
-      const bot = Math.min(seg.mdBot, st.md);
-      if (bot > top) psi += _ssSegPsi(speedFtMin, seg.dh, dpOD, pv, yp, bot - top);
+    let psi = 0, turb = false;
+    for (const s of steps) {
+      const elBot = st.md - s.from;                       // MD of this OD step's bottom
+      const elTop = Math.max(st.md - s.to, 0);            // … and top (DP → surface)
+      if (elBot <= elTop) continue;
+      for (const seg of segs) {
+        const top = Math.max(seg.mdTop, elTop), bot = Math.min(seg.mdBot, elBot);
+        if (bot <= top) continue;
+        const r = _ssSegLoss(speedFtMin, seg.dh, s.od, bot - top, rheo);
+        psi += r.psi; turb = turb || r.turb;
+      }
     }
     const delta = psi / (0.052 * st.tvd);
-    result.push({ md: st.md, tvd: st.tvd, ecdSurge: mwBase + delta, ecdSwab: mwBase - delta });
+    result.push({ md: st.md, tvd: st.tvd, ecdSurge: mwBase + delta, ecdSwab: mwBase - delta, dp: psi, turb });
   }
   return result;
 }
@@ -228,7 +349,7 @@ function drawSurgeSwab() {
   const showData = document.getElementById('ssShowData')?.checked;
 
   // ── Compute profiles ──────────────────────────────────────────────────────────
-  const surgeProfs = SS_SPEEDS.map(v => _ssProfile(mwBase, v));
+  const surgeProfs = SS_SPEEDS.map(v => _ssProfile(mwBase, v, g));
   const swabProfs  = surgeProfs; // symmetric: same profiles for surge and swab
   if (!surgeProfs[0]) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
@@ -406,6 +527,14 @@ function drawSurgeSwab() {
     ctx.fillText(`${fmtSpd(v)} ${uSpd}`, lx + 20, T - 20);
     lx += 76;
   });
+
+  // ── Model caption ─────────────────────────────────────────────────────────────
+  const turbAt = SS_SPEEDS.find((v, i) => surgeProfs[i].some(pt => pt.turb));
+  ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(`${g.rheoLabel} · closed-end string, K=${SS_CLING} · BHA steps from table · ` +
+               (turbAt != null ? `turbulent annular flow from ${fmtSpd(turbAt)} ${uSpd}` : 'laminar throughout'),
+               L + pw / 2, T - 38);
 
   CI.drawAnnotations(ctx, CID);
 }

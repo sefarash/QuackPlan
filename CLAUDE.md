@@ -221,6 +221,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | `js/compute-engine.js` | `qpCompute()` orchestrator + hydraulics calculation |
 | `js/well-schematic-draw.js` | Right-panel schematic canvas + `_readSchematicRows()` |
 | `js/datum-diagram.js` | Fixed-scale RKB/GL/MSL datum mini-diagram (bottom of right panel) — `drawDatumDiagram()` |
+| `js/surge-swab.js` | Surge/swab panel — closed-pipe Burkhardt effective velocity → exact Herschel-Bulkley slot laminar solution (`_ssSlotTauW`) → Bourgoyne annular Reynolds check with an API 13D / Dodge–Metzner turbulent branch (`_ssSegLoss`); string OD steps come from the BHA table (bit-first). Rheology follows the fluid form's model (HB / BP / PL), same as Hydraulics. Reference cases vs published WellPlan / SurgeMOD runs: `npm run test:surgeswab` (pure Node, no server) |
 | `js/phase.js` | Analysis phases (drilling stages from the schematic) — `qpPhaseList()`, `qpPhaseRows()`, `qpSurveyForAnalysis()`, `qpPhaseFluid()`. Engines consume these ('full' = final program, pre-phase behaviour). Per-section fluids live in the Fluid Program table (`fluidProgram*` in fluid-input.js, additive key `fluidProgram`) |
 | `js/output-controls.js` | Output panel control persistence (localStorage) |
 | `js/hierarchy-ui.js` | Project/well/scenario tree — collapsible, persists collapse state |
@@ -239,6 +240,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | Buckling analysis | Done |
 | Overpull sensitivity | Done |
 | Broomstick plot | Done |
+| Surge / Swab (HB slot laminar + turbulent, BHA-aware, speed tables vs PPFG) | Done |
 | Hydraulics (HB/BP/PL rheology, ECD, pressure loss) | Done |
 | Well schematic canvas (grade, weight, TVD, MD labels at shoe) | Done |
 | BHA table (DP / DC / HWDP catalogue + custom OD override) | Done |
