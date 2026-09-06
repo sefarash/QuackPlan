@@ -44,7 +44,10 @@ recoverable, deleted data is not.
    (`db-engine.js`, `worker/`, `migrations/`, load/save paths):
    `npx wrangler dev --local` then **`npm run test:datasafety`** — it replays the corruption
    incident end-to-end (zero writes on load, serialized saves, round-trip, undo log, soft
-   delete) and must print PASS.
+   delete) and must print PASS. **`npm run test:trajsafety`** replays the 2026-09-06 trajectory
+   report (a paste into one cell wiped the Option 1 table; leftover Option 2 rows hijacked the
+   survey on reload; blank rows came back as duplicate stations) — run it for any change to
+   `trajectory-input.js`, the paste handler, or the scenario loader.
 6. **Last resort** — Cloudflare D1 Time Travel can rewind the whole database up to 30 days
    (`wrangler d1 time-travel`); it affects ALL users, so use per-node history first.
 
@@ -257,6 +260,12 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | Catalogue custom overrides (schematic OD / weight / grade; BHA OD) | Done |
 
 ---
+
+## Casing design roadmap
+
+Gap analysis, ordered steps (depth-profiled load cases → wear allowance → temperature
+→ sour service → cement coverage → connections) and the temperature-model reference live
+in `docs/casing-design-roadmap.md`. Update its checkboxes as steps ship.
 
 ## Future integration roadmap
 
