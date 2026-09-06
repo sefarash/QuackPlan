@@ -106,6 +106,23 @@ const res = await page.evaluate(async () => {
   out.blank.afterReload = mds();
   out.blank.stations = qpState.survey.length;
   out.patchesDuringLoads = patches;
+
+  // 7) borehole only: inputs inert + banner; a scenario created from the tree is opened at once
+  _selectNode(await dbGet(bh)); await wait(600);
+  const center = document.getElementById('centerPanel');
+  out.boreholeOnly = {
+    noScenarioClass: center.classList.contains('no-scenario'),
+    bannerShown: !document.getElementById('scenarioBanner').hidden,
+    trajInert: getComputedStyle(document.getElementById('panel-trajectory')).pointerEvents === 'none',
+    compareUsable: getComputedStyle(document.getElementById('panel-compare')).pointerEvents !== 'none',
+    currentScenario: qpState.currentScenarioId,
+  };
+  const newId = await hierarchyAddScenario(bh, 'TS-New'); await wait(1500);
+  out.newScenario = { selected: qpState.currentScenarioId === newId, noScenarioClass: center.classList.contains('no-scenario'),
+                      bannerShown: !document.getElementById('scenarioBanner').hidden };
+  // an edit now saves into the new scenario
+  document.querySelectorAll('#traj1Body tr')[1].querySelector('input').value = '4321'; traj1Recalc(); await wait(700);
+  out.newScenario.savedTraj1 = ((await dbGet(newId)).data.traj1 || []).map(r => r.md);
   return out;
 });
 
@@ -120,6 +137,9 @@ check('Option 2 rows are preserved (not deleted)', res.afterReload.traj2RowsKept
 check('explicitly choosing Option 2 is honoured after reload', res.opt2Chosen.source === 'opt2' && res.opt2Chosen.td === 6000);
 check('blank row round-trips blank, no duplicate station', res.blank.storedMDs.at(-1) === '' && res.blank.afterReload.at(-1) === '' && res.blank.stations === 5, res.blank.storedMDs.join(','));
 check('loads fire zero data writes', res.patchesDuringLoad === 0 && res.patchesDuringLoads === 0, `${res.patchesDuringLoads} PATCHes`);
+check('borehole only: inputs inert, banner shown, Compare still usable', res.boreholeOnly.noScenarioClass && res.boreholeOnly.bannerShown && res.boreholeOnly.trajInert && res.boreholeOnly.compareUsable && !res.boreholeOnly.currentScenario, JSON.stringify(res.boreholeOnly));
+check('new scenario from the tree is opened immediately', res.newScenario.selected && !res.newScenario.noScenarioClass && !res.newScenario.bannerShown);
+check('edits after creation save into the new scenario', res.newScenario.savedTraj1.includes('4321'), res.newScenario.savedTraj1.join(','));
 check('no page errors', pageErrors.length === 0, pageErrors.join(' | '));
 
 await browser.close();

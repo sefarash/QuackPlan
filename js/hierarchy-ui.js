@@ -38,6 +38,14 @@ function _updateGate() {
     if (locked) center.scrollTop = 0;
   }
 
+  // ── Borehole only: inputs are READ-ONLY. Trajectory / schematic / PPFG /
+  //    activity are stored per scenario, so with no scenario there is nowhere
+  //    to save — the tables used to accept edits and silently drop them.
+  const noScenario = hasBorehole && !hasScenario;
+  if (center) center.classList.toggle('no-scenario', noScenario);
+  const banner = document.getElementById('scenarioBanner');
+  if (banner) banner.hidden = !noScenario;
+
   // ── Run button ──
   const runBtn = document.querySelector('.hdr-btn.primary');
   if (runBtn) {
@@ -341,8 +349,27 @@ function _promptAdd(parentNode) {
   if (childType === 'well') { _openWellModal(parentNode.id); return; }
   _editNodeId = null;
   _openModal('New ' + _cap(childType), _cap(childType) + ' name', name => {
+    if (childType === 'scenario') { hierarchyAddScenario(parentNode.id, name); return; }
     dbAdd({ parentId: parentNode.id, name, type: childType }).then(hierarchyRefresh);
   });
+}
+
+// Create a scenario and OPEN it. RULE #1 incident (2026-09-06): a new scenario
+// was created but not selected; the user typed a trajectory with only the
+// borehole selected, the tables accepted it, and nothing was saved (there was
+// no scenario to save into). A new scenario is now selected immediately.
+function hierarchyAddScenario(boreholeId, name) {
+  return dbAdd({ parentId: boreholeId, name, type: 'scenario' }).then(id => {
+    _selectNode({ id, type: 'scenario', parentId: boreholeId, name });
+    return id;
+  });
+}
+
+// Banner button: add a scenario under the currently selected borehole.
+function hierarchyAddScenarioHere() {
+  const bh = qpState.currentBoreholeId;
+  if (!bh) return;
+  dbGet(bh).then(node => { if (node) _promptAdd(node); });
 }
 
 // ── Well creation modal ───────────────────────────────────────────────────────

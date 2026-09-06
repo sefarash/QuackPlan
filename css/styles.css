@@ -334,6 +334,26 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 }
 
 /* When gated, keep panel-center overflow hidden so content below is unreachable */
+/* Borehole selected but no scenario: input panels are inert (Compare needs none) */
+.scenario-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 12px 0;
+  padding: 8px 12px;
+  border: 1px solid #e0a020;
+  border-radius: 6px;
+  background: #fff6dc;
+  color: #6a4a00;
+  font-size: 12px;
+}
+body.dark .scenario-banner { background: #3a2e10; color: #ffd98a; }
+.panel-center.no-scenario .input-panel:not(#panel-compare) {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
 .panel-center.locked {
   overflow: hidden;
 }

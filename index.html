@@ -112,6 +112,13 @@
   <!-- CENTER — Input + Output panels -->
   <div class="panel-center" id="centerPanel">
 
+    <!-- ── NO-SCENARIO BANNER — borehole selected, nothing to save into ── -->
+    <div class="scenario-banner" id="scenarioBanner" hidden>
+      <span>⚠ <strong>No scenario selected.</strong> Trajectory, schematic, PPFG and activity belong to a
+      scenario, so the tables are read-only until you open one — nothing typed here would be saved.</span>
+      <button class="hdr-btn" onclick="hierarchyAddScenarioHere()">+ Add scenario</button>
+    </div>
+
     <!-- ── GATE OVERLAY — shown when no scenario is selected ── -->
     <div class="gate-overlay" id="gateOverlay">
       <div class="gate-message">
