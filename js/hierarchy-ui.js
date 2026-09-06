@@ -284,6 +284,10 @@ function _loadScenario(id) {
         traj1AddRow({ md: 5000, inc: 0, azi: 0 });
       }
       if (d.traj2 && d.traj2.length) traj2LoadRows(d.traj2);
+      // The survey source is explicit ('trajOpt'); legacy scenarios keep the old
+      // precedence (Option 2 wins when it has a survey). Runs under the load
+      // guard, so nothing is written.
+      if (typeof trajApplySource === 'function') trajApplySource(d.trajOpt);
       if (d.schematic) schematicLoadRows(d.schematic);
       if (d.fluid)     fluidLoadState(d.fluid);
       if (d.bha)       bhaLoadState(d.bha);

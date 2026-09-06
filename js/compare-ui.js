@@ -81,11 +81,14 @@ function _cmpBuildPath(node, all) {
 // intentionally NOT applied — the comparison normalizes on the clean planned
 // trajectory (and fixed FF) for a fair side-by-side.
 function _cmpBuildSurvey(d) {
-  if (Array.isArray(d.traj2) && d.traj2.length) {
+  const useOpt2 = d.trajOpt ? d.trajOpt === 'opt2' : true;   // legacy: Option 2 wins when it has rows
+  if (useOpt2 && Array.isArray(d.traj2) && d.traj2.length) {
     const stations = traj2BuildStations(d.traj2);
     if (stations.length >= 2) return computeSurvey(stations);
   }
-  const stations1 = (d.traj1 || []).map(r => ({ md: +r.md, inc: +r.inc, az: +r.azi }));
+  const stations1 = (d.traj1 || [])
+    .filter(r => r && r.md !== '' && r.md != null)                // blank (unfilled) rows
+    .map(r => ({ md: +r.md, inc: +r.inc, az: +r.azi }));
   if (stations1.length >= 2) return computeSurvey(stations1);
   return null;
 }

@@ -47,6 +47,7 @@ async function exportScenario() {
     inputs: {
       traj1:     d.traj1     || [],
       traj2:     d.traj2     || [],
+      trajOpt:   d.trajOpt   || '',        // which option feeds the survey ('opt1' | 'opt2')
       tort:      d.tort      || [],
       schematic: d.schematic || [],
       fluid:     d.fluid     || {},

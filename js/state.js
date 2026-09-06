@@ -17,6 +17,7 @@ let qpState = {
   activeInputTab:  'trajectory',
   activeOutputTab: null,
   activeTrajOpt:   'opt1',
+  trajSource:      'opt1',   // which option feeds qpState.survey (persisted as 'trajOpt')
   currentWellId:      null,
   currentBoreholeId:  null,
   currentScenarioId:  null,
@@ -77,6 +78,7 @@ function switchTrajOption(opt, el) {
   if (panel) panel.classList.add('active');
 
   qpState.activeTrajOpt = opt;
+  if (typeof _trajSetSource === 'function') _trajSetSource(opt);   // opt1 / opt2 only; 'tort' is a modifier
 }
 
 // ── Dispatch chart redraws by panel name ────────────────────────────────────

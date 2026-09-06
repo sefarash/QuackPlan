@@ -9,6 +9,7 @@
     "db:migrate": "wrangler d1 migrations apply quackplan-db --remote",
     "db:migrate:local": "wrangler d1 migrations apply quackplan-db --local",
     "test:datasafety": "node test/data-safety.mjs",
+    "test:trajsafety": "node test/traj-safety.mjs",
     "test:surgeswab": "node test/surge-swab-reference.mjs",
     "test:rheology": "node test/rheology-reference.mjs",
     "test:models": "node test/rheology-reference.mjs && node test/surge-swab-reference.mjs"

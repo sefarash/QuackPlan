@@ -47,6 +47,7 @@ function traj1Recalc() {
 
   // Always persist raw edits so nothing is lost, even if the MD sequence is bad
   _traj1Save();
+  _trajSetSource('opt1');           // a user edit here makes Option 1 the survey source
 
   // MD must strictly increase down the wellbore. A non-monotonic sequence would
   // otherwise silently produce garbage TVD/DLS and NaN/Infinity downstream.
@@ -193,17 +194,18 @@ function _traj1Save() {
   }
   const rows = document.getElementById('traj1Body').rows;
   const data = [];
-  let prevMD = 0;   // imperial (canonical)
   for (const row of rows) {
     const inputs = row.querySelectorAll('input[type=number]');
-    // Store MD in imperial (canonical), converting from the display field
+    // Store MD in imperial (canonical), converting from the display field. A
+    // row the user hasn't filled in yet stays BLANK ('') — trajLoadRows restores
+    // it blank and _traj1ReadStations skips it. (It used to be saved as a copy
+    // of the previous MD, which came back as a duplicate station on reload.)
     const md  = inputs[0]?.value !== ''
-      ? +QP_UNITS.fromDisplay('depth', +inputs[0].value).toFixed(4)
-      : prevMD;
+      ? String(+QP_UNITS.fromDisplay('depth', +inputs[0].value).toFixed(4))
+      : '';
     const inc = inputs[1]?.value || '0';
     const azi = inputs[2]?.value || '0';
-    data.push({ md: String(md), inc, azi });
-    prevMD = md;
+    data.push({ md, inc, azi });
   }
   dbSaveScenarioData(qpState.currentScenarioId, 'traj1', data);
 }
@@ -223,14 +225,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const t1 = document.getElementById('traj1Table');
   if (!t1) return;
 
+  // Excel paste. RULE #1: this used to clear the whole table on ANY paste —
+  // pasting one number into one cell wiped a user's survey and saved the
+  // 1-row result. Now:
+  //   single value          → default browser paste into the focused cell
+  //   one tab-separated row → fills the focused row's MD / Inc / Azi
+  //   multi-line block      → replaces the table, after confirmation when it
+  //                           would discard existing stations
   t1.addEventListener('paste', e => {
+    const text  = (e.clipboardData || window.clipboardData).getData('text') || '';
+    const lines = text.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const isBlock = lines.length > 1 || /\t/.test(text);
+    if (!isBlock) return;                                   // plain value → normal paste
     e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData('text');
-    const lines = text.trim().split(/\r?\n/);
-    const body  = document.getElementById('traj1Body');
-    body.innerHTML = '';   // replace on paste
+    const body = document.getElementById('traj1Body');
+    const parse = line => line.split(/\t|,|;/).map(c => c.trim());
+    if (lines.length === 1) {                               // one row → fill the row under the cursor
+      const tr = e.target.closest ? e.target.closest('tr') : null;
+      if (tr && body.contains(tr)) {
+        const cols = parse(lines[0]), inputs = tr.querySelectorAll('input[type=number]');
+        cols.slice(0, 3).forEach((c, i) => { if (inputs[i] && c !== '') inputs[i].value = c; });
+        traj1Recalc();
+        return;
+      }
+    }
+    const existing = [...body.rows].filter(tr => tr.querySelector('input[type=number]')?.value !== '').length;
+    if (existing > 1 && !confirm(`Replace the ${existing} existing trajectory stations with the ${lines.length} pasted rows?`)) return;
+    body.innerHTML = '';
     lines.forEach(line => {
-      const cols = line.split(/\t/);
+      const cols = parse(line);
       traj1AddRow({ md: cols[0] || 0, inc: cols[1] || 0, azi: cols[2] || 0 });
     });
   });
@@ -243,6 +266,31 @@ document.addEventListener('DOMContentLoaded', () => {
   _trajUpdateHeaders();
   _schUpdateHeaders();
 });
+
+// ── Survey source (Option 1 vs Option 2) ──────────────────────────────────────
+// Which option feeds qpState.survey is stored per scenario under the additive
+// key 'trajOpt' ('opt1' | 'opt2'). It used to be implicit: on load Option 2 was
+// recalculated last and silently won whenever it had rows, so two leftover
+// Option 2 rows made a user's Option 1 survey "disappear" from every output.
+function _trajSetSource(opt) {
+  if (opt !== 'opt1' && opt !== 'opt2') return;
+  if (typeof qpState === 'undefined' || qpState.loadingScenario) return;
+  const changed = qpState.trajSource !== opt;
+  qpState.trajSource = opt;
+  if (changed && qpState.currentScenarioId) dbSaveScenarioData(qpState.currentScenarioId, 'trajOpt', opt);
+}
+
+// Recalculate the stored source (legacy scenarios without one: Option 2 when it
+// has a usable survey, else Option 1 — the previous behaviour) and show its tab.
+function trajApplySource(saved) {
+  const t2rows = document.getElementById('traj2Body')?.rows.length || 0;
+  let src = (saved === 'opt1' || saved === 'opt2') ? saved : (t2rows >= 2 ? 'opt2' : 'opt1');
+  if (src === 'opt2' && t2rows < 2) src = 'opt1';
+  qpState.trajSource = src;
+  if (src === 'opt2') traj2Recalc(); else traj1Recalc();
+  const tab = [...document.querySelectorAll('.opt-tab')].find(b => (b.getAttribute('onclick') || '').includes(`'${src}'`));
+  if (typeof switchTrajOption === 'function') switchTrajOption(src, tab || null);
+}
 
 // ── Option 2 ─────────────────────────────────────────────────────────────────
 
@@ -328,6 +376,7 @@ function traj2Recalc() {
   _traj2Save();
   const stations = traj2BuildStations(rows);
   if (stations.length < 2) return;
+  _trajSetSource('opt2');           // a user edit here makes Option 2 the survey source
 
   const survey = computeSurvey(stations);
   qpState.baseSurvey = survey;
