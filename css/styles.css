@@ -335,6 +335,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 
 /* When gated, keep panel-center overflow hidden so content below is unreachable */
 /* Borehole selected but no scenario: input panels are inert (Compare needs none) */
+.scenario-banner[hidden] { display: none; }   /* author display:flex would otherwise beat the UA hidden rule */
 .scenario-banner {
   display: flex;
   align-items: center;

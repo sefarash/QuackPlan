@@ -59,6 +59,7 @@ const res = await page.evaluate(async () => {
   const out = {};
   await load();
   out.patchesDuringLoad = patches;
+  out.bannerHiddenWithScenario = getComputedStyle(document.getElementById('scenarioBanner')).display === 'none';
 
   // 1) single value paste into row 3's MD cell
   paste(document.querySelectorAll('#traj1Body tr')[2].querySelector('input'), '3500');
@@ -112,14 +113,14 @@ const res = await page.evaluate(async () => {
   const center = document.getElementById('centerPanel');
   out.boreholeOnly = {
     noScenarioClass: center.classList.contains('no-scenario'),
-    bannerShown: !document.getElementById('scenarioBanner').hidden,
+    bannerShown: getComputedStyle(document.getElementById('scenarioBanner')).display !== 'none',
     trajInert: getComputedStyle(document.getElementById('panel-trajectory')).pointerEvents === 'none',
     compareUsable: getComputedStyle(document.getElementById('panel-compare')).pointerEvents !== 'none',
     currentScenario: qpState.currentScenarioId,
   };
   const newId = await hierarchyAddScenario(bh, 'TS-New'); await wait(1500);
   out.newScenario = { selected: qpState.currentScenarioId === newId, noScenarioClass: center.classList.contains('no-scenario'),
-                      bannerShown: !document.getElementById('scenarioBanner').hidden };
+                      bannerShown: getComputedStyle(document.getElementById('scenarioBanner')).display !== 'none' };
   // an edit now saves into the new scenario
   document.querySelectorAll('#traj1Body tr')[1].querySelector('input').value = '4321'; traj1Recalc(); await wait(700);
   out.newScenario.savedTraj1 = ((await dbGet(newId)).data.traj1 || []).map(r => r.md);
@@ -137,6 +138,7 @@ check('Option 2 rows are preserved (not deleted)', res.afterReload.traj2RowsKept
 check('explicitly choosing Option 2 is honoured after reload', res.opt2Chosen.source === 'opt2' && res.opt2Chosen.td === 6000);
 check('blank row round-trips blank, no duplicate station', res.blank.storedMDs.at(-1) === '' && res.blank.afterReload.at(-1) === '' && res.blank.stations === 5, res.blank.storedMDs.join(','));
 check('loads fire zero data writes', res.patchesDuringLoad === 0 && res.patchesDuringLoads === 0, `${res.patchesDuringLoads} PATCHes`);
+check('banner is NOT painted while a scenario is open', res.bannerHiddenWithScenario === true);
 check('borehole only: inputs inert, banner shown, Compare still usable', res.boreholeOnly.noScenarioClass && res.boreholeOnly.bannerShown && res.boreholeOnly.trajInert && res.boreholeOnly.compareUsable && !res.boreholeOnly.currentScenario, JSON.stringify(res.boreholeOnly));
 check('new scenario from the tree is opened immediately', res.newScenario.selected && !res.newScenario.noScenarioClass && !res.newScenario.bannerShown);
 check('edits after creation save into the new scenario', res.newScenario.savedTraj1.includes('4321'), res.newScenario.savedTraj1.join(','));
