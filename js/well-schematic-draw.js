@@ -245,8 +245,10 @@ function drawSchematic(survey) {
         ctx.fillRect(cx - outerHW, y1, outerHW - halfW, y2 - y1);
         ctx.fillRect(cx + halfW,   y1, outerHW - halfW, y2 - y1);
       }
-      // TOC tick + label on the left
-      const yToc = yOf(Math.max(+row.toc, top));
+      // TOC tick + label on the left — only when the cement stops below the
+      // string top (cement to surface needs no label; stacked ones overlapped)
+      if (+row.toc > top) {
+      const yToc = yOf(+row.toc);
       ctx.strokeStyle = '#6b6b6b'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(cx - halfW - 14, yToc); ctx.lineTo(cx - halfW, yToc); ctx.stroke();
       // Label sits just above the tick with a light backing so it stays legible
@@ -259,6 +261,7 @@ function drawSchematic(survey) {
       ctx.fillStyle = '#6b6b6b';
       ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
       ctx.fillText(tocTxt, cx - halfW - 16, yToc - 1);
+      }
     }
 
     // Shoe triangles — never taller than the casing body, so a sliver casing's

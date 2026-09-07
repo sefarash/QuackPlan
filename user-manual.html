@@ -217,6 +217,16 @@
 </section>
 
 <!-- ════════════════════════════════════════════ -->
+<section id="tour">
+<h2>Guided tour</h2>
+<p>On your first sign-in QuackPlan offers a two-minute tour. It creates a <strong>sample well</strong> on your
+account ("Sample well (tour)", a normal project you can delete later) and walks through it in six steps:
+the hierarchy, the trajectory, the well schematic with its TOC, the BHA and fluid, running the model and
+reading the footer charts, and finally changing a value to see the outputs move. The page stays fully usable
+under the spotlight; use <em>Next</em> / <em>Back</em>, the arrow keys, or <em>Esc</em> to skip. Replay it any
+time from the <strong>? Tour</strong> button in the header or from the empty-state screen.</p>
+</section>
+
 <section id="layout">
 <h2>App Layout</h2>
 <p>The interface is divided into four fixed zones:</p>
@@ -473,6 +483,22 @@ the well default.</p>
 </section>
 
 <!-- ════════════════════════════════════════════ -->
+<section id="output-needs">
+<h2>What each output needs</h2>
+<table>
+  <tr><th>Output tab</th><th>Needs</th><th>Optional</th></tr>
+  <tr><td>Profile</td><td>Trajectory</td><td>Well Schematic for shoe markers</td></tr>
+  <tr><td>Torque · Buckling · Overpull · Broomstick</td><td>Trajectory, Well Schematic, Casing / BHA, Drilling Fluid (mud weight)</td><td>WOB and friction factors on the panel — then Run</td></tr>
+  <tr><td>SPP / ECD</td><td>Trajectory, Well Schematic, Casing / BHA (DP ID, nozzles, MWD loss), Drilling Fluid (rheology, flow rate)</td><td>Fluid Program per section — then Run</td></tr>
+  <tr><td>Surge / Swab</td><td>Trajectory, Well Schematic, Casing / BHA, Drilling Fluid</td><td>PPFG for the safe trip-speed tables</td></tr>
+  <tr><td>Casing Design</td><td>Well Schematic with catalogue weight &amp; grade (and TOC), Trajectory, PPFG, Drilling Fluid (mud weight)</td><td>Ratings, P-test and cement density on the panel</td></tr>
+  <tr><td>Kick Tolerance</td><td>PPFG, Trajectory, Well Schematic, Drilling Fluid (mud weight), Casing / BHA</td><td>Temperature and influx inputs on the panel</td></tr>
+  <tr><td>Initial AFE</td><td>Activity (activities, services, casing costs), Well Schematic</td><td>—</td></tr>
+  <tr><td>Final Diagram</td><td>Trajectory, Well Schematic</td><td>Handover elements drawn along the path</td></tr>
+</table>
+<p>The same table is a step in the guided tour and behind the <strong>?</strong> button in the footer next to the output tabs.</p>
+</section>
+
 <section id="traj-plot">
 <h2>Trajectory Plot <span class="badge badge-output">Output</span></h2>
 <p>Shows two views of the wellbore path side by side. Click <strong>Trajectory</strong> in the footer after running Compute (or click <strong>Redraw</strong> any time after entering trajectory data).</p>

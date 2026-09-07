@@ -772,6 +772,38 @@ tr.row-drag-over td { background: #daf0fb !important; }
   width: 60px;
 }
 
+/* Guided tour: spotlight cut-out + step card (page stays clickable) */
+.tour-spot {
+  position: fixed;
+  z-index: 950;
+  pointer-events: none;
+  border-radius: 6px;
+  box-shadow: 0 0 0 9999px rgba(10, 25, 40, 0.55), 0 0 0 2px var(--accent);
+  transition: left .2s, top .2s, width .2s, height .2s;
+}
+.tour-card {
+  position: fixed;
+  z-index: 951;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  background: var(--bg-card, #fff);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.tour-card.wide { width: 640px; }
+.tour-needs { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11.5px; }
+.tour-needs th, .tour-needs td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.tour-needs th { color: var(--text-dim); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.tour-step  { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); }
+.tour-title { font-size: 15px; font-weight: 700; margin: 2px 0 6px; color: var(--accent); }
+.tour-actions { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.tour-welcome { z-index: 960; }
+
 /* Drilling Fluid — target selector + program table selection */
 .fluid-target {
   display: flex;

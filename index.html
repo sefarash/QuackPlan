@@ -80,6 +80,7 @@
     <button class="hdr-btn primary" onclick="qpCompute()">⚡ Run</button>
     <button class="hdr-btn" id="unitToggle" onclick="qpToggleUnits()" title="Toggle imperial / metric units">Imperial</button>
     <span id="authAccount" class="hdr-account" title="Signed-in account"></span>
+    <button class="hdr-btn" id="tourBtn" onclick="QP_TOUR.start()" title="Guided tour with a sample well">? Tour</button>
     <button class="hdr-btn" onclick="qpLogout()" title="Sign out">Sign out</button>
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark / light theme">🌙</button>
   </div>
@@ -133,6 +134,7 @@
           <span>Scenario</span>
         </div>
         <p class="gate-hint">Select a <strong>Borehole</strong> to access Trajectory, Schematic, PPFG &amp; Activity.<br>Add a <strong>Scenario</strong> to unlock Casing/BHA and Drilling Fluid.</p>
+        <button class="add-row-btn" style="margin-top:10px" onclick="QP_TOUR.start()">🦆 Show me around with a sample well</button>
         <button class="btn btn-primary" onclick="showNewProjectModal()">+ New Project</button>
       </div>
     </div>
@@ -899,6 +901,7 @@
     <button class="output-tab" onclick="switchOutputTab('kt',this)">Kick Tolerance</button>
     <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>
     <button class="output-tab" onclick="switchOutputTab('finaldiagram',this)">Final Diagram</button>
+    <button class="output-tab" id="outputsHelpBtn" title="What each output tab needs" onclick="QP_TOUR.showNeeds()">?</button>
   </nav>
   <div class="footer-right">
     <span id="saveIndicator" title="Save state — unsaved changes are kept locally and retried automatically"></span>
@@ -1014,6 +1017,7 @@
 <script src="js/string-validation.js"></script>
 <script src="js/compare-ui.js"></script>
 <script src="js/report.js"></script>
+<script src="js/tour.js"></script>
 <script>
   // ── Theme toggle ──────────────────────────────────────────────────
   function toggleTheme() {

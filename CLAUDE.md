@@ -198,7 +198,11 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
   `hierarchyBoot()` loads the tree only after auth.
 - Output-panel controls are saved per-scenario into the scenario node (`outputControls` key).
 - `localStorage` also holds: unit system, theme, `qp_lastScenarioId`, label-drag offsets
-  (`qp_sch_offsets_*`, `qp_fd_offsets_*`).
+  (`qp_sch_offsets_*`, `qp_fd_offsets_*`), and `qp_tour_done` (guided tour: `done` | `skipped`).
+- **Guided tour** (`js/tour.js`, `QP_TOUR`): offered once after the first boot (not under
+  `navigator.webdriver`); creates an ordinary project "Sample well (tour)" through the normal
+  API on Start (reused on replay, never merged into existing data), then runs six spotlight
+  steps. Restart: header "? Tour" button or the empty-state gate. `npm run test:tour`.
 - Freeze snapshots and annotation state (CI) are in-memory only and lost on page refresh.
 - Safety nets: per-scenario ⬇ Export / ⬆ Import (import creates a NEW project) and whole-tree
   ⬇ Backup / ⬆ Restore (additive, id-remapped) — in the toolbar next to the Well Schematic.

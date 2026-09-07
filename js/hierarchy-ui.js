@@ -508,6 +508,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // Load the tree + restore the last-opened scenario. Called after login.
 function hierarchyBoot() {
   hierarchyRefresh();
+  // First-time users: offer the guided tour once (QP_TOUR checks its own flag)
+  if (typeof QP_TOUR !== 'undefined') setTimeout(() => QP_TOUR.offer(), 600);
 
   const lastId = +localStorage.getItem('qp_lastScenarioId');
   if (lastId) {
