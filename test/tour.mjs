@@ -68,6 +68,8 @@ const res = await page.evaluate(async () => {
   }
   out.needsRows = needsRows;
   QP_TOUR.showNeeds(); out.needsPopover = vis('.tour-card') && document.querySelectorAll('.tour-card .tour-needs tbody tr').length === QP_TOUR.NEEDS.length; QP_TOUR.hideNeeds();
+  out.needsClosed = !vis('.tour-card') && !vis('.tour-spot');
+  QP_TOUR.showNeeds(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); out.needsEsc = !vis('.tour-card') && !vis('.tour-spot');
   tracking = false;
   out.steps = seen;
   out.computed = !!qpState.tdResult;
@@ -98,6 +100,8 @@ check('seven steps in order with their panels', res.steps.map(s => s.idx).join('
       && res.steps[4].outputTab === 'torque' && res.steps[6].inputTab === 'fluid', res.steps.map(s => `${s.idx}:${s.inputTab}/${s.outputTab}`).join(' '));
 check('"what each result needs" step lists every output tab', res.needsRows === 8, `${res.needsRows} rows`);
 check('footer ? popover shows the same table', res.needsPopover === true);
+check('closing the popover removes the card AND the spotlight frame', res.needsClosed === true);
+check('Esc closes the popover', res.needsEsc === true);
 check('every step has a visible spotlight target', res.steps.every(s => s.spot));
 check('Run step computed the well', res.computed === true);
 // 'nozzles' is excluded: bhaGet() → nozzleRecalc() → nozzleSave() rewrites the (unchanged)

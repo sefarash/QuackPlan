@@ -117,11 +117,16 @@ const QP_TOUR = (() => {
       ${needsHTML()}
       <div class="tour-actions"><span style="flex:1"></span><button class="btn btn-primary" onclick="QP_TOUR.hideNeeds()">Close</button></div>`;
     _card.classList.add('wide');
-    _spot.hidden = true;
     _card.hidden = false;
     _place({ target: '#outputTabs' });
+    _needsOpen = true;
   }
-  function hideNeeds() { if (_card) { _card.hidden = true; _card.classList.remove('wide'); } }
+  let _needsOpen = false;
+  function hideNeeds() {
+    _needsOpen = false;
+    if (_card) { _card.hidden = true; _card.classList.remove('wide'); }
+    if (_spot) _spot.hidden = true;                          // the frame must go with the card
+  }
 
   // ── Steps ───────────────────────────────────────────────────────────────────
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -192,7 +197,7 @@ const QP_TOUR = (() => {
     document.addEventListener('keydown', _onKey);
   }
   function _onKey(e) {
-    if (_idx < 0) return;
+    if (_idx < 0) { if (_needsOpen && e.key === 'Escape') hideNeeds(); return; }
     if (e.key === 'Escape') skip();
     else if (e.key === 'ArrowRight' || e.key === 'Enter') next();
     else if (e.key === 'ArrowLeft') back();
