@@ -188,10 +188,8 @@ function _setCell(row, col, val) {
 }
 
 function _traj1Save() {
-  if (!qpState.currentScenarioId) {
-    setStatus('Select a scenario to save data');
-    return;
-  }
+  const tid = qpSaveTarget('traj1');
+  if (!tid) { setStatus('Select a borehole or scenario to save data'); return; }
   const rows = document.getElementById('traj1Body').rows;
   const data = [];
   for (const row of rows) {
@@ -207,7 +205,7 @@ function _traj1Save() {
     const azi = inputs[2]?.value || '0';
     data.push({ md, inc, azi });
   }
-  dbSaveScenarioData(qpState.currentScenarioId, 'traj1', data);
+  dbSaveScenarioData(tid, 'traj1', data);
 }
 
 function trajLoadRows(data) {
@@ -277,7 +275,8 @@ function _trajSetSource(opt) {
   if (typeof qpState === 'undefined' || qpState.loadingScenario) return;
   const changed = qpState.trajSource !== opt;
   qpState.trajSource = opt;
-  if (changed && qpState.currentScenarioId) dbSaveScenarioData(qpState.currentScenarioId, 'trajOpt', opt);
+  const tid = changed ? qpSaveTarget('trajOpt') : null;
+  if (tid) dbSaveScenarioData(tid, 'trajOpt', opt);
 }
 
 // Recalculate the stored source (legacy scenarios without one: Option 2 when it
@@ -396,7 +395,8 @@ function traj2Recalc() {
 }
 
 function _traj2Save() {
-  if (!qpState.currentScenarioId) return;
+  const tid = qpSaveTarget('traj2');
+  if (!tid) return;
   const body = document.getElementById('traj2Body');
   const editableByMode = {
     'md_inc_azi':  ['md', 'inc', 'azi'],
@@ -414,7 +414,7 @@ function _traj2Save() {
     });
     rows.push(row);
   }
-  dbSaveScenarioData(qpState.currentScenarioId, 'traj2', rows);
+  dbSaveScenarioData(tid, 'traj2', rows);
 }
 
 function traj2LoadRows(data) {
@@ -504,7 +504,8 @@ function tortRecalc() {
 }
 
 function tortSave() {
-  if (!qpState.currentScenarioId) return;
+  const tid = qpSaveTarget('tort');
+  if (!tid) return;
   const rows = [];
   for (const tr of document.getElementById('tortBody').rows) {
     const inputs = tr.querySelectorAll('input[type=number]');
@@ -516,7 +517,7 @@ function tortSave() {
       mode:    sel?.value ?? 'random',
     });
   }
-  dbSaveScenarioData(qpState.currentScenarioId, 'tort', rows);
+  dbSaveScenarioData(tid, 'tort', rows);
 }
 
 function tortLoadState(data) {
@@ -780,7 +781,8 @@ function schematicLoadRows(data) {
 }
 
 function schematicSave() {
-  if (!qpState.currentScenarioId) return;
+  const tid = qpSaveTarget('schematic');
+  if (!tid) return;
   const rows = [];
   for (const tr of document.getElementById('schematicBody').rows) {
     const selDef  = tr.querySelector('select');
@@ -809,7 +811,7 @@ function schematicSave() {
       casingSpec:  tr.dataset.casingSpec || '',
     });
   }
-  dbSaveScenarioData(qpState.currentScenarioId, 'schematic', rows);
+  dbSaveScenarioData(tid, 'schematic', rows);
   if (typeof drawSchematic === 'function') drawSchematic(qpState.survey);
   if (typeof _schValidate === 'function') _schValidate();
   if (typeof syncCasingFromSchematic === 'function') syncCasingFromSchematic();

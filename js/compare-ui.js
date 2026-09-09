@@ -96,7 +96,8 @@ function _cmpBuildSurvey(d) {
 async function _cmpLoadMetrics(id) {
   const node = await dbGet(id);
   if (!node?.data) return null;
-  const d = node.data;
+  const bh = node.parentId ? await dbGet(node.parentId).catch(() => null) : null;
+  const d = (typeof qpMergeBoreholeData === 'function') ? qpMergeBoreholeData(node.data, bh?.data).data : node.data;
 
   // Build survey (Option 2 preferred when present — see _cmpBuildSurvey)
   const survey = _cmpBuildSurvey(d);

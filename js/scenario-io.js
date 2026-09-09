@@ -18,7 +18,11 @@ async function exportScenario() {
   const fieldNode     = await dbGet(wellNode?.parentId);
   const projectNode   = await dbGet(fieldNode?.parentId);
 
-  const d = scenarioNode?.data || {};
+  // Borehole-level keys the scenario inherits are exported with it (the export
+  // is a self-contained snapshot; import creates a new scenario that owns them)
+  const d = (typeof qpMergeBoreholeData === 'function')
+    ? qpMergeBoreholeData(scenarioNode?.data || {}, boreholeNode?.data).data
+    : (scenarioNode?.data || {});
   const w = wellNode?.data     || {};
 
   // Output controls — now stored per-scenario in the node data

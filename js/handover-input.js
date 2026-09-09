@@ -64,8 +64,9 @@ function handoverGet() {
 }
 
 function handoverSave() {
-  if (!qpState.currentScenarioId) return;
-  dbSaveScenarioData(qpState.currentScenarioId, 'handover', handoverGet());
+  const tid = qpSaveTarget('handover');
+  if (!tid) return;
+  dbSaveScenarioData(tid, 'handover', handoverGet());
 }
 
 function handoverLoadState(data) {

@@ -255,8 +255,9 @@ function _readPPFG() {
 }
 
 function ppfgSave() {
-  if (!qpState.currentScenarioId) return;
-  dbSaveScenarioData(qpState.currentScenarioId, 'ppfg', _readPPFG());
+  const tid = qpSaveTarget('ppfg');
+  if (!tid) return;
+  dbSaveScenarioData(tid, 'ppfg', _readPPFG());
 }
 
 function ppfgLoadState(data) {

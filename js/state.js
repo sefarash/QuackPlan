@@ -18,6 +18,7 @@ let qpState = {
   activeOutputTab: null,
   activeTrajOpt:   'opt1',
   trajSource:      'opt1',   // which option feeds qpState.survey (persisted as 'trajOpt')
+  inherited:       {},       // borehole-level keys the open scenario is showing from its borehole
   currentWellId:      null,
   currentBoreholeId:  null,
   currentScenarioId:  null,
@@ -113,4 +114,49 @@ function setHeaderContext(wellName, scenarioName) {
   const sn = document.getElementById('hdrScenarioName');
   if (wn) wn.textContent = wellName   || 'No well selected';
   if (sn) sn.textContent = scenarioName || '—';
+}
+
+
+// ── Borehole-level data ───────────────────────────────────────────────────────
+// Trajectory, schematic, PPFG, activity and handover describe the hole, not a
+// design variant, so they can be built with only a BOREHOLE selected: they are
+// then stored on the borehole node (additive keys) and every scenario under it
+// shows them. A scenario may carry its own copy — legacy scenarios always do,
+// and editing one of these tables while a scenario is open forks a copy into
+// that scenario (its own key wins over the borehole's from then on). Nothing is
+// ever moved or deleted: a scenario's stored keys stay exactly as they were.
+const QP_BOREHOLE_KEYS = ['traj1', 'traj2', 'trajOpt', 'tort', 'schematic', 'ppfg', 'activity', 'handover'];
+
+function _qpHasData(v) {
+  if (v == null || v === '') return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === 'object') return Object.values(v).some(x => Array.isArray(x) ? x.length > 0 : !!x);
+  return true;
+}
+
+// Scenario data with the borehole's borehole-level keys filling the gaps.
+// Returns { data, inherited } — pure, so Compare / export can use it too.
+function qpMergeBoreholeData(scenarioData, boreholeData) {
+  const data = { ...(scenarioData || {}) }, inherited = {};
+  for (const k of QP_BOREHOLE_KEYS) {
+    if (!_qpHasData(data[k]) && _qpHasData(boreholeData?.[k])) { data[k] = boreholeData[k]; inherited[k] = true; }
+  }
+  return { data, inherited };
+}
+
+// Where a save of `key` goes: the open scenario, else the selected borehole
+// (borehole-level keys only). Saving a borehole-level key into a scenario that
+// was showing the borehole's copy turns it into the scenario's own copy.
+function qpSaveTarget(key) {
+  if (qpState.currentScenarioId) {
+    // A save during a LOAD is dropped by dbSaveScenarioData (RULE #1), so it
+    // must not count as the scenario taking its own copy either.
+    if (qpState.inherited[key] && !qpState.loadingScenario) {
+      qpState.inherited[key] = false;
+      if (typeof qpUpdateDataBanner === 'function') qpUpdateDataBanner();
+    }
+    return qpState.currentScenarioId;
+  }
+  if (qpState.currentBoreholeId && QP_BOREHOLE_KEYS.includes(key)) return qpState.currentBoreholeId;
+  return null;
 }

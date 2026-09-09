@@ -108,22 +108,36 @@ const res = await page.evaluate(async () => {
   out.blank.stations = qpState.survey.length;
   out.patchesDuringLoads = patches;
 
-  // 7) borehole only: inputs inert + banner; a scenario created from the tree is opened at once
-  _selectNode(await dbGet(bh)); await wait(600);
+  // 7) borehole level: trajectory / schematic / PPFG / activity are built on the BOREHOLE
+  //    and shared by its scenarios; a scenario edit forks its own copy
+  patches = 0; loadPhase = true; _selectNode(await dbGet(bh)); await wait(1200); loadPhase = false;
+  out.boreholeLoadWrites = patches;
   const center = document.getElementById('centerPanel');
   out.boreholeOnly = {
-    noScenarioClass: center.classList.contains('no-scenario'),
     bannerShown: getComputedStyle(document.getElementById('scenarioBanner')).display !== 'none',
-    trajInert: getComputedStyle(document.getElementById('panel-trajectory')).pointerEvents === 'none',
-    compareUsable: getComputedStyle(document.getElementById('panel-compare')).pointerEvents !== 'none',
+    bannerInfo: document.getElementById('scenarioBanner').classList.contains('info'),
+    trajEditable: getComputedStyle(document.getElementById('panel-trajectory')).pointerEvents !== 'none',
     currentScenario: qpState.currentScenarioId,
+    rowsShown: mds().length,                              // borehole has no data yet → 2 seeded rows
   };
+  // edit the trajectory at the borehole → saved on the borehole node, scenario untouched
+  const scBefore = JSON.stringify((await dbGet(sc)).data.traj1);
+  document.querySelectorAll('#traj1Body tr')[1].querySelector('input').value = '7777'; traj1Recalc(); await wait(700);
+  out.boreholeEdit = { boreholeTraj1: ((await dbGet(bh)).data?.traj1 || []).map(r => r.md), scenarioUnchanged: JSON.stringify((await dbGet(sc)).data.traj1) === scBefore };
+  // a NEW scenario inherits the borehole data (nothing copied into it)
   const newId = await hierarchyAddScenario(bh, 'TS-New'); await wait(1500);
-  out.newScenario = { selected: qpState.currentScenarioId === newId, noScenarioClass: center.classList.contains('no-scenario'),
-                      bannerShown: getComputedStyle(document.getElementById('scenarioBanner')).display !== 'none' };
-  // an edit now saves into the new scenario
+  out.newScenario = { selected: qpState.currentScenarioId === newId, rows: mds(), inherited: !!qpState.inherited.traj1,
+                      ownTraj1: (await dbGet(newId)).data.traj1, bannerShown: getComputedStyle(document.getElementById('scenarioBanner')).display !== 'none' };
+  // editing in the scenario forks a scenario-specific copy; the borehole keeps its own
   document.querySelectorAll('#traj1Body tr')[1].querySelector('input').value = '4321'; traj1Recalc(); await wait(700);
-  out.newScenario.savedTraj1 = ((await dbGet(newId)).data.traj1 || []).map(r => r.md);
+  out.fork = { scenarioTraj1: ((await dbGet(newId)).data.traj1 || []).map(r => r.md), boreholeTraj1: ((await dbGet(bh)).data.traj1 || []).map(r => r.md),
+               inheritedNow: !!qpState.inherited.traj1 };
+  // back at the borehole: its own version is shown again
+  _selectNode(await dbGet(bh)); await wait(1000);
+  out.boreholeAgain = mds();
+  // the legacy scenario (own traj1) still shows its own rows, not the borehole's
+  await load();
+  out.legacyScenario = { rows: mds(), inherited: !!qpState.inherited.traj1 };
   return out;
 });
 
@@ -139,9 +153,12 @@ check('explicitly choosing Option 2 is honoured after reload', res.opt2Chosen.so
 check('blank row round-trips blank, no duplicate station', res.blank.storedMDs.at(-1) === '' && res.blank.afterReload.at(-1) === '' && res.blank.stations === 5, res.blank.storedMDs.join(','));
 check('loads fire zero data writes', res.patchesDuringLoad === 0 && res.patchesDuringLoads === 0, `${res.patchesDuringLoads} PATCHes`);
 check('banner is NOT painted while a scenario is open', res.bannerHiddenWithScenario === true);
-check('borehole only: inputs inert, banner shown, Compare still usable', res.boreholeOnly.noScenarioClass && res.boreholeOnly.bannerShown && res.boreholeOnly.trajInert && res.boreholeOnly.compareUsable && !res.boreholeOnly.currentScenario, JSON.stringify(res.boreholeOnly));
-check('new scenario from the tree is opened immediately', res.newScenario.selected && !res.newScenario.noScenarioClass && !res.newScenario.bannerShown);
-check('edits after creation save into the new scenario', res.newScenario.savedTraj1.includes('4321'), res.newScenario.savedTraj1.join(','));
+check('borehole selected: tables editable, info banner, no scenario, zero writes on load', res.boreholeOnly.trajEditable && res.boreholeOnly.bannerShown && res.boreholeOnly.bannerInfo && !res.boreholeOnly.currentScenario && res.boreholeLoadWrites === 0, JSON.stringify(res.boreholeOnly));
+check('editing at the borehole saves on the borehole node, scenario untouched', res.boreholeEdit.boreholeTraj1.includes('7777') && res.boreholeEdit.scenarioUnchanged, res.boreholeEdit.boreholeTraj1.join(','));
+check('new scenario opens at once and inherits the borehole trajectory (nothing copied)', res.newScenario.selected && res.newScenario.rows.includes('7777') && res.newScenario.inherited && res.newScenario.ownTraj1 === undefined && res.newScenario.bannerShown, JSON.stringify({ rows: res.newScenario.rows, own: res.newScenario.ownTraj1 }));
+check('editing in the scenario forks its own copy; borehole keeps its version', res.fork.scenarioTraj1.includes('4321') && res.fork.boreholeTraj1.includes('7777') && !res.fork.boreholeTraj1.includes('4321') && !res.fork.inheritedNow, JSON.stringify(res.fork));
+check('borehole shows its own version again', res.boreholeAgain.includes('7777') && !res.boreholeAgain.includes('4321'));
+check('legacy scenario with its own trajectory is unaffected', !res.legacyScenario.inherited && !res.legacyScenario.rows.includes('7777'));
 check('no page errors', pageErrors.length === 0, pageErrors.join(' | '));
 
 await browser.close();

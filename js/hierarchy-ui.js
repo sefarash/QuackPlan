@@ -38,13 +38,7 @@ function _updateGate() {
     if (locked) center.scrollTop = 0;
   }
 
-  // ── Borehole only: inputs are READ-ONLY. Trajectory / schematic / PPFG /
-  //    activity are stored per scenario, so with no scenario there is nowhere
-  //    to save — the tables used to accept edits and silently drop them.
-  const noScenario = hasBorehole && !hasScenario;
-  if (center) center.classList.toggle('no-scenario', noScenario);
-  const banner = document.getElementById('scenarioBanner');
-  if (banner) banner.hidden = !noScenario;
+  qpUpdateDataBanner();
 
   // ── Run button ──
   const runBtn = document.querySelector('.hdr-btn.primary');
@@ -220,6 +214,7 @@ function _selectNode(node) {
       setHeaderContext(well ? well.name : '?', node.name);
       _applyWellDatums(well);
     });
+    _loadBorehole(node.id);
 
   } else if (node.type === 'well') {
     qpState.currentWellId     = node.id;
@@ -255,10 +250,75 @@ function _applyWellDatums(wellNode) {
   if (typeof drawDatumDiagram === 'function') drawDatumDiagram();
 }
 
-function _loadScenario(id) {
+// Info strip above the input panels: where borehole-level data is going.
+function qpUpdateDataBanner() {
+  const banner = document.getElementById('scenarioBanner');
+  if (!banner) return;
+  const text = banner.querySelector('.banner-text'), btn = banner.querySelector('.banner-btn');
+  const hasScenario = !!qpState.currentScenarioId, hasBorehole = !!qpState.currentBoreholeId;
+  const NAMES = { traj1: 'trajectory', traj2: 'trajectory', trajOpt: '', tort: 'tortuosity', schematic: 'schematic', ppfg: 'PPFG', activity: 'activity', handover: 'handover' };
+  if (hasBorehole && !hasScenario) {
+    banner.hidden = false; banner.classList.add('info');
+    if (text) text.innerHTML = '<strong>Building at the borehole.</strong> Trajectory, schematic, PPFG and activity are saved to the borehole and shared by every scenario under it. Add a scenario for Casing/BHA, drilling fluid and the results.';
+    if (btn) btn.hidden = false;
+    return;
+  }
+  const inh = [...new Set(Object.keys(qpState.inherited || {}).filter(k => qpState.inherited[k] && NAMES[k]).map(k => NAMES[k]))];
+  if (hasScenario && inh.length) {
+    banner.hidden = false; banner.classList.add('info');
+    if (text) text.innerHTML = `<strong>Shared from the borehole:</strong> ${inh.join(', ')}. Edit them at the borehole to change every scenario; editing here gives this scenario its own copy.`;
+    if (btn) btn.hidden = true;
+    return;
+  }
+  banner.hidden = true;
+}
+
+// Borehole selected: show and edit the borehole's own data (trajectory,
+// schematic, PPFG, activity, handover). Scenario-only panels are cleared and
+// results dropped so nothing stale from the last scenario is on screen.
+function _loadBorehole(id) {
   dbGet(id).then(node => {
+    if (!node) return;
+    const d = node.data || {};
+    qpState.loadingScenario = true;            // RULE #1: loads never write
+    try {
+      if (typeof CI !== 'undefined' && CI.clearAll) CI.clearAll();
+      ['traj1Body', 'traj2Body', 'tortBody', 'schematicBody', 'bhaBody', 'nozzleBody', 'mwdBody',
+       'activityBody', 'servicesBody', 'casingCostBody', 'handoverBody'].forEach(i => { const el = document.getElementById(i); if (el) el.innerHTML = ''; });
+      qpState.inherited = {};
+      if (d.traj1 && d.traj1.length) trajLoadRows(d.traj1);
+      else { traj1AddRow({ md: 0, inc: 0, azi: 0 }); traj1AddRow({ md: 5000, inc: 0, azi: 0 }); }
+      if (d.traj2 && d.traj2.length) traj2LoadRows(d.traj2);
+      if (typeof trajApplySource === 'function') trajApplySource(d.trajOpt);
+      schematicLoadRows(d.schematic || []);
+      if (d.tort) tortLoadState(d.tort);
+      if (d.activity) activityLoadState(d.activity);
+      handoverLoadState(d.handover);
+      ppfgLoadState(d.ppfg || []);
+      qpState.tdResult = null; qpState.hydResult = null;
+      if (typeof qpPhaseRebuildSelector === 'function') qpPhaseRebuildSelector();
+    } finally {
+      qpState.loadingScenario = false;
+    }
+    qpUpdateDataBanner();
+    if (qpState.activeOutputTab && typeof redrawOutputPanel === 'function') redrawOutputPanel(qpState.activeOutputTab);
+    setStatus('Borehole loaded');
+  }).catch(err => {
+    console.error('_loadBorehole failed:', err);
+    setStatus('⚠ Couldn\'t load the borehole — your data is safe, retrying…', true);
+    setTimeout(() => { if (qpState.currentBoreholeId === id && !qpState.currentScenarioId) _loadBorehole(id); }, 4000);
+  });
+}
+
+function _loadScenario(id) {
+  dbGet(id).then(async node => {
     if (!node || !node.data) return;
-    const d = node.data;
+    // Borehole-level keys the scenario lacks come from its borehole (display
+    // only — nothing is written; a scenario edit forks its own copy).
+    const bh = node.parentId ? await dbGet(node.parentId).catch(() => null) : null;
+    const merged = qpMergeBoreholeData(node.data, bh?.data);
+    const d = merged.data;
+    qpState.inherited = merged.inherited;
 
     // RULE #1: the loaders below rebuild the tables via the same AddRow helpers
     // the user clicks, and those fire saves — a load must NEVER write back over
@@ -326,6 +386,7 @@ function _loadScenario(id) {
     // Persist last-used scenario ID so reload restores it
     localStorage.setItem('qp_lastScenarioId', id);
 
+    qpUpdateDataBanner();
     setStatus('Scenario loaded');
   }).catch(err => {
     // A failed load must say so and retry — never leave silently-empty panels.

@@ -136,7 +136,7 @@ const QP_TOUR = (() => {
   const STEPS = [
     {
       title: 'Everything lives in a scenario',
-      text: 'Project → Field → Well → Borehole → <b>Scenario</b>. Trajectory, casing, string, fluid and every result belong to the scenario, so always open one before you type. This is the sample well we just created for you.',
+      text: 'Project → Field → Well → <b>Borehole</b> → <b>Scenario</b>. Build the trajectory, schematic, PPFG and activity at the borehole — every scenario under it shares them. A scenario adds the string, the fluid and the results. This is the sample well we just created for you.',
       target: '#hierarchyTree',
       before: async () => { await wait(300); },
     },

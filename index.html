@@ -113,11 +113,11 @@
   <!-- CENTER — Input + Output panels -->
   <div class="panel-center" id="centerPanel">
 
-    <!-- ── NO-SCENARIO BANNER — borehole selected, nothing to save into ── -->
+    <!-- ── DATA BANNER — where borehole-level data (trajectory, schematic, PPFG,
+         activity, handover) is going: the borehole, or inherited by this scenario ── -->
     <div class="scenario-banner" id="scenarioBanner" hidden>
-      <span>⚠ <strong>No scenario selected.</strong> Trajectory, schematic, PPFG and activity belong to a
-      scenario, so the tables are read-only until you open one — nothing typed here would be saved.</span>
-      <button class="hdr-btn" onclick="hierarchyAddScenarioHere()">+ Add scenario</button>
+      <span class="banner-text"></span>
+      <button class="hdr-btn banner-btn" onclick="hierarchyAddScenarioHere()">+ Add scenario</button>
     </div>
 
     <!-- ── GATE OVERLAY — shown when no scenario is selected ── -->
@@ -133,7 +133,7 @@
           <span class="gate-step-active">Borehole</span><span class="gate-arrow">→</span>
           <span>Scenario</span>
         </div>
-        <p class="gate-hint">Select a <strong>Borehole</strong> to access Trajectory, Schematic, PPFG &amp; Activity.<br>Add a <strong>Scenario</strong> to unlock Casing/BHA and Drilling Fluid.</p>
+        <p class="gate-hint">Select a <strong>Borehole</strong> to build the Trajectory, Schematic, PPFG &amp; Activity (shared by its scenarios).<br>Add a <strong>Scenario</strong> for Casing/BHA, Drilling Fluid and the results.</p>
         <button class="add-row-btn" style="margin-top:10px" onclick="QP_TOUR.start()">🦆 Show me around with a sample well</button>
         <button class="btn btn-primary" onclick="showNewProjectModal()">+ New Project</button>
       </div>

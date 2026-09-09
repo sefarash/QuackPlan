@@ -350,10 +350,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
   font-size: 12px;
 }
 body.dark .scenario-banner { background: #3a2e10; color: #ffd98a; }
-.panel-center.no-scenario .input-panel:not(#panel-compare) {
-  pointer-events: none;
-  opacity: 0.55;
-}
+.scenario-banner.info { border-color: var(--accent); background: #eaf3fa; color: var(--text); }
+body.dark .scenario-banner.info { background: #16303f; color: var(--text); }
 
 .panel-center.locked {
   overflow: hidden;

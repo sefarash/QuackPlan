@@ -166,8 +166,9 @@ function activityGet() {
 }
 
 function activitySave() {
-  if (!qpState.currentScenarioId) return;
-  dbSaveScenarioData(qpState.currentScenarioId, 'activity', activityGet());
+  const tid = qpSaveTarget('activity');
+  if (!tid) return;
+  dbSaveScenarioData(tid, 'activity', activityGet());
 }
 
 function activityLoadState(data) {

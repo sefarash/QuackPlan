@@ -196,6 +196,14 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
   Per-key scenario saves are atomic (`json_set`) — no read-modify-write races.
 - `js/auth-ui.js` — login/signup overlay; session token in localStorage `qp_token`;
   `hierarchyBoot()` loads the tree only after auth.
+- **Borehole-level data** (`QP_BOREHOLE_KEYS` in `state.js`: `traj1, traj2, trajOpt, tort, schematic,
+  ppfg, activity, handover`): built with only a borehole selected, these are saved on the BOREHOLE
+  node (additive keys) and every scenario under it shows them (`qpMergeBoreholeData` fills a
+  scenario's missing keys at load; `qpState.inherited` records which). A scenario's own stored keys
+  always win (legacy scenarios have them all); editing one of these tables with a scenario open
+  saves into the scenario (`qpSaveTarget(key)`) — a fork, never a move. `_loadBorehole` shows the
+  borehole's own data; scenario-only panels (BHA, fluid) stay gated. The info banner above the
+  input panels says where the data is going. Tests: `npm run test:trajsafety` (borehole section).
 - Output-panel controls are saved per-scenario into the scenario node (`outputControls` key).
 - `localStorage` also holds: unit system, theme, `qp_lastScenarioId`, label-drag offsets
   (`qp_sch_offsets_*`, `qp_fd_offsets_*`), and `qp_tour_done` (guided tour: `done` | `skipped`).
