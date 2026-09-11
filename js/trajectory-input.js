@@ -845,7 +845,9 @@ function schematicSave() {
   if (typeof drawSchematic === 'function') drawSchematic(qpState.survey);
   if (typeof _schValidate === 'function') _schValidate();
   if (typeof syncCasingFromSchematic === 'function') syncCasingFromSchematic();
-  // Sections changed → refresh the analysis-phase list + fluid-program rows
+  // Sections changed → refresh the analysis-phase list (the scenario's TD may
+  // have moved), the "runs to" note under the casing program, fluid-program rows
   if (typeof qpPhaseRebuildSelector === 'function') qpPhaseRebuildSelector();
+  if (typeof qpUpdateDataBanner === 'function') qpUpdateDataBanner();
   if (typeof fluidProgramSync === 'function') fluidProgramSync();
 }

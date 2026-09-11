@@ -914,7 +914,8 @@
   <select id="phaseSelect" class="phase-select"
     title="Analysis phase — which drilling stage the outputs represent (derived from the Well Schematic)"
     onchange="qpPhaseChanged(this.value)">
-    <option value="full">Full well (final)</option>
+    <option value="auto">Casing program TD (auto)</option>
+    <option value="trajectory">Full trajectory TD</option>
   </select>
   <nav id="outputTabs">
     <button class="output-tab" onclick="switchOutputTab('trajplot',this)">Profile</button>

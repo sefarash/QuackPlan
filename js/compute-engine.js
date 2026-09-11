@@ -6,9 +6,9 @@
 let _qpComputeGen = 0;
 
 async function qpCompute() {
-  // Phase-aware inputs: the survey truncated to the active drilling phase's TD
-  // and that section's fluid ('full' = final program + global fluid — identical
-  // to pre-phase behaviour).
+  // Phase-aware inputs: the survey truncated to the analysis TD — by default
+  // the bottom of the scenario's own casing program (phase.js 'auto'), else the
+  // selected section or the full trajectory — and that section's fluid.
   const survey = (typeof qpSurveyForAnalysis === 'function')
     ? qpSurveyForAnalysis() : qpState.survey;
   if (!survey || survey.length < 2) {
@@ -71,10 +71,12 @@ function _computeHyd(survey, fluid, bha) {
           pumpEff = 90 } = fluid;
 
   // Override flow rate / MW from the hydraulics sliders (display units) — but
-  // only for the 'full' analysis. When a drilling phase is selected, that
-  // section's programmed fluid must win, or phase ECD would silently use the
-  // slider's what-if value instead.
-  const _phase   = (typeof qpState !== 'undefined' && qpState.activePhase && qpState.activePhase !== 'full');
+  // not when a drilling section is EXPLICITLY selected: that section's
+  // programmed fluid must win, or its ECD would silently use the slider's
+  // what-if value. In 'auto' (casing-program TD) and 'trajectory' modes the
+  // sliders keep working as what-if overrides, as they always did by default.
+  const _mode    = (typeof qpPhaseMode === 'function') ? qpPhaseMode() : 'auto';
+  const _phase   = _mode !== 'auto' && _mode !== 'trajectory';
   const _fSl = document.getElementById('hydFlowSlider')?.value;
   const _mSl = document.getElementById('hydMWslider')?.value;
   const activeFlow = (!_phase && _fSl != null && _fSl !== '') ? QP_UNITS.fromDisplay('flow', +_fSl) : flowRate;

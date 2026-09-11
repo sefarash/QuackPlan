@@ -5,9 +5,14 @@
 // and below its shoe there is open hole of that stage's bit size down to the
 // string's setting depth.
 //
-// qpState.activePhase: 'full' (default — final program, identical to the
-// pre-phase behaviour) or the shoe MD (as a string) of the phase-defining row.
-// Everything here is DERIVED from the schematic table — no new stored geometry.
+// qpState.activePhase:
+//   'auto'       (default) — the DEEPEST section of the scenario's casing program:
+//                a scenario runs to the bottom of its own casing program, not to
+//                the trajectory's TD (the trajectory beyond it is ignored)
+//   'trajectory' — the final program down to the trajectory TD (the old 'full')
+//   <shoe MD>    — an explicitly chosen section
+// A legacy stored 'full' is read as 'auto'. Everything here is DERIVED from the
+// schematic table (the scenario's casing program) — no new stored geometry.
 
 // Standard casing-OD → bit-size pairings (inches). Used to reconstruct the hole
 // drilled for a casing string (the schematic stores casing OD, not hole size).
@@ -59,15 +64,46 @@ function qpPhaseList() {
   return phases;
 }
 
+function qpPhaseMode() {
+  const k = (typeof qpState !== 'undefined' && qpState.activePhase) || 'auto';
+  return k === 'full' ? 'auto' : k;            // legacy stored value
+}
+
 function _qpActivePhase() {
-  const key = (typeof qpState !== 'undefined' && qpState.activePhase) || 'full';
-  if (key === 'full') return null;
-  return qpPhaseList().find(p => p.key === key) || null;
+  const key = qpPhaseMode();
+  if (key === 'trajectory') return null;
+  const phases = qpPhaseList();
+  if (!phases.length) return null;
+  if (key === 'auto') return phases[phases.length - 1];                 // deepest section
+  return phases.find(p => p.key === key) || phases[phases.length - 1];  // stale key → auto
+}
+
+// Analysis TD in MD (ft, imperial): the resolved phase's limit — capped at the
+// trajectory TD, since the survey cannot be extended — else the trajectory TD.
+function qpPhaseTD() {
+  const sv = (typeof qpState !== 'undefined' && qpState.survey) || [];
+  const trajTD = sv.length ? sv[sv.length - 1].md : 0;
+  const ph = _qpActivePhase();
+  if (!ph) return trajTD;
+  return trajTD > 0 ? Math.min(ph.mdLimit, trajTD) : ph.mdLimit;
+}
+
+// One sentence for the UI: how deep this scenario's analysis runs and why.
+function qpPhaseTDText() {
+  const dep = md => `${Math.round(QP_UNITS.toDisplay('depth', md)).toLocaleString()} ${QP_UNITS.label('depth')}`;
+  const sv = (typeof qpState !== 'undefined' && qpState.survey) || [];
+  const trajTD = sv.length ? sv[sv.length - 1].md : 0;
+  const mode = qpPhaseMode(), ph = _qpActivePhase();
+  if (!ph) return trajTD > 0 ? `Scenario runs to ${dep(trajTD)} — the trajectory TD (footer selector to change).` : '';
+  if (trajTD > 0 && trajTD < ph.mdLimit)
+    return `Scenario runs to ${dep(trajTD)} — the trajectory ends above the bottom of this program (${dep(ph.mdLimit)}).`;
+  if (mode === 'auto') return `Scenario runs to ${dep(ph.mdLimit)} — the bottom of this casing program (footer selector to change).`;
+  return `Scenario runs to ${dep(ph.mdLimit)} — the section selected in the footer.`;
 }
 
 // Schematic rows AS SEEN during the active phase: the already-set strings plus a
 // synthesized open-hole section for the interval currently being drilled.
-// 'full' returns the stored program untouched (pre-phase behaviour).
+// 'trajectory' mode (or no program) returns the stored program untouched.
 function qpPhaseRows() {
   const full = (typeof _readSchematicRows === 'function') ? _readSchematicRows() : [];
   const ph = _qpActivePhase();
@@ -111,9 +147,9 @@ function qpSurveyForAnalysis() {
   return qpTruncateSurvey(survey, ph.mdLimit);
 }
 
-// The fluid for the active phase: global fluid form overlaid with that
-// section's row from the fluid program (MW / PV / YP / flow). 'full' returns
-// the global fluid untouched.
+// The fluid for the active phase: that section's row from the fluid program
+// over the well default. 'trajectory' mode (or no program) returns the well
+// default untouched.
 function qpPhaseFluid() {
   const ph = _qpActivePhase();
   // fluid-input.js resolves a section's fluid (own record over the well default,
@@ -141,18 +177,33 @@ function qpPhaseFluid() {
 function qpPhaseRebuildSelector() {
   const sel = document.getElementById('phaseSelect');
   if (!sel) return;
-  const cur = (typeof qpState !== 'undefined' && qpState.activePhase) || 'full';
+  const cur = qpPhaseMode();
   const phases = qpPhaseList();
-  sel.innerHTML = '<option value="full">Full well (final)</option>' +
-    phases.map(p => `<option value="${p.key}">${p.label}</option>`).join('');
-  sel.value = [...sel.options].some(o => o.value === cur) ? cur : 'full';
+  const dep = md => `${Math.round(QP_UNITS.toDisplay('depth', md)).toLocaleString()} ${QP_UNITS.label('depth')}`;
+  const sv = (typeof qpState !== 'undefined' && qpState.survey) || [];
+  const trajTD = sv.length ? sv[sv.length - 1].md : 0;
+  const deepest = phases[phases.length - 1];
+  sel.innerHTML =
+    `<option value="auto">Casing program TD${deepest ? ` — ${dep(deepest.mdLimit)}` : ''} (auto)</option>` +
+    `<option value="trajectory">Full trajectory TD${trajTD ? ` — ${dep(trajTD)}` : ''}</option>` +
+    phases.map(p => `<option value="${p.key}">${p.label} — ${dep(p.mdLimit)}</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur : 'auto';
   if (typeof qpState !== 'undefined') qpState.activePhase = sel.value;
 }
 
 function qpPhaseChanged(v) {
   if (typeof qpState !== 'undefined') qpState.activePhase = v;
+  if (typeof qpUpdateDataBanner === 'function') qpUpdateDataBanner();   // "runs to" note follows the mode
   if (typeof fluidProgramSync === 'function') fluidProgramSync();
   if (typeof qpCompute === 'function') qpCompute();
 }
 
 document.addEventListener('DOMContentLoaded', qpPhaseRebuildSelector);
+
+// The selector labels and the "runs to" note carry depths in display units.
+if (typeof QP_UNITS !== 'undefined' && QP_UNITS.onChange) {
+  QP_UNITS.onChange(() => {
+    qpPhaseRebuildSelector();
+    if (typeof qpUpdateDataBanner === 'function') qpUpdateDataBanner();
+  });
+}

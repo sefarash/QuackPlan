@@ -27,7 +27,7 @@ let qpState = {
   survey:          [],
   tdResult:        null,
   hydResult:       null,
-  activePhase:     'full',   // analysis phase key ('full' = final program)
+  activePhase:     'auto',   // analysis phase: 'auto' (casing-program TD) | 'trajectory' | section key
 };
 
 // ── Input tab switching ─────────────────────────────────────────────────────

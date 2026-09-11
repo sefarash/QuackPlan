@@ -209,7 +209,9 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
   into the Casing / BHA tab (`#schematicScenarioSlot`) while a scenario is open, where it edits the
   scenario's own copy (inherited until the first edit forks it); the Well Schematic tab then shows
   the borehole definition read-only (`qpState.boreholeSchematic`). `schematicResetToBorehole()` copies
-  the borehole's program into the scenario (a write, never a delete). The sample well stores
+  the borehole's program into the scenario (a write, never a delete). **A scenario's analysis
+  depth is the bottom of its own casing program** (phase.js `'auto'` mode, `qpPhaseTD()`; the
+  `#schematicSlotNote` under the table states it) — not the trajectory TD. The sample well stores
   borehole-level keys on the borehole node and BHA / fluid / nozzles on the scenario.
 - Output-panel controls are saved per-scenario into the scenario node (`outputControls` key).
 - `localStorage` also holds: unit system, theme, `qp_lastScenarioId`, label-drag offsets
@@ -226,7 +228,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 
 **Well Schematic** (`trajectory-input.js`): Size (OD), Weight, and Grade dropdowns each include a `Custom…` option. Selecting it reveals a text input in the same cell. Custom values are saved as `odCustom`, `wtCustom`, `gradeCustom` fields alongside the select values. `_readSchematicRows()` in `well-schematic-draw.js` checks for custom values and uses them in canvas labels when no catalogue spec is present.
 
-**Drilling fluid** (`fluid-input.js`): the form shows only the selected rheology model's parameters (Bingham PV/YP, Power Law n/K, HB τ₀/n/K — `_fluidModelChanged`); hidden fields keep their values and are always saved. Stored keys `model, pv, yp, tauY, nHB, kHB, …` are unchanged; `nPL`, `kPL` (eq.cP) and `fann` are additive (absent → Power Law derives n/K from PV/YP, so old scenarios compute as before). A Fann-readings block fits the selected model (`fluidFitFann`). ONE form edits MANY fluids: `fluidProgSelect(key)` targets the well default (`fluid` key, `fluidBase()`) or one hole section (a row under the additive `fluidProgram` key: original `mw, pv, yp, flow, tauY, n, K` plus additive `model, mudType, gel10s, gel10m, nHB, kHB, nPL, kPL, fann`; only sections with their own fluid are stored, others inherit). The Fluid Program table is a read-only summary + selector. Engines get a section's fluid via `fluidForSection(key)` (used by `qpPhaseFluid`); the 'Full well' analysis uses the well default.
+**Drilling fluid** (`fluid-input.js`): the form shows only the selected rheology model's parameters (Bingham PV/YP, Power Law n/K, HB τ₀/n/K — `_fluidModelChanged`); hidden fields keep their values and are always saved. Stored keys `model, pv, yp, tauY, nHB, kHB, …` are unchanged; `nPL`, `kPL` (eq.cP) and `fann` are additive (absent → Power Law derives n/K from PV/YP, so old scenarios compute as before). A Fann-readings block fits the selected model (`fluidFitFann`). ONE form edits MANY fluids: `fluidProgSelect(key)` targets the well default (`fluid` key, `fluidBase()`) or one hole section (a row under the additive `fluidProgram` key: original `mw, pv, yp, flow, tauY, n, K` plus additive `model, mudType, gel10s, gel10m, nHB, kHB, nPL, kPL, fann`; only sections with their own fluid are stored, others inherit). The Fluid Program table is a read-only summary + selector. Engines get a section's fluid via `fluidForSection(key)` (used by `qpPhaseFluid`); the default 'auto' analysis uses the deepest section's fluid, 'Full trajectory TD' the well default.
 
 **Well Schematic hole size**: each string row has a manual Hole (in) column stored as the additive key `hole` (`''` = blank → `_qpHoleSizeFor(size)` infers it; Open Hole rows have none). `_readSchematicRows` returns `hole` (number | null); `qpPhaseList` and `_schCementSegments` prefer it. Row inputs are read by class (`.sch-size .sch-hole .sch-top .sch-bot .sch-toc`), not by `input[type=number]` index.
 
@@ -250,7 +252,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | `js/well-schematic-draw.js` | Right-panel schematic canvas + `_readSchematicRows()` |
 | `js/datum-diagram.js` | Fixed-scale RKB/GL/MSL datum mini-diagram (bottom of right panel) — `drawDatumDiagram()` |
 | `js/surge-swab.js` | Surge/swab panel — closed-pipe Burkhardt effective velocity → shared `rheoAnnularGrad` (`_ssSegLoss`); string OD steps come from the BHA table (bit-first). Reference cases vs published WellPlan / SurgeMOD runs: `npm run test:surgeswab` (pure Node, no server) |
-| `js/phase.js` | Analysis phases (drilling stages from the schematic) — `qpPhaseList()`, `qpPhaseRows()`, `qpSurveyForAnalysis()`, `qpPhaseFluid()`. Engines consume these ('full' = final program, pre-phase behaviour). Per-section fluids live in the Fluid Program table (`fluidProgram*` in fluid-input.js, additive key `fluidProgram`) |
+| `js/phase.js` | Analysis phases (drilling stages from the schematic) — `qpPhaseList()`, `qpPhaseRows()`, `qpSurveyForAnalysis()`, `qpPhaseFluid()`, `qpPhaseTD()`. Modes (`qpState.activePhase`, footer `#phaseSelect`, saved in `outputControls`): **`'auto'` (default) = the deepest section of the scenario's own casing program — a scenario runs to the bottom of its program, the trajectory below is ignored**; `'trajectory'` = final program to the trajectory TD (the old `'full'`; a stored `'full'` reads as `'auto'`); or a section key. Only an explicit section locks the hydraulics MW/flow sliders out (compute-engine `_phase`). Per-section fluids live in the Fluid Program table (`fluidProgram*` in fluid-input.js, additive key `fluidProgram`) |
 | `js/output-controls.js` | Output panel control persistence (localStorage) |
 | `js/hierarchy-ui.js` | Project/well/scenario tree — collapsible, persists collapse state |
 | `js/bha-catalogue.js` | Drill pipe, drill collar, HWDP catalogue data + lookup helpers |
@@ -273,7 +275,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 | Well schematic canvas (grade, weight, TVD, MD labels at shoe) | Done |
 | BHA table (DP / DC / HWDP catalogue + custom OD override) | Done |
 | Casing design (burst / collapse SF) | Done |
-| Analysis phases (footer selector; engines see each drilling stage's geometry + per-section fluid program) | Done |
+| Analysis phases (footer selector; engines see each drilling stage's geometry + per-section fluid program; default = the scenario's casing-program TD) | Done |
 | AFE cost estimation | Done |
 | Trajectory plan view + VS plot | Done |
 | Project / well / scenario hierarchy (collapsible, IndexedDB) | Done |

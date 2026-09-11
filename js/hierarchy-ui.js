@@ -279,9 +279,11 @@ function qpPlaceSchematicEditor() {
 function _updateSchematicSlotNote() {
   const el = document.getElementById('schematicSlotNote');
   if (!el) return;
-  el.textContent = (qpState.inherited && qpState.inherited.schematic)
+  const tdTxt = (typeof qpPhaseTDText === 'function') ? qpPhaseTDText() : '';
+  el.textContent = ((qpState.inherited && qpState.inherited.schematic)
     ? 'Inherited from the borehole definition — edit any cell to give this scenario its own casing program.'
-    : 'This scenario\'s own casing program. The borehole definition (Well Schematic tab) is not affected by edits here.';
+    : 'This scenario\'s own casing program. The borehole definition (Well Schematic tab) is not affected by edits here.')
+    + (tdTxt ? ' ' + tdTxt : '');
 }
 
 function _renderBoreholeSchematicView() {
@@ -459,8 +461,9 @@ function _loadScenario(id) {
       if (typeof loadOutputControls === 'function') loadOutputControls(d.outputControls);
       // loadOutputControls restored the saved phase selection — validate + mirror
       const _ps = document.getElementById('phaseSelect');
-      if (_ps && ![..._ps.options].some(o => o.value === _ps.value)) _ps.value = 'full';
-      qpState.activePhase = _ps?.value || 'full';
+      if (_ps && _ps.value === 'full') _ps.value = 'auto';                       // legacy stored value
+      if (_ps && ![..._ps.options].some(o => o.value === _ps.value)) _ps.value = 'auto';
+      qpState.activePhase = _ps?.value || 'auto';
     } finally {
       qpState.loadingScenario = false;   // an exception must not leave saves suppressed
     }

@@ -12,8 +12,8 @@ const _TD_CONTROL_UNITS = {
   uBsBlock: 'force', uBsDPwt: 'linwt', uBsMW: 'mw', uBsMaxHL: 'force',
 };
 
-// Phase-aware inputs for the chart engines: the survey truncated to the active
-// drilling phase and that section's fluid ('full' phase = unchanged behaviour).
+// Phase-aware inputs for the chart engines: the survey truncated to the analysis
+// TD (by default the bottom of the scenario's casing program) + that section's fluid.
 function _tdSurvey() {
   return (typeof qpSurveyForAnalysis === 'function') ? qpSurveyForAnalysis() : qpState.survey;
 }

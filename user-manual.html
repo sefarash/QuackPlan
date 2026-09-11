@@ -270,7 +270,8 @@ build them with only a <strong>borehole</strong> selected; they are saved on the
 it shows them. A <strong>scenario</strong> adds the string (Casing / BHA), the drilling fluid and the results.
 If you edit one of the borehole tables while a scenario is open, that scenario takes its own copy from then on
 (the banner above the tables tells you which data is shared and which is the scenario's own). Scenarios created
-before this feature keep their own data unchanged.</p>
+before this feature keep their own data unchanged. Each scenario runs to the bottom of its <em>own</em> casing program,
+not to the trajectory TD — see <a href="#schematic">Well Schematic → How deep a scenario runs</a>.</p>
 </section>
 
 <section id="hierarchy">
@@ -381,6 +382,16 @@ button), and the editable table moves to the top of the <strong>Casing / BHA</st
 It starts as the borehole definition (marked "inherited"); the first edit gives the scenario its own copy, which the borehole
 does not see. <em>Reset to borehole definition</em> copies the borehole's current program back into the scenario.</p>
 
+<h3>How deep a scenario runs</h3>
+<p>Every output runs to the bottom of the scenario's <strong>own casing program</strong> — the deepest MD Bottom in its
+Casing Program table — not to the trajectory's total depth. The trajectory below that depth is ignored, so two scenarios
+on the same borehole with different programs run to different depths, and shortening the last string or open-hole
+interval shortens every chart. The note under the Casing Program table states the depth. The footer selector shows it as
+<em>Casing program TD (auto)</em>; choose <em>Full trajectory TD</em> to run the final program down to the last survey
+station, or a single drilling section to see the well as it is while that hole is being drilled (only the shallower
+strings set, open hole below). If the trajectory ends above the bottom of the program, the analysis stops at the
+trajectory TD and the note says so.</p>
+
 <div class="tip">
   <strong>Schematic feeds hydraulics</strong>
   The annular geometry defined here is used directly in the hydraulics calculation to compute section-by-section annular pressure losses and ECD.
@@ -464,9 +475,9 @@ which: the <strong>Well default</strong>, or one hole section from the Well Sche
 fluid inherits the well default (shown in grey in the table); editing any field while that section is selected
 gives it its own fluid, including its own rheology model. The table is a read-only summary — model, mud weight,
 rheology parameters and flow rate per section — and the place to pick a section. Pump efficiency and the rig SPP
-limit are well-wide and are edited under Well default. When an analysis phase is selected in the footer, every
-engine (Hydraulics, Surge/Swab, Kick Tolerance) uses that section's fluid; the <em>Full well</em> analysis uses
-the well default.</p>
+limit are well-wide and are edited under Well default. Every engine (Hydraulics, Surge/Swab, Kick Tolerance) uses the
+fluid of the section being analysed — by default the deepest section of the scenario's casing program (footer selector
+<em>Casing program TD (auto)</em>) or the section picked there; <em>Full trajectory TD</em> uses the well default.</p>
 </section>
 
 <!-- ════════════════════════════════════════════ -->
@@ -616,7 +627,7 @@ the well default.</p>
 <!-- ════════════════════════════════════════════ -->
 <section id="broomstick">
 <h2>Broomstick <span class="badge badge-output">Output</span></h2>
-<p>Surface hook load versus <em>bit depth</em>, with depth increasing downward. For every bit depth the survey is cut at that depth and the full soft-string (Johancsik) march is run with the BHA — the components and lengths from the Casing / BHA table — hanging from the bit and drill pipe to surface. Each point is the surface hook load (block weight included) with the bit parked at that depth, so the string shortens as the bit comes up and the collars see the inclination at their own depth.</p>
+<p>Surface hook load versus <em>bit depth</em>, with depth increasing downward, from surface to the scenario's analysis depth (the bottom of its casing program by default). For every bit depth the survey is cut at that depth and the full soft-string (Johancsik) march is run with the BHA — the components and lengths from the Casing / BHA table — hanging from the bit and drill pipe to surface. Each point is the surface hook load (block weight included) with the bit parked at that depth, so the string shortens as the bit comes up and the collars see the inclination at their own depth.</p>
 
 <table>
   <tr><th>Line</th><th>Mode</th><th>Interpretation</th></tr>
