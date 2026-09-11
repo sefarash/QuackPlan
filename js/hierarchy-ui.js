@@ -256,6 +256,9 @@ function qpUpdateDataBanner() {
   if (!banner) return;
   const text = banner.querySelector('.banner-text'), btn = banner.querySelector('.banner-btn');
   const hasScenario = !!qpState.currentScenarioId, hasBorehole = !!qpState.currentBoreholeId;
+  // Only while an input panel is showing: output panels are absolutely
+  // positioned over the centre column and their control bar sat on the text.
+  if (!qpState.activeInputTab) { banner.hidden = true; return; }
   const NAMES = { traj1: 'trajectory', traj2: 'trajectory', trajOpt: '', tort: 'tortuosity', schematic: 'schematic', ppfg: 'PPFG', activity: 'activity', handover: 'handover' };
   if (hasBorehole && !hasScenario) {
     banner.hidden = false; banner.classList.add('info');

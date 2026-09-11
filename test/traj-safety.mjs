@@ -120,6 +120,11 @@ const res = await page.evaluate(async () => {
     currentScenario: qpState.currentScenarioId,
     rowsShown: mds().length,                              // borehole has no data yet → 2 seeded rows
   };
+  // the banner belongs to the input tables: an output tab hides it, an input tab brings it back
+  switchOutputTab('trajplot', [...document.querySelectorAll('.output-tab')][0]); await wait(200);
+  out.bannerOnOutputTab = getComputedStyle(document.getElementById('scenarioBanner')).display !== 'none';
+  switchInputTab('trajectory', [...document.querySelectorAll('.input-tab')][0]); await wait(200);
+  out.bannerBackOnInputTab = getComputedStyle(document.getElementById('scenarioBanner')).display !== 'none';
   // edit the trajectory at the borehole → saved on the borehole node, scenario untouched
   const scBefore = JSON.stringify((await dbGet(sc)).data.traj1);
   document.querySelectorAll('#traj1Body tr')[1].querySelector('input').value = '7777'; traj1Recalc(); await wait(700);
@@ -154,6 +159,7 @@ check('blank row round-trips blank, no duplicate station', res.blank.storedMDs.a
 check('loads fire zero data writes', res.patchesDuringLoad === 0 && res.patchesDuringLoads === 0, `${res.patchesDuringLoads} PATCHes`);
 check('banner is NOT painted while a scenario is open', res.bannerHiddenWithScenario === true);
 check('borehole selected: tables editable, info banner, no scenario, zero writes on load', res.boreholeOnly.trajEditable && res.boreholeOnly.bannerShown && res.boreholeOnly.bannerInfo && !res.boreholeOnly.currentScenario && res.boreholeLoadWrites === 0, JSON.stringify(res.boreholeOnly));
+check('banner hides under output tabs and returns on input tabs (no overlap with chart controls)', res.bannerOnOutputTab === false && res.bannerBackOnInputTab === true);
 check('editing at the borehole saves on the borehole node, scenario untouched', res.boreholeEdit.boreholeTraj1.includes('7777') && res.boreholeEdit.scenarioUnchanged, res.boreholeEdit.boreholeTraj1.join(','));
 check('new scenario opens at once and inherits the borehole trajectory (nothing copied)', res.newScenario.selected && res.newScenario.rows.includes('7777') && res.newScenario.inherited && res.newScenario.ownTraj1 === undefined && res.newScenario.bannerShown, JSON.stringify({ rows: res.newScenario.rows, own: res.newScenario.ownTraj1 }));
 check('editing in the scenario forks its own copy; borehole keeps its version', res.fork.scenarioTraj1.includes('4321') && res.fork.boreholeTraj1.includes('7777') && !res.fork.boreholeTraj1.includes('4321') && !res.fork.inheritedNow, JSON.stringify(res.fork));

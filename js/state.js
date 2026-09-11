@@ -43,6 +43,7 @@ function switchInputTab(name, el) {
 
   qpState.activeInputTab  = name;
   qpState.activeOutputTab = null;
+  if (typeof qpUpdateDataBanner === 'function') qpUpdateDataBanner();   // banner belongs to the input tables
 
   if (name === 'compare' && typeof compareInit === 'function') compareInit();
 }
@@ -62,6 +63,7 @@ function switchOutputTab(name, el) {
 
   qpState.activeOutputTab = name;
   qpState.activeInputTab  = null;
+  if (typeof qpUpdateDataBanner === 'function') qpUpdateDataBanner();   // output panels cover the top — hide it
 
   // Trigger chart redraw when switching to an output panel
   if (qpState.survey && qpState.survey.length > 1) {
