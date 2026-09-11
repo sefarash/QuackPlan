@@ -78,21 +78,20 @@ function qpPhaseRows() {
   ];
 }
 
-// The survey down to the phase's TD (interpolated end station); full otherwise.
-function qpSurveyForAnalysis() {
-  const survey = (typeof qpState !== 'undefined' && qpState.survey) || [];
-  const ph = _qpActivePhase();
-  if (!ph || survey.length < 2) return survey;
+// The survey cut at mdLimit with an interpolated end station (the bit at that
+// depth). Used by the analysis phases and by the broomstick (bit at every depth).
+function qpTruncateSurvey(survey, mdLimit) {
+  if (!survey || survey.length < 2) return survey || [];
   const last = survey[survey.length - 1];
-  if (ph.mdLimit >= last.md) return survey;
+  if (mdLimit >= last.md) return survey;
   const out = [];
-  for (const st of survey) { if (st.md <= ph.mdLimit) out.push(st); else break; }
-  const i = survey.findIndex(s => s.md > ph.mdLimit);
+  for (const st of survey) { if (st.md <= mdLimit) out.push(st); else break; }
+  const i = survey.findIndex(s => s.md > mdLimit);
   const a = survey[i - 1], b = survey[i];
   if (a && b && b.md > a.md) {
-    const t = (ph.mdLimit - a.md) / (b.md - a.md);
+    const t = (mdLimit - a.md) / (b.md - a.md);
     out.push({
-      md: ph.mdLimit,
+      md: mdLimit,
       inc:   a.inc   + t * (b.inc   - a.inc),
       az:    a.az    + t * (b.az    - a.az),
       tvd:   a.tvd   + t * (b.tvd   - a.tvd),
@@ -102,6 +101,14 @@ function qpSurveyForAnalysis() {
     });
   }
   return out.length >= 2 ? out : survey;
+}
+
+// The survey down to the phase's TD (interpolated end station); full otherwise.
+function qpSurveyForAnalysis() {
+  const survey = (typeof qpState !== 'undefined' && qpState.survey) || [];
+  const ph = _qpActivePhase();
+  if (!ph || survey.length < 2) return survey;
+  return qpTruncateSurvey(survey, ph.mdLimit);
 }
 
 // The fluid for the active phase: global fluid form overlaid with that

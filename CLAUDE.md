@@ -233,7 +233,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 
 | File | Purpose |
 |------|---------|
-| `js/td-engine.js` | Johancsik soft-string T&D model — `tdCompute()` is the main entry point |
+| `js/td-engine.js` | Johancsik soft-string T&D model — `tdCompute()` is the main entry point. `_buildElements` subdivides survey intervals to ≤ 100 ft and cuts them at every BHA component boundary (`_subdivideSurvey`), so collar weights aren't smeared over / dropped from long intervals. The Broomstick (`td-charts.js`) runs `tdCompute` on the survey truncated at every bit depth (`qpTruncateSurvey`) — bit-at-depth hook loads, BHA lengths from the table |
 | `js/survey-engine.js` | Minimum curvature — `computeSurvey()` |
 | `js/rheology-engine.js` | The single rheology model. `rheoParams(fluid)` resolves the fluid record for the SELECTED model (HB / BP / PL) into Herschel-Bulkley form in field units; `rheoAnnularGrad(v̄, gap, rheo)` is the one annular-loss model (exact HB slot laminar solution → Bourgoyne annular Reynolds number → API 13D transition → Dodge–Metzner turbulent) used by Hydraulics (`computeRheology`, legacy contract kept) and Surge/Swab; `rheoPipeVisc` feeds the drill-pipe bore loss; `rheoFit*` fit Bingham / Power Law / HB from Fann readings. `npm run test:rheology` |
 | `js/trajectory-solver.js` | Option 2 mixed-criteria solver + `applyTortuosity()` |

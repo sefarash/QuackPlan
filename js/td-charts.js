@@ -474,57 +474,54 @@ function drawBroomstick(r) {
   const ffHi  = +(document.getElementById('bsFFhi')?.value  || 0.40);
   const BF    = 1 - mw / 65.5;
 
-  // 3 runs: FF lo/mid/hi at single MW and DP weight
-  const run = ff => tdCompute(_tdSurvey(), bhaGet(), null, mw,
-    { ffCased: ff, ffOpen: ff, wob_klbs: 25, dpWt_ppf: dpWt, overpullMargin_lbf: 100000 });
-
-  const resLo  = run(ffLo);
-  const resMid = run(ffMid);
-  const resHi  = run(ffHi);
-  if (!resMid) { _noData(ctx, W, H, 'Run Compute first'); return; }
-
-  const st = (res, mode) => res?.modes?.[mode]?.ffSensitivity?.mid?.stations || [];
-
-  const rihLo  = st(resLo,  'rih');
-  const rihMid = st(resMid, 'rih');
-  const rihHi  = st(resHi,  'rih');
-  const rotOff = st(resMid, 'rotOff');
-  const poohLo = st(resLo,  'pooh');
-  const poohMid= st(resMid, 'pooh');
-  const poohHi = st(resHi,  'pooh');
-
+  // Bit-at-every-depth broomstick. For each bit depth D the survey is cut at D
+  // (interpolated end station, qpTruncateSurvey) and the full soft-string march
+  // runs with the BHA — lengths and ODs from the BHA table — hanging from the
+  // bit and drill pipe to surface. The surface hookload (block weight included)
+  // is one point of the curve. The string therefore shortens as the bit comes
+  // up and the collars see the inclination at THEIR depth; the old version
+  // took one march at TD and read surface-minus-local load off it.
   const _sv = _tdSurvey();
+  if (!_sv || _sv.length < 2) { _noData(ctx, W, H, 'Run Compute first'); return; }
   const maxMD = _sv[_sv.length - 1].md;
-
-  // Broomstick hookload when bit is at depth D:
-  //   = blockWt + accumulated (weight ± friction) from surface down to D
-  //   = blockWt + surfaceLoad − axialLoad(D)
-  // where surfaceLoad = axialLoad at the surface station (min MD).
-  // Result: all curves start at blockWt at surface and fan out with depth.
-  const surfLoad_klbs = sts => {
-    if (!sts.length) return 0;
-    const surf = sts.reduce((mn, s) => s.md < mn.md ? s : mn, sts[0]);
-    return surf.axialLoad_lbf / 1000;
+  const bha   = bhaGet();
+  // Bit depths: every survey station plus an even grid, so a coarse survey
+  // still gives a smooth curve and a dense one keeps its kinks.
+  const N_PTS = 60;
+  const stationMDs = _sv.map(s => s.md).filter(m => m > 0 && m <= maxMD);
+  const gridMDs = Array.from({ length: N_PTS }, (_, i) => Math.round(maxMD * (i + 1) / N_PTS));
+  const depths = [...new Set([...stationMDs, ...gridMDs, maxMD])].sort((a, b) => a - b);
+  const trunc = (typeof qpTruncateSurvey === 'function') ? qpTruncateSurvey : (sv) => sv;
+  const hookAt = (D, ff) => {
+    const res = tdCompute(trunc(_sv, D), bha, null, mw,
+      { ffCased: ff, ffOpen: ff, wob_klbs: 25, dpWt_ppf: dpWt, blockWeight_klbs: blockWt, overpullMargin_lbf: 100000 });
+    if (!res) return null;
+    const m = res.modes;
+    return { rih:    m.rih.ffSensitivity.mid.surfaceHookload_lbf    / 1000,
+             pooh:   m.pooh.ffSensitivity.mid.surfaceHookload_lbf   / 1000,
+             rotOff: m.rotOff.ffSensitivity.mid.surfaceHookload_lbf / 1000 };   // klbf (canonical)
   };
-  const toBS = (sl, s) => Math.max(0, blockWt + sl - s.axialLoad_lbf / 1000);   // klbf (canonical)
-  const toBSLine = (sl, sts) => sts.map(s => ({ x: toF(toBS(sl, s)), y: toD(s.md) }));
-
-  const slRihLo   = surfLoad_klbs(rihLo);
-  const slRihMid  = surfLoad_klbs(rihMid);
-  const slRihHi   = surfLoad_klbs(rihHi);
-  const slRotOff  = surfLoad_klbs(rotOff);
-  const slPoohLo  = surfLoad_klbs(poohLo);
-  const slPoohMid = surfLoad_klbs(poohMid);
-  const slPoohHi  = surfLoad_klbs(poohHi);
+  const series = { rihLo: [], rihMid: [], rihHi: [], rotOff: [], poohLo: [], poohMid: [], poohHi: [] };
+  const start = { x: toF(blockWt), y: 0 };                 // every curve starts at the block weight
+  Object.values(series).forEach(arr => arr.push(start));
+  for (const D of depths) {
+    const lo = hookAt(D, ffLo), mid = hookAt(D, ffMid), hi = hookAt(D, ffHi);
+    if (!lo || !mid || !hi) continue;
+    const y = toD(D), P = v => ({ x: toF(Math.max(0, v)), y });
+    series.rihLo.push(P(lo.rih));   series.rihMid.push(P(mid.rih));   series.rihHi.push(P(hi.rih));
+    series.rotOff.push(P(mid.rotOff));
+    series.poohLo.push(P(lo.pooh)); series.poohMid.push(P(mid.pooh)); series.poohHi.push(P(hi.pooh));
+  }
+  if (series.rihMid.length < 2) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
   const liveCurves = [
-    { pts: toBSLine(slRihLo,   rihLo),  color: '#5a9fd4', label: `RIH FF ${ffLo}`  },
-    { pts: toBSLine(slRihMid,  rihMid), color: '#2a7fa8', label: `RIH FF ${ffMid}` },
-    { pts: toBSLine(slRihHi,   rihHi),  color: '#1a5f88', label: `RIH FF ${ffHi}`  },
-    { pts: toBSLine(slRotOff,  rotOff), color: '#8e44ad', label: 'Rot Off Btm'     },
-    { pts: toBSLine(slPoohLo,  poohLo), color: '#e07878', label: `PKP FF ${ffLo}`  },
-    { pts: toBSLine(slPoohMid, poohMid),color: '#c0392b', label: `PKP FF ${ffMid}` },
-    { pts: toBSLine(slPoohHi,  poohHi), color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
+    { pts: series.rihLo,   color: '#5a9fd4', label: `RIH FF ${ffLo}`  },
+    { pts: series.rihMid,  color: '#2a7fa8', label: `RIH FF ${ffMid}` },
+    { pts: series.rihHi,   color: '#1a5f88', label: `RIH FF ${ffHi}`  },
+    { pts: series.rotOff,  color: '#8e44ad', label: 'Rot Off Btm'     },
+    { pts: series.poohLo,  color: '#e07878', label: `PKP FF ${ffLo}`  },
+    { pts: series.poohMid, color: '#c0392b', label: `PKP FF ${ffMid}` },
+    { pts: series.poohHi,  color: '#8b1a1a', label: `PKP FF ${ffHi}`  },
   ];
 
   const xMax = Math.max(...liveCurves.flatMap(c => c.pts.map(p => p.x)), toF(maxHL), 1) * 1.1;
@@ -583,9 +580,9 @@ function drawBroomstick(r) {
   ctx.textAlign = 'right';
   ctx.fillText('Pick up', g.l + pw - 6, labelMidY);
 
-  const rotMidSt = rotOff[Math.floor(rotOff.length / 2)];
-  if (rotMidSt) {
-    const xRot = g.l + (toBS(slRotOff, rotMidSt) / xMax) * pw;
+  const rotPts = liveCurves[3].pts, rotMidPt = rotPts[Math.floor(rotPts.length / 2)];
+  if (rotMidPt) {
+    const xRot = g.l + (rotMidPt.x / xMax) * pw;
     ctx.fillStyle = '#8e44ad'; ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText('Rotation', xRot + 4, labelMidY + 20);
@@ -593,24 +590,13 @@ function drawBroomstick(r) {
   }
 
   // ── Bottom FF labels at TD depth (where curves fan out most) ─────────────
-  const tdHL = (sl, sts) => {
-    if (!sts.length) return 0;
-    const td = sts.reduce((mx, s) => s.md > mx.md ? s : mx, sts[0]);
-    return toBS(sl, td);
-  };
   const labelY = g.t + ph + 16;
   ctx.font = '9px sans-serif'; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-  [
-    [slRihHi,   rihHi,   ffHi,  '#1a5f88'],
-    [slRihMid,  rihMid,  ffMid, '#2a7fa8'],
-    [slRihLo,   rihLo,   ffLo,  '#5a9fd4'],
-    [slPoohLo,  poohLo,  ffLo,  '#e07878'],
-    [slPoohMid, poohMid, ffMid, '#c0392b'],
-    [slPoohHi,  poohHi,  ffHi,  '#8b1a1a'],
-  ].forEach(([sl, sts, ff, color]) => {
-    if (!sts.length) return;
-    ctx.fillStyle = color;
-    ctx.fillText(`${ff}FF`, g.l + (tdHL(sl, sts) / xMax) * pw, labelY);
+  [[2, ffHi], [1, ffMid], [0, ffLo], [4, ffLo], [5, ffMid], [6, ffHi]].forEach(([ci, ff]) => {
+    const c = liveCurves[ci], last = c.pts[c.pts.length - 1];
+    if (!last) return;
+    ctx.fillStyle = c.color;
+    ctx.fillText(`${ff}FF`, g.l + (last.x / xMax) * pw, labelY);
   });
 
   CI.drawAnnotations(ctx, CID);

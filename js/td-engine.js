@@ -25,6 +25,44 @@ function _dpLookup(od_in) {
   return DP_WEIGHT_TABLE[key];
 }
 
+// ----- survey subdivision -----
+// Elements are at most TD_MAX_EL ft long and are cut at every BHA component
+// boundary (measured up from the bit at TD). The element builder assigns ONE
+// component to a whole element by its midpoint, so with raw survey intervals a
+// heavy collar was smeared over a 2,000-ft interval — or dropped entirely when
+// the midpoint fell above the BHA. That biased torque/drag on sparse surveys
+// and made the bit-at-depth broomstick saw-tooth as the bit crossed intervals.
+// Inclination / azimuth / TVD are interpolated linearly inside an interval
+// (azimuth through the short way round), which is the same assumption the
+// march makes when it spreads Δα and Δφ over an element.
+const TD_MAX_EL = 100;
+function _subdivideSurvey(survey, tdMD_ft, bhaStack) {
+  if (!survey || survey.length < 2) return survey || [];
+  const bounds = [];
+  for (const b of bhaStack) { bounds.push(tdMD_ft - b.from, tdMD_ft - b.to); }
+  const out = [survey[0]];
+  for (let i = 0; i < survey.length - 1; i++) {
+    const s0 = survey[i], s1 = survey[i + 1];
+    const md0 = s0.md, md1 = s1.md, L = md1 - md0;
+    if (L <= 0.01) { out.push(s1); continue; }
+    const cuts = new Set();
+    const n = Math.ceil(L / TD_MAX_EL);
+    for (let k = 1; k < n; k++) cuts.add(md0 + L * k / n);
+    for (const b of bounds) if (b > md0 + 0.01 && b < md1 - 0.01) cuts.add(b);
+    const i0 = s0.inc || 0, i1 = s1.inc || 0;
+    const a0 = s0.az ?? s0.azimuth ?? 0, a1 = s1.az ?? s1.azimuth ?? 0;
+    let dZ = a1 - a0; if (dZ > 180) dZ -= 360; if (dZ < -180) dZ += 360;
+    const t0 = s0.tvd || 0, t1 = s1.tvd || 0;
+    for (const md of [...cuts].sort((a, b) => a - b)) {
+      const t = (md - md0) / L;
+      out.push({ md, inc: i0 + t * (i1 - i0), az: ((a0 + t * dZ) % 360 + 360) % 360,
+                 tvd: t0 + t * (t1 - t0), dls: s1.dls || 0 });
+    }
+    out.push(s1);
+  }
+  return out;
+}
+
 // ----- element builder -----
 // dpWtOverride: optional calibrated DP weight lb/ft (replaces table lookup for DP sections)
 function _buildElements(survey, bha, casingDesign, BF, dpWtOverride) {
@@ -53,9 +91,10 @@ function _buildElements(survey, bha, casingDesign, BF, dpWtOverride) {
   }));
   const deepestShoe_ft = shoes.reduce((mx, s) => Math.max(mx, s.depth_ft), 0);
 
+  const sv = _subdivideSurvey(survey, tdMD_ft, bhaStack);
   const elements = [];
-  for (let i = 0; i < survey.length - 1; i++) {
-    const s0 = survey[i], s1 = survey[i + 1];
+  for (let i = 0; i < sv.length - 1; i++) {
+    const s0 = sv[i], s1 = sv[i + 1];
     const md0 = s0.md, md1 = s1.md;                // md already in feet
     const dL  = md1 - md0;
     if (dL < 0.01) continue;

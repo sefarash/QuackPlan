@@ -609,19 +609,16 @@ the well default.</p>
 <!-- ════════════════════════════════════════════ -->
 <section id="broomstick">
 <h2>Broomstick <span class="badge badge-output">Output</span></h2>
-<p>A composite hook load chart showing all three drillstring operating modes simultaneously at a single friction factor, with depth increasing <em>downward</em>.</p>
+<p>Surface hook load versus <em>bit depth</em>, with depth increasing downward. For every bit depth the survey is cut at that depth and the full soft-string (Johancsik) march is run with the BHA — the components and lengths from the Casing / BHA table — hanging from the bit and drill pipe to surface. Each point is the surface hook load (block weight included) with the bit parked at that depth, so the string shortens as the bit comes up and the collars see the inclination at their own depth.</p>
 
 <table>
   <tr><th>Line</th><th>Mode</th><th>Interpretation</th></tr>
-  <tr><td style="color:#2a7fa8">Blue — RIH</td><td>Running in hole</td><td>Lower hook load; gravity assists descent</td></tr>
-  <tr><td style="color:#1a7a4a">Green — Rot-On (WOB)</td><td>Rotary drilling at WOB</td><td>Middle hook load; used for set-down weight checks</td></tr>
-  <tr><td style="color:#c0392b">Red — POOH</td><td>Pulling out of hole</td><td>Highest hook load; friction opposes upward motion</td></tr>
+  <tr><td style="color:#2a7fa8">Blue — RIH (3 lines)</td><td>Running in hole at FF low / mid / high</td><td>Lowest hook load; friction opposes descent. A curve bending back toward zero means the string cannot be slacked off further</td></tr>
+  <tr><td style="color:#8e44ad">Purple — Rot Off Btm</td><td>Rotating off bottom</td><td>Buoyed string weight with no axial friction (torque only)</td></tr>
+  <tr><td style="color:#c0392b">Red — PKP (3 lines)</td><td>Pulling out of hole at FF low / mid / high</td><td>Highest hook load; compare against the rig limit line</td></tr>
 </table>
 
-<p>The spread between RIH and POOH lines is the total friction contribution. A wide spread in openhole sections indicates high wellbore friction — consider wipers or optimizing the trajectory.</p>
-
-<h4>FF control</h4>
-<p>Use a single friction factor for all three lines. Adjust to bracket the expected friction range for the mud system and formation type.</p>
+<p>Every curve starts at the block weight at surface. The spread between RIH and PKP at a depth is the total friction; the fan between the three friction factors shows the sensitivity to the assumed FF. Inputs: block weight, drill-pipe weight per foot, mud weight (buoyancy), the three friction factors and the rig hook-load limit.</p>
 </section>
 
 <!-- ════════════════════════════════════════════ -->
