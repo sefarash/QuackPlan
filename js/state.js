@@ -19,6 +19,7 @@ let qpState = {
   activeTrajOpt:   'opt1',
   trajSource:      'opt1',   // which option feeds qpState.survey (persisted as 'trajOpt')
   inherited:       {},       // borehole-level keys the open scenario is showing from its borehole
+  boreholeSchematic: [],     // the borehole's own casing program (read-only view while a scenario is open)
   currentWellId:      null,
   currentBoreholeId:  null,
   currentScenarioId:  null,

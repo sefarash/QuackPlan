@@ -39,6 +39,7 @@ function _updateGate() {
   }
 
   qpUpdateDataBanner();
+  qpPlaceSchematicEditor();
 
   // ── Run button ──
   const runBtn = document.querySelector('.hdr-btn.primary');
@@ -250,8 +251,83 @@ function _applyWellDatums(wellNode) {
   if (typeof drawDatumDiagram === 'function') drawDatumDiagram();
 }
 
+// ── Casing program placement ─────────────────────────────────────────────────
+// The schematic editor (#schematicEditor: table + buttons + warnings) is ONE DOM
+// block. Borehole selected → it sits on the Well Schematic tab and edits the
+// borehole definition. Scenario open → it is moved into the Casing / BHA tab
+// above the BHA and edits the scenario's own copy (inherited from the borehole
+// until the first edit, which forks it — qpSaveTarget), while the Well
+// Schematic tab shows the borehole definition read-only.
+function qpPlaceSchematicEditor() {
+  const editor = document.getElementById('schematicEditor');
+  const home   = document.getElementById('schematicHome');
+  const host   = document.getElementById('schematicSlotHost');
+  const slot   = document.getElementById('schematicScenarioSlot');
+  const view   = document.getElementById('schematicBoreholeView');
+  if (!editor || !home || !host || !slot || !view) return;
+  if (qpState.currentScenarioId) {
+    if (editor.parentElement !== host) host.appendChild(editor);
+    slot.hidden = false; view.hidden = false; home.hidden = true;
+    _renderBoreholeSchematicView();
+  } else {
+    if (editor.parentElement !== home) home.appendChild(editor);
+    slot.hidden = true; view.hidden = true; home.hidden = false;
+  }
+  _updateSchematicSlotNote();
+}
+
+function _updateSchematicSlotNote() {
+  const el = document.getElementById('schematicSlotNote');
+  if (!el) return;
+  el.textContent = (qpState.inherited && qpState.inherited.schematic)
+    ? 'Inherited from the borehole definition — edit any cell to give this scenario its own casing program.'
+    : 'This scenario\'s own casing program. The borehole definition (Well Schematic tab) is not affected by edits here.';
+}
+
+function _renderBoreholeSchematicView() {
+  const host = document.getElementById('schematicBoreholeTable');
+  if (!host) return;
+  const rows = qpState.boreholeSchematic || [];
+  const uD = QP_UNITS.label('depth');
+  const dep = v => (v === '' || v == null) ? '—' : Math.round(QP_UNITS.toDisplay('depth', +v)).toLocaleString();
+  const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  if (!rows.length) {
+    host.innerHTML = '<p class="text-dim" style="padding:6px 0">The borehole has no casing program yet — add one at the borehole, or build this scenario\'s own on the Casing / BHA tab.</p>';
+    return;
+  }
+  const wt = r => r.wt === 'custom' ? r.wtCustom : r.wt, gr = r => r.grade === 'custom' ? r.gradeCustom : r.grade;
+  host.innerHTML = `<table class="qp-table" style="max-width:900px"><thead><tr>
+      <th style="text-align:left">Definition</th><th>OD (in)</th><th>Weight</th><th>Grade</th><th>Hole (in)</th>
+      <th>MD Top (${uD})</th><th>MD Bottom (${uD})</th><th>TOC (${uD})</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td style="text-align:left">${esc(r.def)}</td><td>${esc(r.size)}</td>
+      <td>${wt(r) ? esc(wt(r)) + ' lb/ft' : '—'}</td><td>${esc(gr(r) || '—')}</td><td>${r.hole > 0 ? esc(r.hole) : '—'}</td>
+      <td>${dep(r.top)}</td><td>${dep(r.bot)}</td><td>${dep(r.toc)}</td></tr>`).join('') + '</tbody></table>';
+}
+
+// "Edit at the borehole" — open the parent borehole node
+function hierarchyOpenBorehole() {
+  const bh = qpState.currentBoreholeId;
+  if (!bh) return;
+  dbGet(bh).then(node => { if (node) _selectNode(node); });
+}
+
+// Replace this scenario's casing program with the borehole definition (a
+// write into the scenario's own copy — the borehole is untouched).
+function schematicResetToBorehole() {
+  if (!qpState.currentScenarioId) return;
+  const rows = qpState.boreholeSchematic || [];
+  if (!confirm(rows.length
+    ? `Replace this scenario's casing program with the borehole definition (${rows.length} row${rows.length === 1 ? '' : 's'})?`
+    : 'The borehole has no casing program; this will clear the scenario\'s copy. Continue?')) return;
+  qpState.loadingScenario = true;                     // rebuild without per-row writes …
+  try { schematicLoadRows(rows); } finally { qpState.loadingScenario = false; }
+  schematicSave();                                    // … then ONE full save into the scenario
+  qpUpdateDataBanner();
+}
+
 // Info strip above the input panels: where borehole-level data is going.
 function qpUpdateDataBanner() {
+  _updateSchematicSlotNote();
   const banner = document.getElementById('scenarioBanner');
   if (!banner) return;
   const text = banner.querySelector('.banner-text'), btn = banner.querySelector('.banner-btn');
@@ -289,6 +365,7 @@ function _loadBorehole(id) {
       ['traj1Body', 'traj2Body', 'tortBody', 'schematicBody', 'bhaBody', 'nozzleBody', 'mwdBody',
        'activityBody', 'servicesBody', 'casingCostBody', 'handoverBody'].forEach(i => { const el = document.getElementById(i); if (el) el.innerHTML = ''; });
       qpState.inherited = {};
+      qpState.boreholeSchematic = d.schematic || [];
       if (d.traj1 && d.traj1.length) trajLoadRows(d.traj1);
       else { traj1AddRow({ md: 0, inc: 0, azi: 0 }); traj1AddRow({ md: 5000, inc: 0, azi: 0 }); }
       if (d.traj2 && d.traj2.length) traj2LoadRows(d.traj2);
@@ -303,6 +380,7 @@ function _loadBorehole(id) {
     } finally {
       qpState.loadingScenario = false;
     }
+    qpPlaceSchematicEditor();
     qpUpdateDataBanner();
     if (qpState.activeOutputTab && typeof redrawOutputPanel === 'function') redrawOutputPanel(qpState.activeOutputTab);
     setStatus('Borehole loaded');
@@ -322,6 +400,7 @@ function _loadScenario(id) {
     const merged = qpMergeBoreholeData(node.data, bh?.data);
     const d = merged.data;
     qpState.inherited = merged.inherited;
+    qpState.boreholeSchematic = (bh && bh.data && bh.data.schematic) || [];
 
     // RULE #1: the loaders below rebuild the tables via the same AddRow helpers
     // the user clicks, and those fire saves — a load must NEVER write back over
@@ -389,6 +468,7 @@ function _loadScenario(id) {
     // Persist last-used scenario ID so reload restores it
     localStorage.setItem('qp_lastScenarioId', id);
 
+    qpPlaceSchematicEditor();
     qpUpdateDataBanner();
     setStatus('Scenario loaded');
   }).catch(err => {
@@ -524,6 +604,10 @@ function _confirmDelete(node) {
     setHeaderContext('No well selected', '—');
     _updateGate();
     hierarchyRefresh();
+    // Deleted the open scenario: fall back to its borehole's own data
+    if (node.type === 'scenario' && qpState.currentBoreholeId && !qpState.currentScenarioId) {
+      dbGet(qpState.currentBoreholeId).then(bh => { if (bh) _selectNode(bh); });
+    }
   });
 }
 

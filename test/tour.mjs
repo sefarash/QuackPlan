@@ -50,7 +50,15 @@ const res = await page.evaluate(async () => {
   const sample = roots.find(n => n.name === QP_TOUR.SAMPLE_PROJECT);
   out.sampleCreated = !!sample && roots.length === rootsBefore + 1;
   out.scenarioOpen  = !!qpState.currentScenarioId;
-  const scData = (await dbGet(qpState.currentScenarioId)).data;
+  const scNode = await dbGet(qpState.currentScenarioId);
+  const bhNode = await dbGet(scNode.parentId);
+  const scData = qpMergeBoreholeData(scNode.data, bhNode.data).data;   // borehole-level keys live on the borehole
+  out.split = { onBorehole: Object.keys(bhNode.data).sort(), onScenario: Object.keys(scNode.data).sort() };
+  out.placement = {
+    editorInBhaTab: !!document.querySelector('#schematicSlotHost #schematicEditor'),
+    boreholeViewRows: document.querySelectorAll('#schematicBoreholeTable tbody tr').length,
+    inheritedNote: document.getElementById('schematicSlotNote').textContent.includes('Inherited'),
+  };
   out.sample = { traj1: scData.traj1?.length, strings: scData.schematic?.length,
                  specs: scData.schematic?.filter(r => r.casingSpec).length, bha: scData.bha?.length, ppfg: scData.ppfg?.length,
                  trajOpt: scData.trajOpt, fluidModel: scData.fluid?.model, holes: scData.schematic?.map(r => r.hole) };
@@ -65,7 +73,9 @@ const res = await page.evaluate(async () => {
     out.holeUI.readHole = rowsRead[2].hole;
     out.holeUI.cementOuter = _schCementSegments(rowsRead[2], rowsRead).map(s => s.outerDia);
     out.holeUI.phaseHole = qpPhaseList().find(p => p.key === '7500')?.holeSize;
-    out.holeUI.stored = (await dbGet(qpState.currentScenarioId)).data.schematic[2].hole;
+    out.holeUI.stored = (await dbGet(qpState.currentScenarioId)).data.schematic[2].hole;   // the edit forked a scenario copy
+    out.holeUI.boreholeUntouched = (await dbGet(scNode.parentId)).data.schematic[2].hole;
+    out.holeUI.ownNote = document.getElementById('schematicSlotNote').textContent.includes('own casing program');
     hIn[2].value = '12.25'; schematicSave(); await wait(400);
   }
   out.step1 = { idx: QP_TOUR.step(), spot: vis('.tour-spot'), card: vis('.tour-card'),
@@ -90,6 +100,8 @@ const res = await page.evaluate(async () => {
   out.patchesWhileWalking = patches;   // outputControls (tab / phase memory) is allowed; well data is not
   out.finished = { active: QP_TOUR.active(), flag: localStorage.getItem(QP_TOUR.KEY), cardHidden: !vis('.tour-card') };
   out.secondOffer = QP_TOUR.offer(false);                  // flag set → no welcome
+  _selectNode(bhNode); await wait(1200);
+  out.editorHomeAtBorehole = !!document.querySelector('#schematicHome #schematicEditor') && document.getElementById('schematicScenarioSlot').hidden;
   // replay reuses the sample project (no second copy)
   await QP_TOUR.start(); await wait(800);
   out.replay = { roots: (await dbRoots()).filter(n => n.name === QP_TOUR.SAMPLE_PROJECT).length, active: QP_TOUR.active() };
@@ -108,6 +120,12 @@ check('Start creates exactly one sample project and opens its scenario', res.sam
 check('sample well is complete (6 stations, 4 strings with 3 catalogue specs, 7 BHA rows, 5 PPFG rows, HB fluid)',
       res.sample.traj1 === 6 && res.sample.strings === 4 && res.sample.specs === 3 && res.sample.bha === 7 && res.sample.ppfg === 5 && res.sample.fluidModel === 'HB' && res.sample.trajOpt === 'opt1',
       JSON.stringify(res.sample));
+check('sample well: borehole holds trajectory/schematic/PPFG, scenario holds BHA/fluid/nozzles',
+      JSON.stringify(res.split.onBorehole) === JSON.stringify(['ppfg', 'schematic', 'traj1', 'trajOpt']) && JSON.stringify(res.split.onScenario) === JSON.stringify(['bha', 'fluid', 'nozzles']), JSON.stringify(res.split));
+check('scenario open: casing editor sits in Casing/BHA, Well Schematic shows the borehole definition read-only, marked inherited',
+      res.placement.editorInBhaTab && res.placement.boreholeViewRows === 4 && res.placement.inheritedNote, JSON.stringify(res.placement));
+check('editing the casing program in the scenario forks a copy; borehole definition untouched',
+      res.holeUI.stored === 12.5 && res.holeUI.boreholeUntouched === 12.25 && res.holeUI.ownNote, JSON.stringify({ stored: res.holeUI.stored, bh: res.holeUI.boreholeUntouched }));
 check('sample strings carry manual hole sizes', JSON.stringify(res.sample.holes) === JSON.stringify([26, 17.5, 12.25, '']), JSON.stringify(res.sample.holes));
 check('hole column: shown, Open Hole disabled, inferred placeholder, manual value wins (cement sheath, phase) and round-trips',
       res.holeUI.shown.slice(0, 3).join(',') === '26,17.5,12.25' && res.holeUI.ohDisabled && res.holeUI.placeholderInferred === '12.25'
@@ -117,6 +135,7 @@ check('step 1 shows spotlight + card', res.step1.idx === 0 && res.step1.spot && 
 check('seven steps in order with their panels', res.steps.map(s => s.idx).join(',') === '0,1,2,3,4,5,6'
       && res.steps[1].inputTab === 'trajectory' && res.steps[2].inputTab === 'schematic' && res.steps[3].inputTab === 'bha'
       && res.steps[4].outputTab === 'torque' && res.steps[6].inputTab === 'fluid', res.steps.map(s => `${s.idx}:${s.inputTab}/${s.outputTab}`).join(' '));
+check('editor returns to the Well Schematic tab at borehole level', res.editorHomeAtBorehole === true);
 check('"what each result needs" step lists every output tab', res.needsRows === 8, `${res.needsRows} rows`);
 check('footer ? popover shows the same table', res.needsPopover === true);
 check('closing the popover removes the card AND the spotlight frame', res.needsClosed === true);

@@ -223,6 +223,20 @@
     <!-- Well Schematic Input -->
     <div id="panel-schematic" class="input-panel">
       <div class="panel-title">🏗 Well Schematic Definition</div>
+
+      <!-- Scenario open: the editable table lives in Casing / BHA (the scenario's own
+           copy); this tab shows the BOREHOLE definition read-only. -->
+      <div id="schematicBoreholeView" class="schematic-view" hidden>
+        <div class="text-dim" style="margin-bottom:8px">
+          <strong>Borehole definition</strong> — shared by every scenario under this borehole. This scenario's
+          own casing program is edited on the <strong>Casing / BHA</strong> tab.
+          <button class="add-row-btn" style="margin-left:8px" onclick="hierarchyOpenBorehole()">Edit at the borehole</button>
+        </div>
+        <div id="schematicBoreholeTable"></div>
+      </div>
+
+      <div id="schematicHome">
+      <div id="schematicEditor">
       <table class="qp-table" id="schematicTable">
         <thead>
           <tr>
@@ -244,13 +258,25 @@
       <button class="add-row-btn" onclick="schematicAddRow()">+ Add string / interval</button>
       <button class="add-row-btn" style="margin-left:8px" onclick="exportSchematic()">⬇ CSV</button>
       <div id="schematicWarnings" style="margin-top:6px"></div>
+      </div><!-- /schematicEditor -->
+      </div><!-- /schematicHome -->
     </div>
 
     <!-- Casing / BHA -->
     <div id="panel-bha" class="input-panel">
       <div class="panel-title">🔧 Casing / BHA Definition</div>
 
-      <div class="section-label">BHA Components (bottom to top)</div>
+      <!-- Scenario's casing program: the schematic editor (#schematicEditor) is
+           moved in here while a scenario is open (qpPlaceSchematicEditor). -->
+      <div id="schematicScenarioSlot" hidden>
+        <div class="section-label">Casing Program (this scenario)</div>
+        <div class="text-dim" id="schematicSlotNote" style="margin-bottom:6px"></div>
+        <div id="schematicSlotHost"></div>
+        <button class="add-row-btn" style="margin-top:4px" onclick="schematicResetToBorehole()"
+                title="Replace this scenario's casing program with the borehole definition">↺ Reset to borehole definition</button>
+      </div>
+
+      <div class="section-label mt12">BHA Components (bottom to top)</div>
       <table class="qp-table" id="bhaTable">
         <thead>
           <tr>

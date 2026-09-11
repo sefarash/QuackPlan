@@ -770,6 +770,11 @@ tr.row-drag-over td { background: #daf0fb !important; }
   width: 60px;
 }
 
+/* Casing program: read-only borehole view on the schematic tab (scenario open) */
+.schematic-view table { opacity: 0.92; }
+.schematic-view td, .schematic-view th { font-size: 12px; }
+#schematicScenarioSlot { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+
 /* Guided tour: spotlight cut-out + step card (page stays clickable) */
 .tour-spot {
   position: fixed;

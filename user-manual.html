@@ -374,6 +374,13 @@ Project
 
 <p>Add rows in order from largest (shallowest) to smallest (deepest) string. The schematic draws shoe triangles, casing strings, and liner hangers automatically. Open hole below the last casing shoe is shown as a wavy line.</p>
 
+<h3>Borehole definition vs scenario copy</h3>
+<p>With a <strong>borehole</strong> selected, this tab edits the borehole's casing program, shared by every scenario under it.
+With a <strong>scenario</strong> open, this tab shows the borehole definition read-only (with an <em>Edit at the borehole</em>
+button), and the editable table moves to the top of the <strong>Casing / BHA</strong> tab as <em>Casing Program (this scenario)</em>.
+It starts as the borehole definition (marked "inherited"); the first edit gives the scenario its own copy, which the borehole
+does not see. <em>Reset to borehole definition</em> copies the borehole's current program back into the scenario.</p>
+
 <div class="tip">
   <strong>Schematic feeds hydraulics</strong>
   The annular geometry defined here is used directly in the hydraulics calculation to compute section-by-section annular pressure losses and ECD.

@@ -63,6 +63,13 @@ const QP_TOUR = (() => {
     };
   }
 
+  // Borehole-level keys live on the borehole; the scenario holds the string and fluid.
+  function _splitSample(all) {
+    const bh = {}, sc = {};
+    for (const [k, v] of Object.entries(all)) ((QP_BOREHOLE_KEYS || []).includes(k) ? bh : sc)[k] = v;
+    return { bh, sc };
+  }
+
   // Find the sample scenario if the project already exists, else create the
   // whole chain. Resolves { scenarioId, boreholeId, created }.
   async function ensureSampleWell() {
@@ -83,8 +90,9 @@ const QP_TOUR = (() => {
     const fid = await dbAdd({ parentId: pid, name: 'Demo Field', type: 'field' });
     const wid = await dbAdd({ parentId: fid, name: 'Duck-1', type: 'well',
                               data: { environment: 'onshore', rkb: 25, gl: 200, seaBedDepth: 0 } });
-    const bid = await dbAdd({ parentId: wid, name: 'Duck-1 main bore', type: 'borehole' });
-    const sid = await dbAdd({ parentId: bid, name: 'Drilling 8½" hole', type: 'scenario', data: _sampleScenarioData() });
+    const { bh, sc } = _splitSample(_sampleScenarioData());
+    const bid = await dbAdd({ parentId: wid, name: 'Duck-1 main bore', type: 'borehole', data: bh });
+    const sid = await dbAdd({ parentId: bid, name: 'Drilling 8½" hole', type: 'scenario', data: sc });
     return { scenarioId: sid, boreholeId: bid, created: true };
   }
 
@@ -148,14 +156,14 @@ const QP_TOUR = (() => {
     },
     {
       title: 'Well schematic',
-      text: 'Each row is a string: size, weight and grade from the catalogue, the <b>hole</b> it is run in, and the <b>TOC</b>. The drawing on the right updates as you edit — watch the cement sheath from TOC to the shoe.',
-      target: ['#schematicTable', '#schematicCanvas'],
+      text: 'The casing program is defined once at the <b>borehole</b> — this is that definition, drawn on the right with TOC and cement. Each string has a size, weight and grade from the catalogue, the hole it is run in, and the TOC. A scenario works on its own copy: next tab.',
+      target: ['#schematicBoreholeView', '#schematicCanvas'],
       before: async () => { inputTab('schematic'); await wait(200); },
     },
     {
-      title: 'String and mud',
-      text: 'The BHA table is entered <b>bit first</b>. On the Drilling Fluid tab the form shows only the rheology model you pick, and each hole section can carry its own fluid.',
-      target: '#bhaTable',
+      title: 'Casing program, string and mud',
+      text: 'Casing / BHA holds this scenario\'s <b>copy of the casing program</b> — edit it here without touching the borehole — and the BHA, entered <b>bit first</b>. On the Drilling Fluid tab the form shows only the rheology model you pick, and each hole section can carry its own fluid.',
+      target: ['#schematicScenarioSlot', '#bhaTable'],
       before: async () => { inputTab('bha'); await wait(200); },
     },
     {

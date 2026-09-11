@@ -204,6 +204,13 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
   saves into the scenario (`qpSaveTarget(key)`) — a fork, never a move. `_loadBorehole` shows the
   borehole's own data; scenario-only panels (BHA, fluid) stay gated. The info banner above the
   input panels says where the data is going. Tests: `npm run test:trajsafety` (borehole section).
+  **Casing program placement** (`qpPlaceSchematicEditor`): the schematic editor `#schematicEditor`
+  is one DOM block — on the Well Schematic tab (`#schematicHome`) while a borehole is selected, moved
+  into the Casing / BHA tab (`#schematicScenarioSlot`) while a scenario is open, where it edits the
+  scenario's own copy (inherited until the first edit forks it); the Well Schematic tab then shows
+  the borehole definition read-only (`qpState.boreholeSchematic`). `schematicResetToBorehole()` copies
+  the borehole's program into the scenario (a write, never a delete). The sample well stores
+  borehole-level keys on the borehole node and BHA / fluid / nozzles on the scenario.
 - Output-panel controls are saved per-scenario into the scenario node (`outputControls` key).
 - `localStorage` also holds: unit system, theme, `qp_lastScenarioId`, label-drag offsets
   (`qp_sch_offsets_*`, `qp_fd_offsets_*`), and `qp_tour_done` (guided tour: `done` | `skipped`).
