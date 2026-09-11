@@ -365,13 +365,15 @@ Project
 
 <table>
   <tr><th>Field</th><th>Description</th></tr>
-  <tr><td>Definition</td><td>String type: Surface Casing, Intermediate Casing, Production Casing, or Liner</td></tr>
-  <tr><td>Size (in)</td><td>Nominal OD in inches (e.g. 13.375, 9.625, 7)</td></tr>
-  <tr><td>Hole (in)</td><td>Drilled hole diameter the string is run in, entered manually. Leave blank to use the standard bit size for that casing (shown as the placeholder). Open Hole rows have no separate hole size. Used for the cement sheath on the schematic and for the hole size of each analysis phase.</td></tr>
-  <tr><td>MD Top (ft)</td><td>Top of string. Enter 0 or leave blank for surface strings. For liners, enter the liner top (hanger depth).</td></tr>
+  <tr><td>Definition</td><td>String type: Conductor, Surface / Intermediate / Production Casing, Liner, Tubing — or Open Hole for the interval below the last shoe</td></tr>
+  <tr><td>Size (in)</td><td>Nominal OD from the catalogue (e.g. 13⅜, 9⅝, 7). For an Open Hole row the list holds standard hole sizes instead.</td></tr>
+  <tr><td>Hole (in)</td><td>Drilled hole diameter the string is run in, entered manually. Leave blank to use the standard bit size for that casing (shown as the placeholder). For an Open Hole row this is the hole size itself: pick a standard size in the Size column or type any value here. Used for the cement sheath on the schematic and for the hole size of each analysis phase.</td></tr>
+  <tr><td>MD Top (ft)</td><td>Top of string. Enter 0 or leave blank for surface strings. For liners, enter the liner top (hanger depth). Open Hole rows derive it — the interval starts at the deepest shoe (or hole bottom) above it — and the cell is greyed out.</td></tr>
   <tr><td>MD Bottom (ft)</td><td>Casing shoe / liner shoe measured depth</td></tr>
   <tr><td>TOC (ft)</td><td>Top of cement, measured depth. Leave blank if the string is not cemented or the TOC is unknown. The cement sheath is drawn on the schematic and the final diagram (hatched grey, from TOC to the shoe, against the enclosing casing ID or the drilled hole size), and Casing Design uses it as the collapse backup: the run-in mud (the section's fluid from the Fluid Program, else the well default) above TOC and the cement slurry density (Casing Design &rarr; <em>Cement</em>, default 15.8 ppg) below it. Without a TOC the full mud column to the shoe is used, as before.</td></tr>
 </table>
+
+<p><strong>Open Hole rows</strong> have no pipe, so only Size, Hole and MD Bottom are editable. Weight, Grade, OD, MD Top and TOC are greyed out: OD mirrors the hole size and MD Top follows the shoe above it.</p>
 
 <p>Add rows in order from largest (shallowest) to smallest (deepest) string. The schematic draws shoe triangles, casing strings, and liner hangers automatically. Open hole below the last casing shoe is shown as a wavy line.</p>
 

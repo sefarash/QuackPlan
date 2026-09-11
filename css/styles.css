@@ -620,6 +620,11 @@ body.dark .scenario-banner.info { background: #16303f; color: var(--text); }
   background: var(--bg-input) !important;
 }
 
+/* Cells that do not apply to the row (an Open Hole interval has no pipe) */
+.qp-table td.editable.na { background: var(--bg-calc) !important; }
+.qp-table td.editable.na input,
+.qp-table td.editable.na select { color: var(--text-dim); opacity: .55; cursor: not-allowed; }
+
 .qp-table td.calc-cell {
   background: var(--bg-calc) !important;
   color: var(--text-dim);
@@ -1107,6 +1112,8 @@ body.dark input[type="range"]        { accent-color: var(--accent); }
 body.dark .qp-table td.editable                  { color: #e8d458; }
 body.dark .qp-table td.editable input,
 body.dark .qp-table td.editable select           { color: #e8d458; }
+body.dark .qp-table td.editable.na input,
+body.dark .qp-table td.editable.na select        { color: var(--text-dim); }
 body.dark .qp-table td input:focus               { background: #3a3400; color: #f0e060; border-radius: 2px; }
 
 /* Calc cells — use a readable mid-blue, not the dim muted colour */

@@ -67,7 +67,7 @@ const res = await page.evaluate(async () => {
   {
     const rowsDom = [...document.querySelectorAll('#schematicBody tr')];
     const hIn = rowsDom.map(tr => tr.querySelector('.sch-hole'));
-    out.holeUI = { shown: hIn.map(i => i.value), ohDisabled: hIn[3].disabled, placeholderInferred: hIn[2].placeholder };
+    out.holeUI = { shown: hIn.map(i => i.value), ohEnabled: !hIn[3].disabled, placeholderInferred: hIn[2].placeholder };
     hIn[2].value = '12.5'; schematicSave(); await wait(600);
     const rowsRead = _readSchematicRows();
     out.holeUI.readHole = rowsRead[2].hole;
@@ -77,6 +77,26 @@ const res = await page.evaluate(async () => {
     out.holeUI.boreholeUntouched = (await dbGet(scNode.parentId)).data.schematic[2].hole;
     out.holeUI.ownNote = document.getElementById('schematicSlotNote').textContent.includes('own casing program');
     hIn[2].value = '12.25'; schematicSave(); await wait(400);
+  }
+  // Open Hole row: only Size (standard hole sizes), Hole and MD Bottom are live; OD mirrors the
+  // hole, MD Top is derived from the shoe above, weight / grade / TOC are greyed out
+  {
+    const rowsDom = [...document.querySelectorAll('#schematicBody tr')];
+    const oh = rowsDom[3], q = c => oh.querySelector(c), dis = c => !!q(c)?.disabled;
+    out.ohRow = { def: q('select').value, hole: q('.sch-hole').value, sizeMirror: q('.sch-size').value,
+                  sizeSel: q('.sch-od').value, sizeMode: q('.sch-od').dataset.mode,
+                  greyed: ['.sch-size', '.sch-wt', '.sch-grade', '.sch-top', '.sch-toc'].every(dis),
+                  live: !dis('.sch-hole') && !dis('.sch-bot') && !dis('.sch-od'),
+                  naCells: oh.querySelectorAll('td.na').length, topDerived: q('.sch-top').value };
+    q('.sch-od').value = '6.125'; _schOdChanged(q('.sch-od')); await wait(500);       // pick a standard size
+    out.ohRow.afterPick = { hole: q('.sch-hole').value, size: q('.sch-size').value, readSize: +_readSchematicRows()[3].size,
+                            phaseHole: qpPhaseList().find(p => p.key === '11000')?.holeSize,
+                            storedOd: (await dbGet(qpState.currentScenarioId)).data.schematic[3].od };
+    q('.sch-hole').value = '6.25'; _schHoleChanged(q('.sch-hole')); await wait(400);  // type a non-standard one
+    out.ohRow.afterType = { size: q('.sch-size').value, sizeSel: q('.sch-od').value };
+    rowsDom[2].querySelector('.sch-bot').value = '7600'; schematicSave(); await wait(400);   // shoe above moves
+    out.ohRow.topFollows = q('.sch-top').value;
+    rowsDom[2].querySelector('.sch-bot').value = '7500'; q('.sch-od').value = '8.5'; _schOdChanged(q('.sch-od')); await wait(500);
   }
   out.step1 = { idx: QP_TOUR.step(), spot: vis('.tour-spot'), card: vis('.tour-card'),
                 cardText: document.querySelector('.tour-card .tour-title')?.textContent };
@@ -127,8 +147,15 @@ check('scenario open: casing editor sits in Casing/BHA, Well Schematic shows the
 check('editing the casing program in the scenario forks a copy; borehole definition untouched',
       res.holeUI.stored === 12.5 && res.holeUI.boreholeUntouched === 12.25 && res.holeUI.ownNote, JSON.stringify({ stored: res.holeUI.stored, bh: res.holeUI.boreholeUntouched }));
 check('sample strings carry manual hole sizes', JSON.stringify(res.sample.holes) === JSON.stringify([26, 17.5, 12.25, '']), JSON.stringify(res.sample.holes));
-check('hole column: shown, Open Hole disabled, inferred placeholder, manual value wins (cement sheath, phase) and round-trips',
-      res.holeUI.shown.slice(0, 3).join(',') === '26,17.5,12.25' && res.holeUI.ohDisabled && res.holeUI.placeholderInferred === '12.25'
+check('Open Hole row: only Size / Hole / MD Bottom live, OD mirrors the hole, MD Top derived from the shoe above, weight / grade / TOC greyed',
+      res.ohRow.def === 'Open Hole' && res.ohRow.hole === '8.5' && res.ohRow.sizeMirror === '8.5' && res.ohRow.sizeSel === '8.5' && res.ohRow.sizeMode === 'hole'
+      && res.ohRow.greyed && res.ohRow.live && res.ohRow.naCells === 5 && res.ohRow.topDerived === '7500'
+      && res.ohRow.afterPick.hole === '6.125' && res.ohRow.afterPick.size === '6.125' && res.ohRow.afterPick.readSize === 6.125
+      && res.ohRow.afterPick.phaseHole === 6.125 && res.ohRow.afterPick.storedOd === ''
+      && res.ohRow.afterType.size === '6.25' && res.ohRow.afterType.sizeSel === '6.25' && res.ohRow.topFollows === '7600',
+      JSON.stringify(res.ohRow));
+check('hole column: shown, Open Hole editable, inferred placeholder, manual value wins (cement sheath, phase) and round-trips',
+      res.holeUI.shown.slice(0, 3).join(',') === '26,17.5,12.25' && res.holeUI.ohEnabled && res.holeUI.placeholderInferred === '12.25'
       && res.holeUI.readHole === 12.5 && res.holeUI.cementOuter.every(d => d === 12.5) && res.holeUI.phaseHole === 12.5 && res.holeUI.stored === 12.5,
       JSON.stringify(res.holeUI));
 check('step 1 shows spotlight + card', res.step1.idx === 0 && res.step1.spot && res.step1.card, res.step1.cardText);

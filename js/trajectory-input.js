@@ -558,23 +558,90 @@ function _schGradeOptions(od, wt) {
 }
 
 // Hole size column: the drilled hole the string is run in (inches, manual).
-// Blank → inferred from the casing size (_qpHoleSizeFor, bit-for-casing table);
-// Open Hole rows have no separate hole (their size IS the hole).
+// Blank → inferred from the casing size (_qpHoleSizeFor, bit-for-casing table).
 function _schHolePlaceholder(size) {
   const s = parseFloat(size);
   if (!(s > 0)) return '';
   return (typeof _qpHoleSizeFor === 'function') ? String(_qpHoleSizeFor(s)) : '';
 }
-function _schSyncHoleCell(tr) {
-  const def  = tr.querySelector('select')?.value;
-  const hole = tr.querySelector('.sch-hole');
-  const size = tr.querySelector('.sch-size')?.value;
-  if (!hole) return;
-  const isOH = def === 'Open Hole';
-  hole.disabled = isOH;
-  hole.placeholder = isOH ? '= OD' : _schHolePlaceholder(size);
-  if (isOH) hole.value = '';
+
+// Standard hole (bit) sizes offered in the Size dropdown of an Open Hole row.
+const QP_HOLE_SIZES = [36, 32, 30, 28, 26, 24, 22, 20, 18.5, 17.5, 16, 14.75, 13.5, 12.25,
+                       10.625, 9.875, 9.5, 8.75, 8.5, 8.375, 7.875, 6.75, 6.5, 6.125, 5.875, 4.75, 4.125, 3.875];
+function _schFmtIn(v) { return ((typeof _qpFmtIn === 'function') ? _qpFmtIn(+v) : String(v)) + '"'; }
+
+// An Open Hole interval starts where the deepest string / hole section above it
+// ends — its MD Top is derived from the other rows (display units), never typed.
+function _schOpenHoleTop(tr) {
+  const myBot = parseFloat(tr.querySelector('.sch-bot')?.value);
+  let top = 0;
+  for (const other of tr.parentElement.rows) {
+    if (other === tr) continue;
+    const b = parseFloat(other.querySelector('.sch-bot')?.value);
+    if (b > top && (!(myBot > 0) || b < myBot)) top = b;
+  }
+  return top;
 }
+
+// Row mode. A STRING row: catalogue Size / Weight / Grade, OD, a manual Hole,
+// MD Top / Bottom, TOC. An OPEN HOLE row has no pipe: only Size (standard hole
+// sizes), Hole (the value — type a non-standard size there) and MD Bottom are
+// live. OD mirrors the hole (engines and stored data read an Open Hole's `size`
+// as its hole diameter, so nothing downstream changes), MD Top is derived, and
+// Weight / Grade / TOC are greyed out (td.na).
+const _SCH_STRING_ONLY = ['.sch-wt', '.sch-wt-txt', '.sch-grade', '.sch-grade-txt', '.sch-od-txt', '.sch-size', '.sch-top', '.sch-toc'];
+const _SCH_NA_CELLS    = ['.sch-wt', '.sch-grade', '.sch-size', '.sch-top', '.sch-toc'];   // greyed cells (Size stays live)
+function _schSyncRowMode(tr) {
+  const q = c => tr.querySelector(c);
+  const isOH = q('select')?.value === 'Open Hole';
+  const odSel = q('.sch-od'), sizeIn = q('.sch-size'), holeIn = q('.sch-hole'), topIn = q('.sch-top');
+  _SCH_STRING_ONLY.forEach(c => { const el = q(c); if (el) el.disabled = isOH; });
+  _SCH_NA_CELLS.forEach(c => q(c)?.closest('td')?.classList.toggle('na', isOH));
+  if (isOH) {
+    let v = parseFloat(holeIn?.value);
+    if (!(v > 0)) v = parseFloat(sizeIn?.value);      // legacy rows: the size IS the hole
+    if (!(v > 0)) v = 8.5;
+    if (holeIn) { holeIn.value = v; holeIn.placeholder = ''; holeIn.title = 'Hole size (in) — pick a standard size in the Size column or type one here.'; }
+    if (sizeIn) sizeIn.value = v;
+    if (odSel) {
+      if (odSel.dataset.mode !== 'hole') {
+        odSel.innerHTML = QP_HOLE_SIZES.map(s => `<option value="${s}">${_schFmtIn(s)}</option>`).join('');
+        odSel.dataset.mode = 'hole';
+        odSel.title = 'Standard hole sizes — or type any size in the Hole column.';
+      }
+      if (![...odSel.options].some(o => +o.value === v)) {           // non-standard size: list it too
+        const o = document.createElement('option'); o.value = String(v); o.textContent = _schFmtIn(v);
+        odSel.insertBefore(o, [...odSel.options].find(x => +x.value < v) || null);   // list is descending
+      }
+      odSel.value = String(v);
+    }
+    if (topIn) topIn.value = +_schOpenHoleTop(tr).toFixed(2);
+  } else {
+    if (odSel && odSel.dataset.mode === 'hole') {          // back from Open Hole → catalogue ODs
+      odSel.innerHTML = `<option value="">— OD —</option>${_schOdOptions()}<option value="custom">Custom…</option>`;
+      odSel.value = ''; odSel.dataset.mode = 'od'; odSel.title = '';
+    }
+    if (holeIn) { holeIn.placeholder = _schHolePlaceholder(sizeIn?.value); holeIn.title = 'Drilled hole size (in). Blank = inferred from the casing size.'; }
+  }
+}
+
+function _schDefChanged(sel) {
+  const tr = sel.closest('tr');
+  if (sel.value === 'Open Hole') {
+    // The user just declared this row an open-hole interval: it has no pipe, so
+    // the string-only cells are reset before they are greyed out.
+    const wtSel = tr.querySelector('.sch-wt'), grSel = tr.querySelector('.sch-grade');
+    if (wtSel) { wtSel.innerHTML = '<option value="">— Wt —</option><option value="custom">Custom…</option>'; wtSel.value = ''; }
+    if (grSel) { grSel.innerHTML = '<option value="">— Grade —</option><option value="custom">Custom…</option>'; grSel.value = ''; }
+    ['.sch-wt-txt', '.sch-grade-txt', '.sch-od-txt'].forEach(c => { const el = tr.querySelector(c); if (el) { el.value = ''; el.style.display = 'none'; } });
+    const toc = tr.querySelector('.sch-toc'); if (toc) toc.value = '';
+    _schStoreCatalogueSpec(tr, null);
+  }
+  _schSyncRowMode(tr);
+  schematicSave();
+}
+function _schHoleChanged(holeIn) { _schSyncRowMode(holeIn.closest('tr')); schematicSave(); }
+function _schSizeChanged(sizeIn) { _schSyncRowMode(sizeIn.closest('tr')); schematicSave(); }
 
 function schematicAddRow(preset) {
   const body = document.getElementById('schematicBody');
@@ -583,7 +650,7 @@ function schematicAddRow(preset) {
   tr.innerHTML = `
     <td class="drag-handle">⠿</td>
     <td class="editable">
-      <select onchange="schematicSave()">
+      <select onchange="_schDefChanged(this)">
         <option>Conductor</option>
         <option>Surface Casing</option>
         <option>Intermediate Casing</option>
@@ -623,12 +690,12 @@ function schematicAddRow(preset) {
     </td>
     <td class="editable" style="min-width:60px">
       <input type="number" class="sch-size" step="0.125" value="${preset?.size ?? 13.375}"
-        style="width:58px" onchange="schematicSave()">
+        style="width:58px" onchange="_schSizeChanged(this)">
     </td>
     <td class="editable" style="min-width:60px">
       <input type="number" class="sch-hole" step="0.125" min="0" placeholder="${_schHolePlaceholder(preset?.size ?? 13.375)}"
         title="Drilled hole size (in). Blank = inferred from the casing size."
-        style="width:58px" value="${preset?.hole > 0 ? +preset.hole : ''}" onchange="schematicSave()">
+        style="width:58px" value="${preset?.hole > 0 ? +preset.hole : ''}" onchange="_schHoleChanged(this)">
     </td>
     <td class="editable"><input type="number" class="sch-top" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.top ?? 0).toFixed(2)}" onchange="schematicSave()"></td>
     <td class="editable"><input type="number" class="sch-bot" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.bot ?? 5000).toFixed(2)}" onchange="schematicSave()"></td>
@@ -637,6 +704,7 @@ function schematicAddRow(preset) {
       value="${(preset?.toc != null && preset.toc !== '') ? +QP_UNITS.toDisplay('depth', +preset.toc).toFixed(2) : ''}" onchange="schematicSave()"></td>
     <td class="row-act"><button onclick="this.closest('tr').remove();schematicSave()">✕</button></td>`;
   body.appendChild(tr);
+  _schSyncRowMode(tr);
   schematicSave();
 }
 
@@ -649,6 +717,14 @@ function _schOdChanged(odSel) {
   const wtTxt  = tr.querySelector('.sch-wt-txt');
   const grTxt  = tr.querySelector('.sch-grade-txt');
   const od     = odSel.value;
+
+  if (odSel.dataset.mode === 'hole') {                    // Open Hole row: the pick IS the hole size
+    const holeIn = tr.querySelector('.sch-hole');
+    if (parseFloat(od) > 0 && holeIn) holeIn.value = parseFloat(od);
+    _schSyncRowMode(tr);
+    schematicSave();
+    return;
+  }
 
   if (od === 'custom') {
     odTxt.style.display = '';
@@ -673,7 +749,7 @@ function _schOdChanged(odSel) {
   grTxt.style.display = 'none';
 
   if (od) sizeIn.value = _odToDecimal(od);
-  _schSyncHoleCell(tr);
+  _schSyncRowMode(tr);
   _schStoreCatalogueSpec(tr, null);
   schematicSave();
 }
@@ -758,9 +834,9 @@ function schematicLoadRows(data) {
 
     if (selDef) selDef.value = row.def  ?? 'Open Hole';
     if (sizeIn) sizeIn.value = row.size ?? 9.625;
-    _schSyncHoleCell(tr);
+    _schSyncRowMode(tr);
 
-    if (row.od && odSel) {
+    if (row.od && odSel && selDef?.value !== 'Open Hole') {   // an Open Hole row's Size lists hole sizes
       odSel.value = row.od;
 
       if (row.od === 'custom') {
@@ -819,7 +895,8 @@ function schematicSave() {
     const odTxt   = tr.querySelector('.sch-od-txt');
     const wtTxt   = tr.querySelector('.sch-wt-txt');
     const grTxt   = tr.querySelector('.sch-grade-txt');
-    _schSyncHoleCell(tr);
+    _schSyncRowMode(tr);                                // Open Hole rows: mirror hole → OD, derive MD Top
+    const isOH = selDef?.value === 'Open Hole';
     const topIn = tr.querySelector('.sch-top'), botIn = tr.querySelector('.sch-bot');
     const tocIn = tr.querySelector('.sch-toc'), holeIn = tr.querySelector('.sch-hole');
     rows.push({
@@ -832,7 +909,7 @@ function schematicSave() {
       toc:         (tocIn && tocIn.value !== '') ? +QP_UNITS.fromDisplay('depth', +tocIn.value).toFixed(4) : '',
       // Drilled hole size (inches, manual) — additive key; '' = inferred from the casing size
       hole:        (holeIn && !holeIn.disabled && holeIn.value !== '') ? +holeIn.value : '',
-      od:          odSel?.value  || '',
+      od:          isOH ? '' : (odSel?.value || ''),     // catalogue OD only — an Open Hole has none
       odCustom:    odTxt?.value  || '',
       wt:          wtSel?.value  || '',
       wtCustom:    wtTxt?.value  || '',
