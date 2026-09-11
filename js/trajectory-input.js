@@ -138,9 +138,9 @@ function _schConvertFields(fromSys, toSys) {
   const body = document.getElementById('schematicBody');
   if (!body) return;
   for (const tr of body.rows) {
-    const nums = tr.querySelectorAll('input[type=number]');   // [0]=OD (inches), [1]=top, [2]=bot, [3]=TOC
-    [1, 2, 3].forEach(i => {
-      const inp = nums[i];
+    // depth fields only — OD and hole size stay in inches
+    ['.sch-top', '.sch-bot', '.sch-toc'].forEach(cls => {
+      const inp = tr.querySelector(cls);
       if (inp && inp.value !== '') inp.value = +QP_UNITS.convert('depth', +inp.value, fromSys, toSys).toFixed(2);
     });
   }
@@ -557,6 +557,25 @@ function _schGradeOptions(od, wt) {
     .join('');
 }
 
+// Hole size column: the drilled hole the string is run in (inches, manual).
+// Blank → inferred from the casing size (_qpHoleSizeFor, bit-for-casing table);
+// Open Hole rows have no separate hole (their size IS the hole).
+function _schHolePlaceholder(size) {
+  const s = parseFloat(size);
+  if (!(s > 0)) return '';
+  return (typeof _qpHoleSizeFor === 'function') ? String(_qpHoleSizeFor(s)) : '';
+}
+function _schSyncHoleCell(tr) {
+  const def  = tr.querySelector('select')?.value;
+  const hole = tr.querySelector('.sch-hole');
+  const size = tr.querySelector('.sch-size')?.value;
+  if (!hole) return;
+  const isOH = def === 'Open Hole';
+  hole.disabled = isOH;
+  hole.placeholder = isOH ? '= OD' : _schHolePlaceholder(size);
+  if (isOH) hole.value = '';
+}
+
 function schematicAddRow(preset) {
   const body = document.getElementById('schematicBody');
   const tr   = document.createElement('tr');
@@ -606,8 +625,13 @@ function schematicAddRow(preset) {
       <input type="number" class="sch-size" step="0.125" value="${preset?.size ?? 13.375}"
         style="width:58px" onchange="schematicSave()">
     </td>
-    <td class="editable"><input type="number" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.top ?? 0).toFixed(2)}" onchange="schematicSave()"></td>
-    <td class="editable"><input type="number" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.bot ?? 5000).toFixed(2)}" onchange="schematicSave()"></td>
+    <td class="editable" style="min-width:60px">
+      <input type="number" class="sch-hole" step="0.125" min="0" placeholder="${_schHolePlaceholder(preset?.size ?? 13.375)}"
+        title="Drilled hole size (in). Blank = inferred from the casing size."
+        style="width:58px" value="${preset?.hole > 0 ? +preset.hole : ''}" onchange="schematicSave()">
+    </td>
+    <td class="editable"><input type="number" class="sch-top" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.top ?? 0).toFixed(2)}" onchange="schematicSave()"></td>
+    <td class="editable"><input type="number" class="sch-bot" step="1" value="${+QP_UNITS.toDisplay('depth', preset?.bot ?? 5000).toFixed(2)}" onchange="schematicSave()"></td>
     <td class="editable"><input type="number" class="sch-toc" step="1" min="0" placeholder="—"
       title="Top of cement (MD). Blank = not cemented / unknown."
       value="${(preset?.toc != null && preset.toc !== '') ? +QP_UNITS.toDisplay('depth', +preset.toc).toFixed(2) : ''}" onchange="schematicSave()"></td>
@@ -649,6 +673,7 @@ function _schOdChanged(odSel) {
   grTxt.style.display = 'none';
 
   if (od) sizeIn.value = _odToDecimal(od);
+  _schSyncHoleCell(tr);
   _schStoreCatalogueSpec(tr, null);
   schematicSave();
 }
@@ -720,7 +745,7 @@ function schematicLoadRows(data) {
   const body = document.getElementById('schematicBody');
   body.innerHTML = '';
   (data || []).forEach(row => {
-    schematicAddRow({ size: row.size, top: row.top, bot: row.bot, toc: row.toc });
+    schematicAddRow({ size: row.size, top: row.top, bot: row.bot, toc: row.toc, hole: row.hole });
     const tr     = body.rows[body.rows.length - 1];
     const selDef = tr.querySelector('select');
     const odSel  = tr.querySelector('.sch-od');
@@ -733,6 +758,7 @@ function schematicLoadRows(data) {
 
     if (selDef) selDef.value = row.def  ?? 'Open Hole';
     if (sizeIn) sizeIn.value = row.size ?? 9.625;
+    _schSyncHoleCell(tr);
 
     if (row.od && odSel) {
       odSel.value = row.od;
@@ -793,15 +819,19 @@ function schematicSave() {
     const odTxt   = tr.querySelector('.sch-od-txt');
     const wtTxt   = tr.querySelector('.sch-wt-txt');
     const grTxt   = tr.querySelector('.sch-grade-txt');
-    const inputs  = tr.querySelectorAll('input[type=number]');
+    _schSyncHoleCell(tr);
+    const topIn = tr.querySelector('.sch-top'), botIn = tr.querySelector('.sch-bot');
+    const tocIn = tr.querySelector('.sch-toc'), holeIn = tr.querySelector('.sch-hole');
     rows.push({
       def:         selDef?.value,
-      size:        sizeIn?.value ?? inputs[0]?.value,   // OD stays inches
+      size:        sizeIn?.value,                        // OD stays inches
       // MD top/bot fields are display units → store imperial (canonical)
-      top:         inputs[1]?.value !== '' ? +QP_UNITS.fromDisplay('depth', +inputs[1].value).toFixed(4) : inputs[1]?.value,
-      bot:         inputs[2]?.value !== '' ? +QP_UNITS.fromDisplay('depth', +inputs[2].value).toFixed(4) : inputs[2]?.value,
+      top:         (topIn && topIn.value !== '') ? +QP_UNITS.fromDisplay('depth', +topIn.value).toFixed(4) : (topIn?.value ?? ''),
+      bot:         (botIn && botIn.value !== '') ? +QP_UNITS.fromDisplay('depth', +botIn.value).toFixed(4) : (botIn?.value ?? ''),
       // Top of cement (MD, imperial) — additive key; '' = not cemented / unknown
-      toc:         (inputs[3] && inputs[3].value !== '') ? +QP_UNITS.fromDisplay('depth', +inputs[3].value).toFixed(4) : '',
+      toc:         (tocIn && tocIn.value !== '') ? +QP_UNITS.fromDisplay('depth', +tocIn.value).toFixed(4) : '',
+      // Drilled hole size (inches, manual) — additive key; '' = inferred from the casing size
+      hole:        (holeIn && !holeIn.disabled && holeIn.value !== '') ? +holeIn.value : '',
       od:          odSel?.value  || '',
       odCustom:    odTxt?.value  || '',
       wt:          wtSel?.value  || '',

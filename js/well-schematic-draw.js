@@ -541,7 +541,7 @@ function _schCementSegments(row, schRows) {
   if (!(toc < bot)) return [];
   const enclosing = schRows.filter(r => r !== row && r.def !== 'Open Hole' && r.def !== 'Tubing'
                                    && +r.size > size && +(r.bot || 0) > toc && +(r.top || 0) < bot);
-  const holeDia = (typeof _qpHoleSizeFor === 'function') ? _qpHoleSizeFor(size) : size + 1.5;
+  const holeDia = (row.hole > 0) ? +row.hole : ((typeof _qpHoleSizeFor === 'function') ? _qpHoleSizeFor(size) : size + 1.5);
   const idOf = r => (r.id_in ? +r.id_in : (typeof _rowID === 'function' ? _rowID(r) : +r.size * 0.87));
   const cuts = [...new Set([toc, bot, ...enclosing.flatMap(r => [+r.top || 0, +r.bot]).filter(d => d > toc && d < bot)])]
     .sort((a, b) => a - b);
@@ -581,14 +581,19 @@ function _readSchematicRows() {
     const grTxt  = tr.querySelector('.sch-grade-txt');
     const isWtCustom = wtSel?.value === 'custom';
     const isGrCustom = grSel?.value === 'custom';
+    const topIn = tr.querySelector('.sch-top'), botIn = tr.querySelector('.sch-bot');
+    const tocIn = tr.querySelector('.sch-toc'), holeIn = tr.querySelector('.sch-hole');
+    const holeV = (holeIn && !holeIn.disabled) ? parseFloat(holeIn.value) : NaN;
     rows.push({
       def:  sel?.value        || 'Open Hole',
-      size: inputs[0]?.value  || 9.625,   // OD stays in inches (API sizes)
+      size: tr.querySelector('.sch-size')?.value || inputs[0]?.value || 9.625,   // OD stays in inches (API sizes)
       // MD top/bot fields are display units → imperial (canonical) for all consumers
-      top:  QP_UNITS.fromDisplay('depth', +(inputs[1]?.value || 0)),
-      bot:  QP_UNITS.fromDisplay('depth', +(inputs[2]?.value || 5000)),
+      top:  QP_UNITS.fromDisplay('depth', +(topIn?.value || 0)),
+      bot:  QP_UNITS.fromDisplay('depth', +(botIn?.value || 5000)),
       // Top of cement (MD, imperial); null when blank
-      toc:  (inputs[3] && inputs[3].value !== '') ? QP_UNITS.fromDisplay('depth', +inputs[3].value) : null,
+      toc:  (tocIn && tocIn.value !== '') ? QP_UNITS.fromDisplay('depth', +tocIn.value) : null,
+      // Drilled hole size (inches, manual); null when blank → consumers infer it
+      hole: holeV > 0 ? holeV : null,
       ...(spec ? {
         nomWt_ppf:  spec.nomWt_ppf,
         grade:      spec.grade,

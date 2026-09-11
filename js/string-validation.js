@@ -22,6 +22,12 @@ function _schValidate() {
     const top = +(row.top || 0);
     if (!od || od <= 0) return;
 
+    // Manual hole size must be larger than the casing OD it is drilled for
+    if (row.def !== 'Open Hole' && row.hole > 0 && row.hole <= od) {
+      warnings.push(`${row.size}" ${row.def}: hole size ${row.hole}" is not larger than the casing OD ${od}"`);
+      if (trList[idx]) trList[idx].style.outline = '2px solid #e05555';
+    }
+
     // Two independent checks:
     //
     // Check A — inner casing too large for its enclosing (larger-OD) casing:

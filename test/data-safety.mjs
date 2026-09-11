@@ -85,8 +85,9 @@ const res = await page.evaluate(async () => {
   out.rowsAfterOpens = (await dbGet(sc)).data.schematic.length;
 
   // 2+3) Edit one value, then rapid-fire saves — must stay serialized + full
-  const inputs = document.getElementById('schematicBody').rows[2].querySelectorAll('input[type=number]');
-  inputs[2].value = '5400';
+  // MD Bottom by its class — the row's number-input order changed when the Hole column was added
+  const botIn = document.getElementById('schematicBody').rows[2].querySelector('.sch-bot');
+  botIn.value = '5400';
   for (let i = 0; i < 6; i++) schematicSave();
   await new Promise(r => setTimeout(r, 1500));
   out.maxInFlight = maxInFlight;
@@ -127,8 +128,8 @@ const res = await page.evaluate(async () => {
 //    a reconnect banner — it must NOT log the user out into an empty app.
 await page.setOfflineMode(true);
 const off = await page.evaluate(async () => {
-  const inputs = document.getElementById('schematicBody').rows[2].querySelectorAll('input[type=number]');
-  inputs[2].value = '5500';
+  const botIn = document.getElementById('schematicBody').rows[2].querySelector('.sch-bot');
+  botIn.value = '5500';
   schematicSave();
   await new Promise(r => setTimeout(r, 600));
   hierarchyRefresh();                                    // failed tree fetch

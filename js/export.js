@@ -292,7 +292,7 @@ function exportSchematic() {
 
   const lines = [
     '# QuackPlan Well Schematic Export',
-    _row('Definition', 'OD (in)', 'ID (in)', 'Nom Wt (ppf)', 'Grade',
+    _row('Definition', 'OD (in)', 'ID (in)', 'Hole (in)', 'Nom Wt (ppf)', 'Grade',
          'MD Top (ft)', 'MD Bottom (ft)', 'TOC (ft)', 'TVD Shoe (ft)',
          'Length (ft)', 'Burst (psi)', 'Collapse (psi)'),
     ...rows.map(r => {
@@ -302,7 +302,7 @@ function exportSchematic() {
       const botMD  = +(r.bot || 0);
       const shoeTVD = survey.length ? Math.round(_tvdAt(survey, botMD)) : '';
       return _row(
-        r.def, od.toFixed(3), id.toFixed(3),
+        r.def, od.toFixed(3), id.toFixed(3), (r.hole > 0 ? (+r.hole).toFixed(3) : ''),
         r.nomWt_ppf || '', r.grade || '',
         topMD, botMD, (r.toc != null ? Math.round(+r.toc) : ''), shoeTVD,
         (botMD - topMD).toFixed(0),

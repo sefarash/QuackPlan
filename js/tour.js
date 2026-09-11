@@ -27,8 +27,8 @@ const QP_TOUR = (() => {
       const r = catalogueByOD(od).find(x => x[1] === wt && x[2] === grade);
       return r ? JSON.stringify(catalogueSpec(r)) : '';
     };
-    const casing = (def, od, size, wt, grade, top, bot, toc) => ({
-      def, size: String(size), top, bot, toc,
+    const casing = (def, od, size, wt, grade, top, bot, toc, hole) => ({
+      def, size: String(size), top, bot, toc, hole,
       od, odCustom: '', wt: String(wt), wtCustom: '', grade, gradeCustom: '',
       casingSpec: spec(od, wt, grade),
     });
@@ -36,10 +36,10 @@ const QP_TOUR = (() => {
       traj1: [st(0, 0, 0), st(1500, 0, 0), st(3000, 15, 45), st(5000, 35, 45), st(9000, 35, 45), st(11000, 35, 45)],
       trajOpt: 'opt1',
       schematic: [
-        casing('Conductor',           '20',     20,     94, 'K-55',  0,    300,  0),
-        casing('Surface Casing',      '13 3/8', 13.375, 68, 'L-80',  0,    2500, 0),
-        casing('Intermediate Casing', '9 5/8',  9.625,  47, 'P-110', 0,    7500, 4000),
-        { def: 'Open Hole', size: '8.5', top: 7500, bot: 11000, toc: '', od: '', odCustom: '', wt: '', wtCustom: '', grade: '', gradeCustom: '', casingSpec: '' },
+        casing('Conductor',           '20',     20,     94, 'K-55',  0,    300,  0,    26),
+        casing('Surface Casing',      '13 3/8', 13.375, 68, 'L-80',  0,    2500, 0,    17.5),
+        casing('Intermediate Casing', '9 5/8',  9.625,  47, 'P-110', 0,    7500, 4000, 12.25),
+        { def: 'Open Hole', size: '8.5', top: 7500, bot: 11000, toc: '', hole: '', od: '', odCustom: '', wt: '', wtCustom: '', grade: '', gradeCustom: '', casingSpec: '' },
       ],
       fluid: { mudType: 'WBM', model: 'HB', mudWeight: 10.2, pv: 18, yp: 14, gel10s: 6, gel10m: 12,
                tauY: 6, nHB: 0.72, kHB: 220, flowRate: 450, pumpEff: 92, rigSppLimit: 4000, nPL: 0, kPL: 0 },
@@ -148,7 +148,7 @@ const QP_TOUR = (() => {
     },
     {
       title: 'Well schematic',
-      text: 'Each row is a string: size, weight and grade from the catalogue, plus the <b>TOC</b>. The drawing on the right updates as you edit — watch the cement sheath from TOC to the shoe.',
+      text: 'Each row is a string: size, weight and grade from the catalogue, the <b>hole</b> it is run in, and the <b>TOC</b>. The drawing on the right updates as you edit — watch the cement sheath from TOC to the shoe.',
       target: ['#schematicTable', '#schematicCanvas'],
       before: async () => { inputTab('schematic'); await wait(200); },
     },

@@ -53,7 +53,21 @@ const res = await page.evaluate(async () => {
   const scData = (await dbGet(qpState.currentScenarioId)).data;
   out.sample = { traj1: scData.traj1?.length, strings: scData.schematic?.length,
                  specs: scData.schematic?.filter(r => r.casingSpec).length, bha: scData.bha?.length, ppfg: scData.ppfg?.length,
-                 trajOpt: scData.trajOpt, fluidModel: scData.fluid?.model };
+                 trajOpt: scData.trajOpt, fluidModel: scData.fluid?.model, holes: scData.schematic?.map(r => r.hole) };
+  // manual hole size: shown in the table, wins over the inferred size for cement sheath + phase hole,
+  // round-trips through save, and Open Hole rows have it disabled
+  {
+    const rowsDom = [...document.querySelectorAll('#schematicBody tr')];
+    const hIn = rowsDom.map(tr => tr.querySelector('.sch-hole'));
+    out.holeUI = { shown: hIn.map(i => i.value), ohDisabled: hIn[3].disabled, placeholderInferred: hIn[2].placeholder };
+    hIn[2].value = '12.5'; schematicSave(); await wait(600);
+    const rowsRead = _readSchematicRows();
+    out.holeUI.readHole = rowsRead[2].hole;
+    out.holeUI.cementOuter = _schCementSegments(rowsRead[2], rowsRead).map(s => s.outerDia);
+    out.holeUI.phaseHole = qpPhaseList().find(p => p.key === '7500')?.holeSize;
+    out.holeUI.stored = (await dbGet(qpState.currentScenarioId)).data.schematic[2].hole;
+    hIn[2].value = '12.25'; schematicSave(); await wait(400);
+  }
   out.step1 = { idx: QP_TOUR.step(), spot: vis('.tour-spot'), card: vis('.tour-card'),
                 cardText: document.querySelector('.tour-card .tour-title')?.textContent };
 
@@ -94,6 +108,11 @@ check('Start creates exactly one sample project and opens its scenario', res.sam
 check('sample well is complete (6 stations, 4 strings with 3 catalogue specs, 7 BHA rows, 5 PPFG rows, HB fluid)',
       res.sample.traj1 === 6 && res.sample.strings === 4 && res.sample.specs === 3 && res.sample.bha === 7 && res.sample.ppfg === 5 && res.sample.fluidModel === 'HB' && res.sample.trajOpt === 'opt1',
       JSON.stringify(res.sample));
+check('sample strings carry manual hole sizes', JSON.stringify(res.sample.holes) === JSON.stringify([26, 17.5, 12.25, '']), JSON.stringify(res.sample.holes));
+check('hole column: shown, Open Hole disabled, inferred placeholder, manual value wins (cement sheath, phase) and round-trips',
+      res.holeUI.shown.slice(0, 3).join(',') === '26,17.5,12.25' && res.holeUI.ohDisabled && res.holeUI.placeholderInferred === '12.25'
+      && res.holeUI.readHole === 12.5 && res.holeUI.cementOuter.every(d => d === 12.5) && res.holeUI.phaseHole === 12.5 && res.holeUI.stored === 12.5,
+      JSON.stringify(res.holeUI));
 check('step 1 shows spotlight + card', res.step1.idx === 0 && res.step1.spot && res.step1.card, res.step1.cardText);
 check('seven steps in order with their panels', res.steps.map(s => s.idx).join(',') === '0,1,2,3,4,5,6'
       && res.steps[1].inputTab === 'trajectory' && res.steps[2].inputTab === 'schematic' && res.steps[3].inputTab === 'bha'

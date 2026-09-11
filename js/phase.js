@@ -44,7 +44,7 @@ function qpPhaseList() {
   let prevShoe = 0;
   sorted.forEach((r, i) => {
     const isOH = r.def === 'Open Hole';
-    const hole = isOH ? +r.size : _qpHoleSizeFor(+r.size);
+    const hole = isOH ? +r.size : (r.hole > 0 ? +r.hole : _qpHoleSizeFor(+r.size));   // manual hole size wins
     phases.push({
       key:      String(+r.bot),
       label:    `Drilling ${_qpFmtIn(hole)}" hole` +
