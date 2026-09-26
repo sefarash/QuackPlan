@@ -10,7 +10,7 @@ const BHA_PRESETS = {
   'HWDP':        { od: 5.0,   id: 3.0,   wt: 1600 },
   'Drill Collar':{ od: 6.5,   id: 2.25,  wt: 2976 },
   'Drill Pipe':  { od: 5.0,   id: 4.276, wt: 710  },
-  'Casing':      { od: 9.625, id: 8.835, wt: 47   },
+  'Casing':      { od: 9.625, id: 8.835, wt: 1410 },   // total lbs like the rest: 47 ppf × 30 ft
 };
 
 const BHA_GRADES = ['S-135', 'G-105', 'X-95', 'E-75'];
@@ -560,10 +560,35 @@ function bhaSyncTopLength() {
   lenN.title = `Auto: depth ${Math.round(tdDisp).toLocaleString()} ${u} − other components ${Math.round(below).toLocaleString()} ${u}`;
 }
 
+// Casing rows: once a catalogue nominal weight (ppf) is picked, the Weight
+// column is that ppf × the row length — read-only, like the DP / HWDP catalogue
+// rows. (The casing cascade used to leave Weight at the preset, so a 16,000 ft
+// casing string weighed 47 lbs and the broomstick saw only the block.) Display
+// only, like bhaSyncTopLength: bhaSave stores it on the next edit.
+function _bhaSyncCasingWeights() {
+  for (const tr of document.getElementById('bhaBody').rows) {
+    if (tr.querySelector('.bha-type')?.value !== 'Casing') continue;
+    const wtN   = tr.querySelector('.bha-wt-n');
+    const nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);    // lb/ft
+    const odSel = tr.querySelector('.bha-cat-od')?.value;
+    if (!wtN) continue;
+    if (!nomWt || !odSel || odSel === 'custom') {                         // no catalogue weight → manual
+      if (wtN.readOnly) { wtN.readOnly = false; wtN.classList.remove('bha-wt-auto'); wtN.title = ''; }
+      continue;
+    }
+    const lenFt = QP_UNITS.fromDisplay('depth', +(tr.querySelector('.bha-len-n')?.value || 0));
+    wtN.value = +QP_UNITS.toDisplay('mass', nomWt * lenFt).toFixed(1);
+    wtN.readOnly = true;
+    wtN.classList.add('bha-wt-auto');
+    wtN.title = `Auto: ${nomWt} lb/ft × length`;
+  }
+}
+
 // ── Recalculate PPF and cumulative weight/length ────────────────────────────────
 
 function _bhaRecalc() {
   bhaSyncTopLength();
+  _bhaSyncCasingWeights();
   const rows = [...document.getElementById('bhaBody').rows];
 
   const data = rows.map(tr => {
