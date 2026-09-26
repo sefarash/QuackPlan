@@ -17,7 +17,7 @@ const _OC_IDS = [
   // Overpull
   'ovpBlock', 'ovpDPwt', 'ovpMW', 'ovpFFlo', 'ovpFFmid', 'ovpFFhi',
   // Broomstick
-  'bsBlock', 'bsDPwt', 'bsMW', 'bsFFlo', 'bsFFmid', 'bsFFhi', 'bsMaxHL',
+  'bsBlock', 'bsMW', 'bsFFlo', 'bsFFmid', 'bsFFhi', 'bsMaxHL',
   // Hydraulics
   'hydMWmin', 'hydMWslider', 'hydMWmax', 'hydFlowMin', 'hydFlowSlider', 'hydFlowMax',
   // Surge / Swab
@@ -43,7 +43,7 @@ const _OC_UNITS = {
   torqWOB: 'force', torqMaxTq: 'torque_k',
   buckWOB: 'force',
   ovpBlock: 'force', ovpDPwt: 'linwt', ovpMW: 'mw',
-  bsBlock: 'force',  bsDPwt: 'linwt',  bsMW: 'mw',  bsMaxHL: 'force',
+  bsBlock: 'force',  bsMW: 'mw',  bsMaxHL: 'force',
   // Surge / Swab trip speeds
   ssSpeedMin: 'speed', ssSpeedMax: 'speed',
   // Casing design cement slurry density
@@ -84,6 +84,7 @@ function _readOutputControls() {
 // Persist the current controls to the active scenario (debounced — the sliders
 // fire 'input' continuously during a drag).
 let _ocSaveTimer = null;
+let _ocLastLoaded = {};   // the scenario's stored outputControls, as loaded
 function saveOutputControls() {
   if (typeof qpState === 'undefined' || !qpState.currentScenarioId) return;
   if (typeof dbSaveScenarioData !== 'function') return;
@@ -91,7 +92,10 @@ function saveOutputControls() {
   _ocSaveTimer = setTimeout(() => {
     _ocSaveTimer = null;
     if (qpState.currentScenarioId) {
-      dbSaveScenarioData(qpState.currentScenarioId, 'outputControls', _readOutputControls());
+      // RULE #1: keys with no control any more (e.g. the removed broomstick
+      // bsDPwt) are carried forward from the loaded object, never dropped.
+      _ocLastLoaded = { ..._ocLastLoaded, ..._readOutputControls() };
+      dbSaveScenarioData(qpState.currentScenarioId, 'outputControls', _ocLastLoaded);
     }
   }, 200);
 }
@@ -157,6 +161,7 @@ function _ocRetuneSliders(fromSys, toSys) {
 // `vals` is reset to its HTML default. Sliders are set AFTER their ranges.
 function loadOutputControls(vals) {
   vals = vals || {};
+  _ocLastLoaded = { ...vals };
 
   _OC_IDS.forEach(id => {
     const el = document.getElementById(id);

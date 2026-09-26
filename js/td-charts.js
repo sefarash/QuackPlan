@@ -9,7 +9,7 @@ const CHART_PAD = { t: 62, b: 22, l: 70, r: 20 };
 const _TD_CONTROL_UNITS = {
   uTorqWOB: 'force', uTorqMaxTq: 'torque_k', uBuckWOB: 'force',
   uOvpBlock: 'force', uOvpDPwt: 'linwt', uOvpMW: 'mw',
-  uBsBlock: 'force', uBsDPwt: 'linwt', uBsMW: 'mw', uBsMaxHL: 'force',
+  uBsBlock: 'force', uBsMW: 'mw', uBsMaxHL: 'force',
 };
 
 // Phase-aware inputs for the chart engines: the survey truncated to the analysis
@@ -462,11 +462,9 @@ function drawBroomstick(r) {
   const uF  = QP_UNITS.label('force'), uD = QP_UNITS.label('depth'), uMW = QP_UNITS.label('mw');
 
   const _blkRaw = document.getElementById('bsBlock')?.value;
-  const _dpRaw  = document.getElementById('bsDPwt')?.value;
   const _mwRaw  = document.getElementById('bsMW')?.value;
   const _hlRaw  = document.getElementById('bsMaxHL')?.value;
   const blockWt = (_blkRaw==='' || _blkRaw==null) ? 35   : QP_UNITS.fromDisplay('force', +_blkRaw);  // klbf (canonical)
-  const dpWt  = (_dpRaw==='' || _dpRaw==null) ? 22.5 : QP_UNITS.fromDisplay('linwt', +_dpRaw);       // lb/ft
   const mw    = (_mwRaw==='' || _mwRaw==null) ? (_tdFluid().mudWeight || 10.0) : QP_UNITS.fromDisplay('mw', +_mwRaw); // ppg
   const maxHL = (_hlRaw==='' || _hlRaw==null) ? 0    : QP_UNITS.fromDisplay('force', +_hlRaw);       // rig hook-load limit, klbf (canonical)
   const ffLo  = +(document.getElementById('bsFFlo')?.value  || 0.20);
@@ -485,6 +483,10 @@ function drawBroomstick(r) {
   if (!_sv || _sv.length < 2) { _noData(ctx, W, H, 'Run Compute first'); return; }
   const maxMD = _sv[_sv.length - 1].md;
   const bha   = bhaGet();
+  // Drill pipe lb/ft from the Casing / BHA tab (the DP row's weight ÷ length);
+  // no DP row → undefined and the engine uses its table value for the DP OD.
+  const dpRow = bha.components.find(c => c.type === 'Drill Pipe' && c.lengthFt > 0 && c.weightLbs > 0);
+  const dpWt  = dpRow ? dpRow.weightLbs / dpRow.lengthFt : undefined;   // lb/ft
   // Bit depths: every survey station plus an even grid, so a coarse survey
   // still gives a smooth curve and a dense one keeps its kinks.
   const N_PTS = 60;
