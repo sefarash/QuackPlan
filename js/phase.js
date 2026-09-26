@@ -147,6 +147,25 @@ function qpSurveyForAnalysis() {
   return qpTruncateSurvey(survey, ph.mdLimit);
 }
 
+// Bit depth for the STRING outputs (Torque, Buckling, Overpull, Broomstick,
+// SPP / ECD, Surge / Swab): the BHA's max cumulative length — the sum of the
+// Casing / BHA rows, i.e. the bottom row's Cum Len — in ft (imperial). Usually
+// equal to qpPhaseTD() (the uppermost row fills to it), but an overridden
+// length moves the bit. 0 when there is no BHA.
+function qpStringTD() {
+  if (typeof bhaGet !== 'function') return 0;
+  return (bhaGet().components || []).reduce((s, c) => s + (+c.lengthFt || 0), 0);
+}
+
+// The survey down to the string's bit depth (capped at the trajectory TD — the
+// survey cannot be extended); no BHA → the phase survey.
+function qpSurveyForString() {
+  const survey = (typeof qpState !== 'undefined' && qpState.survey) || [];
+  const L = qpStringTD();
+  if (!(L > 0) || survey.length < 2) return qpSurveyForAnalysis();
+  return qpTruncateSurvey(survey, Math.min(L, survey[survey.length - 1].md));
+}
+
 // The fluid for the active phase: that section's row from the fluid program
 // over the well default. 'trajectory' mode (or no program) returns the well
 // default untouched.

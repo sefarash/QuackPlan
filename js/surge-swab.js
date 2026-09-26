@@ -66,7 +66,7 @@ function _ssStringSteps(bha) {
 
 function _ssGeom() {
   // Phase-aware: the active drilling stage's survey, fluid and hole configuration
-  const survey = (typeof qpSurveyForAnalysis === 'function') ? qpSurveyForAnalysis() : qpState.survey;
+  const survey = (typeof qpSurveyForString === 'function') ? qpSurveyForString() : qpState.survey;   // to the bit (BHA length)
   if (!survey || survey.length < 2) return null;
   const fluid   = (typeof qpPhaseFluid === 'function') ? qpPhaseFluid() : fluidGet();
   const bha     = bhaGet();

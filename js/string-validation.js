@@ -123,10 +123,13 @@ function _bhaValidate() {
   const bhaComps   = bhaGet().components;
   const schRows    = _readSchematicRows().filter(r => +(r.bot || 0) > 0);
   const survey     = qpState.survey || [];
-  // The bit sits at the analysis depth (phase.js) — the same depth the
-  // uppermost component's auto length is measured to.
-  const tdMD       = (typeof qpPhaseTD === 'function') ? qpPhaseTD()
-                   : (survey.length ? survey[survey.length - 1].md : 0);
+  // Casing-program depth (the uppermost component's auto length is measured to
+  // it) and the bit depth = the string's max cumulative length, capped at the
+  // trajectory TD — the depth the T&D / hydraulics / surge-swab outputs use.
+  const trajTD     = survey.length ? survey[survey.length - 1].md : 0;
+  const phaseTD    = (typeof qpPhaseTD === 'function') ? qpPhaseTD() : trajTD;
+  const strLen     = bhaComps.reduce((s, c) => s + (+c.lengthFt || 0), 0);
+  const tdMD       = strLen > 0 ? (trajTD > 0 ? Math.min(strLen, trajTD) : strLen) : phaseTD;
   const trList     = Array.from(body.rows);
   const warnings   = [];
 
@@ -170,13 +173,19 @@ function _bhaValidate() {
   });
 
   // The uppermost component's length is derived; flag when nothing is left for it.
-  if (bhaComps.length > 1 && tdMD > 0) {
+  const d = v => `${Math.round(QP_UNITS.toDisplay('depth', v)).toLocaleString()} ${QP_UNITS.label('depth')}`;
+  if (bhaComps.length > 1 && phaseTD > 0) {
     const below = bhaComps.slice(0, -1).reduce((s, c) => s + c.lengthFt, 0);
-    if (below > tdMD) {
-      const d = v => `${Math.round(QP_UNITS.toDisplay('depth', v)).toLocaleString()} ${QP_UNITS.label('depth')}`;
-      warnings.push(`Components below the ${bhaComps[bhaComps.length - 1].type} total ${d(below)} — longer than the depth ${d(tdMD)}`);
+    if (below > phaseTD) {
+      warnings.push(`Components below the ${bhaComps[bhaComps.length - 1].type} total ${d(below)} — longer than the depth ${d(phaseTD)}`);
       if (trList[trList.length - 1]) trList[trList.length - 1].style.outline = '2px solid #e05555';
     }
+  }
+  // The string outputs run to the string length, not the casing-program depth.
+  if (strLen > 0 && phaseTD > 0 && Math.abs(strLen - phaseTD) >= 1) {
+    warnings.push(trajTD > 0 && strLen > trajTD
+      ? `String length ${d(strLen)} is longer than the trajectory (${d(trajTD)}) — Torque, Buckling, Overpull, Broomstick, SPP / ECD and Surge / Swab stop at ${d(trajTD)}`
+      : `String length ${d(strLen)} ≠ casing program depth ${d(phaseTD)} — Torque, Buckling, Overpull, Broomstick, SPP / ECD and Surge / Swab put the bit at ${d(strLen)}`);
   }
 
   _renderWarnings(warnDiv, warnings);

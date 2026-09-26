@@ -14,8 +14,8 @@ const _TD_CONTROL_UNITS = {
 
 // Phase-aware inputs for the chart engines: the survey truncated to the analysis
 // TD (by default the bottom of the scenario's casing program) + that section's fluid.
-function _tdSurvey() {
-  return (typeof qpSurveyForAnalysis === 'function') ? qpSurveyForAnalysis() : qpState.survey;
+function _tdSurvey() {   // to the bit: the BHA's max cumulative length (phase.js)
+  return (typeof qpSurveyForString === 'function') ? qpSurveyForString() : qpState.survey;
 }
 function _tdFluid() {
   return (typeof qpPhaseFluid === 'function') ? qpPhaseFluid() : fluidGet();

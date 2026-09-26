@@ -13,8 +13,9 @@ async function qpCompute() {
   // Phase-aware inputs: the survey truncated to the analysis TD — by default
   // the bottom of the scenario's own casing program (phase.js 'auto'), else the
   // selected section or the full trajectory — and that section's fluid.
-  const survey = (typeof qpSurveyForAnalysis === 'function')
-    ? qpSurveyForAnalysis() : qpState.survey;
+  // T&D and hydraulics run to the bit: the BHA's max cumulative length.
+  const survey = (typeof qpSurveyForString === 'function')
+    ? qpSurveyForString() : qpState.survey;
   if (!survey || survey.length < 2) {
     setStatus('No trajectory — add stations first'); return;
   }
