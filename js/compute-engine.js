@@ -6,6 +6,10 @@
 let _qpComputeGen = 0;
 
 async function qpCompute() {
+  // The uppermost BHA component spans the analysis depth minus the rest of the
+  // string — refresh it (display only, no save) since the depth may have moved.
+  if (typeof _bhaRecalc === 'function') _bhaRecalc();
+
   // Phase-aware inputs: the survey truncated to the analysis TD — by default
   // the bottom of the scenario's own casing program (phase.js 'auto'), else the
   // selected section or the full trajectory — and that section's fluid.

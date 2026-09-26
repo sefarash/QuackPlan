@@ -507,9 +507,63 @@ function _bhaCasingGradeChanged(sel) {
   bhaSave();
 }
 
+// ── Uppermost component length = depth − the other components ─────────────────
+// Rows are bit-first, so the LAST row is the uppermost component (normally the
+// drill pipe). Its length is derived from the scenario's analysis depth
+// (qpPhaseTD — the bottom of its casing program) minus every other row, shown
+// read-only. Weight follows at constant PPF (catalogue DP: adjWt × length).
+// Never saves on its own: the loaders/qpCompute call it, and loads never write.
+
+function _bhaRowSetLength(tr, lenDisp) {
+  const lenN = tr.querySelector('.bha-len-n');
+  const wtN  = tr.querySelector('.bha-wt-n');
+  const oldLen = +(lenN.value || 0);
+  if (Math.abs(oldLen - lenDisp) < 0.005) return;
+  let spec = null;
+  if (tr.querySelector('.bha-type')?.value === 'Drill Pipe') {
+    const od    = tr.querySelector('.bha-cat-od')?.value;
+    const nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);
+    const grade = tr.querySelector('.bha-cat-grade')?.value;
+    const conn  = tr.querySelector('.bha-conn')?.value;
+    if (od && od !== 'custom' && nomWt && grade && conn) spec = dpSpecFull(od, nomWt, grade, conn);
+  }
+  if (wtN) {
+    if (spec) {
+      // spec.adjWt is lb/ft (imperial) — length to imperial ft first
+      wtN.value = +QP_UNITS.toDisplay('mass', spec.adjWt * QP_UNITS.fromDisplay('depth', lenDisp)).toFixed(1);
+    } else if (oldLen > 0) {
+      wtN.value = +(+(wtN.value || 0) * lenDisp / oldLen).toFixed(1);   // keep PPF
+    }
+  }
+  lenN.value = +lenDisp.toFixed(2);
+}
+
+function bhaSyncTopLength() {
+  const body = document.getElementById('bhaBody');
+  if (!body) return;
+  const rows = [...body.rows];
+  rows.forEach(tr => {                       // a row that is no longer on top is editable again
+    const lenN = tr.querySelector('.bha-len-n');
+    if (lenN && lenN.readOnly) { lenN.readOnly = false; lenN.classList.remove('bha-len-auto'); lenN.title = ''; }
+  });
+  const top = rows[rows.length - 1];
+  const tdFt = (typeof qpPhaseTD === 'function') ? qpPhaseTD() : 0;
+  if (!top || rows.length < 2 || !(tdFt > 0)) return;   // no depth yet → leave it manual
+
+  const tdDisp = QP_UNITS.toDisplay('depth', tdFt);
+  const below  = rows.slice(0, -1).reduce((s, tr) => s + +(tr.querySelector('.bha-len-n')?.value || 0), 0);
+  const lenN   = top.querySelector('.bha-len-n');
+  _bhaRowSetLength(top, Math.max(0, tdDisp - below));
+  lenN.readOnly = true;
+  lenN.classList.add('bha-len-auto');
+  const u = QP_UNITS.label('depth');
+  lenN.title = `Auto: depth ${Math.round(tdDisp).toLocaleString()} ${u} − other components ${Math.round(below).toLocaleString()} ${u}`;
+}
+
 // ── Recalculate PPF and cumulative weight/length ────────────────────────────────
 
 function _bhaRecalc() {
+  bhaSyncTopLength();
   const rows = [...document.getElementById('bhaBody').rows];
 
   const data = rows.map(tr => {

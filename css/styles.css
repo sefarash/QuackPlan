@@ -625,6 +625,9 @@ body.dark .scenario-banner.info { background: #16303f; color: var(--text); }
 .qp-table td.editable.na input,
 .qp-table td.editable.na select { color: var(--text-dim); opacity: .55; cursor: not-allowed; }
 
+/* BHA uppermost component: length derived from depth − the other components */
+.qp-table td input.bha-len-auto { color: var(--text-dim); font-style: italic; cursor: default; }
+
 .qp-table td.calc-cell {
   background: var(--bg-calc) !important;
   color: var(--text-dim);

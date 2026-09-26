@@ -123,7 +123,10 @@ function _bhaValidate() {
   const bhaComps   = bhaGet().components;
   const schRows    = _readSchematicRows().filter(r => +(r.bot || 0) > 0);
   const survey     = qpState.survey || [];
-  const tdMD       = survey.length ? survey[survey.length - 1].md : 0;
+  // The bit sits at the analysis depth (phase.js) — the same depth the
+  // uppermost component's auto length is measured to.
+  const tdMD       = (typeof qpPhaseTD === 'function') ? qpPhaseTD()
+                   : (survey.length ? survey[survey.length - 1].md : 0);
   const trList     = Array.from(body.rows);
   const warnings   = [];
 
@@ -165,6 +168,16 @@ function _bhaValidate() {
       if (trList[idx]) trList[idx].style.outline = '2px solid #e0a020';
     }
   });
+
+  // The uppermost component's length is derived; flag when nothing is left for it.
+  if (bhaComps.length > 1 && tdMD > 0) {
+    const below = bhaComps.slice(0, -1).reduce((s, c) => s + c.lengthFt, 0);
+    if (below > tdMD) {
+      const d = v => `${Math.round(QP_UNITS.toDisplay('depth', v)).toLocaleString()} ${QP_UNITS.label('depth')}`;
+      warnings.push(`Components below the ${bhaComps[bhaComps.length - 1].type} total ${d(below)} — longer than the depth ${d(tdMD)}`);
+      if (trList[trList.length - 1]) trList[trList.length - 1].style.outline = '2px solid #e05555';
+    }
+  }
 
   _renderWarnings(warnDiv, warnings);
 }
