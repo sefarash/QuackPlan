@@ -123,12 +123,15 @@ async function _importScenarioDoc(doc) {
         gl:          meta.gl  != null ? +meta.gl  : 0,
         seaBedDepth: meta.seaBedDepth != null ? +meta.seaBedDepth : 0,
       } });
-    const bhId   = await dbAdd({ parentId: wellId,  name: meta.borehole || 'Borehole',         type: 'borehole' });
+    // The trajectory belongs to the borehole (QP_TRAJ_KEYS) — it goes onto the
+    // NEW borehole created here, everything else onto the scenario.
+    const bhData = {}, data = {};
+    Object.entries(inp).forEach(([k, v]) => { (QP_TRAJ_KEYS.includes(k) ? bhData : data)[k] = v; });
+    const bhId   = await dbAdd({ parentId: wellId,  name: meta.borehole || 'Borehole',         type: 'borehole',
+      ...(Object.keys(bhData).length ? { data: bhData } : {}) });
 
     // Build the scenario's full data (inputs + output controls + casing ratings)
     // and create the scenario node in one shot.
-    const data = {};
-    Object.entries(inp).forEach(([k, v]) => { data[k] = v; });
     if (doc.outputControls && Object.keys(doc.outputControls).length) data.outputControls = doc.outputControls;
     if (doc.casingRatings  && Object.keys(doc.casingRatings).length)  data.cdRatings      = doc.casingRatings;
     const scId = await dbAdd({ parentId: bhId, name: meta.scenario || 'Scenario', type: 'scenario', data });

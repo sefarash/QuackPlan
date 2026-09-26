@@ -19,6 +19,7 @@ let qpState = {
   activeTrajOpt:   'opt1',
   trajSource:      'opt1',   // which option feeds qpState.survey (persisted as 'trajOpt')
   inherited:       {},       // borehole-level keys the open scenario is showing from its borehole
+  trajFrom:        null,     // open scenario's trajectory: 'borehole' | 'scenario' (legacy) | 'none'
   boreholeSchematic: [],     // the borehole's own casing program (read-only view while a scenario is open)
   currentWellId:      null,
   currentBoreholeId:  null,
@@ -137,14 +138,45 @@ function _qpHasData(v) {
   return true;
 }
 
-// Scenario data with the borehole's borehole-level keys filling the gaps.
-// Returns { data, inherited } — pure, so Compare / export can use it too.
+// The trajectory (Option 1, Option 2, survey source, tortuosity) is OWNED by the
+// borehole: it is edited only there, and once the borehole has one every
+// scenario under it computes with it — as one unit, so a borehole trajectory is
+// never mixed with a scenario's tortuosity. A legacy scenario's own stored copy
+// is left exactly as it was, just not read. Only while the borehole has NO
+// trajectory does such a scenario show its own (read-only; it can be copied up
+// to the borehole — trajPromoteToBorehole).
+const QP_TRAJ_KEYS = ['traj1', 'traj2', 'trajOpt', 'tort'];
+
+function qpBoreholeHasTraj(boreholeData) {
+  return _qpHasData(boreholeData?.traj1) || _qpHasData(boreholeData?.traj2);
+}
+
+// Scenario data with the borehole's borehole-level keys filling the gaps (and
+// the borehole trajectory replacing the scenario's, see above).
+// Returns { data, inherited, trajFrom } — pure, so Compare / export can use it too.
+// trajFrom: 'borehole' | 'scenario' (legacy copy, borehole has none) | 'none'.
 function qpMergeBoreholeData(scenarioData, boreholeData) {
   const data = { ...(scenarioData || {}) }, inherited = {};
+  let trajFrom = 'none';
+  if (qpBoreholeHasTraj(boreholeData)) {
+    trajFrom = 'borehole';
+    for (const k of QP_TRAJ_KEYS) {
+      if (boreholeData[k] !== undefined) data[k] = boreholeData[k]; else delete data[k];
+      inherited[k] = true;
+    }
+  } else if (qpBoreholeHasTraj(data)) {
+    trajFrom = 'scenario';
+  }
   for (const k of QP_BOREHOLE_KEYS) {
+    if (QP_TRAJ_KEYS.includes(k) && trajFrom !== 'none') continue;
     if (!_qpHasData(data[k]) && _qpHasData(boreholeData?.[k])) { data[k] = boreholeData[k]; inherited[k] = true; }
   }
-  return { data, inherited };
+  return { data, inherited, trajFrom };
+}
+
+// Trajectory tables are read-only while a scenario is open.
+function qpTrajLocked() {
+  return typeof qpState !== 'undefined' && !!qpState.currentScenarioId;
 }
 
 // Where a save of `key` goes: the open scenario, else the selected borehole
@@ -152,6 +184,7 @@ function qpMergeBoreholeData(scenarioData, boreholeData) {
 // was showing the borehole's copy turns it into the scenario's own copy.
 function qpSaveTarget(key) {
   if (qpState.currentScenarioId) {
+    if (QP_TRAJ_KEYS.includes(key)) return null;   // trajectory is edited at the borehole only
     // A save during a LOAD is dropped by dbSaveScenarioData (RULE #1), so it
     // must not count as the scenario taking its own copy either.
     if (qpState.inherited[key] && !qpState.loadingScenario) {

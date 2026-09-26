@@ -189,7 +189,7 @@ function _setCell(row, col, val) {
 
 function _traj1Save() {
   const tid = qpSaveTarget('traj1');
-  if (!tid) { setStatus('Select a borehole or scenario to save data'); return; }
+  if (!tid) { if (!qpTrajLocked()) setStatus('Select a borehole or scenario to save data'); return; }
   const rows = document.getElementById('traj1Body').rows;
   const data = [];
   for (const row of rows) {
@@ -273,6 +273,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function _trajSetSource(opt) {
   if (opt !== 'opt1' && opt !== 'opt2') return;
   if (typeof qpState === 'undefined' || qpState.loadingScenario) return;
+  // Scenario open: the tabs only VIEW the borehole trajectory — the survey
+  // source stays whatever the borehole chose.
+  if (typeof qpTrajLocked === 'function' && qpTrajLocked()) return;
   const changed = qpState.trajSource !== opt;
   qpState.trajSource = opt;
   const tid = changed ? qpSaveTarget('trajOpt') : null;

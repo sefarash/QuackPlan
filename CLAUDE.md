@@ -201,7 +201,15 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
   node (additive keys) and every scenario under it shows them (`qpMergeBoreholeData` fills a
   scenario's missing keys at load; `qpState.inherited` records which). A scenario's own stored keys
   always win (legacy scenarios have them all); editing one of these tables with a scenario open
-  saves into the scenario (`qpSaveTarget(key)`) — a fork, never a move. `_loadBorehole` shows the
+  saves into the scenario (`qpSaveTarget(key)`) — a fork, never a move.
+  **Exception — the trajectory is borehole-owned** (`QP_TRAJ_KEYS` = `traj1, traj2, trajOpt, tort`,
+  one unit): edited only at the borehole; inside a scenario the trajectory panel is read-only
+  (`qpApplyTrajLock`, `.traj-locked`, `#trajLockNote`), `qpSaveTarget` returns null for these keys
+  and `_trajSetSource` does nothing, and once the borehole has a trajectory every scenario (legacy
+  ones included) computes with it — a legacy scenario's own stored copy is left untouched, just
+  unread. Only while the borehole has none does a scenario show its own copy
+  (`qpState.trajFrom = 'scenario'`), which `trajPromoteToBorehole()` copies up (additive).
+  Import puts these keys on the new borehole. `_loadBorehole` shows the
   borehole's own data; scenario-only panels (BHA, fluid) stay gated. The info banner above the
   input panels says where the data is going. Tests: `npm run test:trajsafety` (borehole section).
   **Casing program placement** (`qpPlaceSchematicEditor`): the schematic editor `#schematicEditor`

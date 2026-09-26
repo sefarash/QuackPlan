@@ -150,7 +150,7 @@ const QP_TOUR = (() => {
     },
     {
       title: 'Trajectory',
-      text: 'Option 1 takes MD, inclination and azimuth; TVD and dog-leg fill in as you type. You can paste MD / Inc / Azi columns straight from Excel or import a WITSML file.',
+      text: 'The trajectory belongs to the <b>borehole</b>: inside a scenario it is shown read-only and every scenario computes with it. At the borehole, Option 1 takes MD, inclination and azimuth; TVD and dog-leg fill in as you type. You can paste MD / Inc / Azi columns straight from Excel or import a WITSML file.',
       target: '#traj1Table',
       before: async () => { inputTab('trajectory'); await wait(200); },
     },

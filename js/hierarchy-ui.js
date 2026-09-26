@@ -327,6 +327,49 @@ function schematicResetToBorehole() {
   qpUpdateDataBanner();
 }
 
+// ── Trajectory: edited at the borehole, read-only in a scenario ──────────────
+// Scenario open → every input / button in the three trajectory tables is
+// disabled (the Option 1 / Option 2 / Tortuosity tabs still switch the VIEW)
+// and a note says where the trajectory comes from. Only elements this function
+// disabled are re-enabled, so Option 2's per-mode disabled cells are untouched.
+function qpApplyTrajLock() {
+  const panel = document.getElementById('panel-trajectory');
+  if (!panel) return;
+  const locked = qpTrajLocked();
+  panel.classList.toggle('traj-locked', locked);
+  panel.querySelectorAll('#trajOpt1, #trajOpt2, #trajTort').forEach(sec => {
+    sec.querySelectorAll('input, select, button, textarea').forEach(el => {
+      if (locked && !el.disabled) { el.disabled = true; el.dataset.qpLock = '1'; }
+      else if (!locked && el.dataset.qpLock) { el.disabled = false; delete el.dataset.qpLock; }
+    });
+  });
+  const note = document.getElementById('trajLockNote');
+  if (!note) return;
+  note.hidden = !locked;
+  if (!locked) { note.innerHTML = ''; return; }
+  const src = qpState.trajFrom;
+  note.innerHTML = src === 'scenario'
+    ? '<span><strong>Read-only.</strong> The trajectory is edited at the borehole, which has none yet — this scenario shows its own earlier copy.</span>'
+      + '<button class="add-row-btn" onclick="trajPromoteToBorehole()">Use as the borehole trajectory</button>'
+    : `<span><strong>Read-only — from the borehole.</strong> ${src === 'borehole' ? 'Every scenario under it uses this trajectory.' : 'The borehole has no trajectory yet.'}</span>`
+      + '<button class="add-row-btn" onclick="hierarchyOpenBorehole()">Edit at the borehole</button>';
+}
+
+// Legacy scenario whose borehole has no trajectory: copy the scenario's own
+// trajectory keys up to the borehole. Additive only — keys the borehole already
+// has are never written, and the scenario's copy stays as it is.
+async function trajPromoteToBorehole() {
+  const sc = qpState.currentScenarioId, bh = qpState.currentBoreholeId;
+  if (!sc || !bh) return;
+  const [sn, bn] = await Promise.all([dbGet(sc), dbGet(bh)]);
+  if (qpBoreholeHasTraj(bn?.data)) { alert('The borehole already has a trajectory — reopening the scenario to show it.'); _loadScenario(sc); return; }
+  if (!confirm('Copy this scenario\'s trajectory to the borehole?\n\nEvery scenario under the borehole will then use it, including other scenarios that have their own older copy (their copies are kept, not deleted).')) return;
+  const writes = QP_TRAJ_KEYS.filter(k => _qpHasData(sn?.data?.[k]) && !_qpHasData(bn?.data?.[k]))
+    .map(k => dbSaveScenarioData(bh, k, sn.data[k]));
+  await Promise.all(writes);
+  _loadScenario(sc);
+}
+
 // Info strip above the input panels: where borehole-level data is going.
 function qpUpdateDataBanner() {
   _updateSchematicSlotNote();
@@ -344,10 +387,12 @@ function qpUpdateDataBanner() {
     if (btn) btn.hidden = false;
     return;
   }
-  const inh = [...new Set(Object.keys(qpState.inherited || {}).filter(k => qpState.inherited[k] && NAMES[k]).map(k => NAMES[k]))];
+  // Trajectory keys are not "shared until forked" any more — the trajectory
+  // panel carries its own read-only note (qpApplyTrajLock).
+  const inh = [...new Set(Object.keys(qpState.inherited || {}).filter(k => qpState.inherited[k] && NAMES[k] && !QP_TRAJ_KEYS.includes(k)).map(k => NAMES[k]))];
   if (hasScenario && inh.length) {
     banner.hidden = false; banner.classList.add('info');
-    if (text) text.innerHTML = `<strong>Shared from the borehole:</strong> ${inh.join(', ')}. Edit them at the borehole to change every scenario; editing here gives this scenario its own copy.`;
+    if (text) text.innerHTML = `<strong>Shared from the borehole:</strong> ${inh.join(', ')}. Edit them at the borehole to change every scenario; editing here gives this scenario its own copy. The trajectory is always the borehole's.`;
     if (btn) btn.hidden = true;
     return;
   }
@@ -367,6 +412,7 @@ function _loadBorehole(id) {
       ['traj1Body', 'traj2Body', 'tortBody', 'schematicBody', 'bhaBody', 'nozzleBody', 'mwdBody',
        'activityBody', 'servicesBody', 'casingCostBody', 'handoverBody'].forEach(i => { const el = document.getElementById(i); if (el) el.innerHTML = ''; });
       qpState.inherited = {};
+      qpState.trajFrom = null;
       qpState.boreholeSchematic = d.schematic || [];
       if (d.traj1 && d.traj1.length) trajLoadRows(d.traj1);
       else { traj1AddRow({ md: 0, inc: 0, azi: 0 }); traj1AddRow({ md: 5000, inc: 0, azi: 0 }); }
@@ -383,6 +429,7 @@ function _loadBorehole(id) {
       qpState.loadingScenario = false;
     }
     qpPlaceSchematicEditor();
+    qpApplyTrajLock();
     qpUpdateDataBanner();
     if (qpState.activeOutputTab && typeof redrawOutputPanel === 'function') redrawOutputPanel(qpState.activeOutputTab);
     setStatus('Borehole loaded');
@@ -402,6 +449,7 @@ function _loadScenario(id) {
     const merged = qpMergeBoreholeData(node.data, bh?.data);
     const d = merged.data;
     qpState.inherited = merged.inherited;
+    qpState.trajFrom  = merged.trajFrom;
     qpState.boreholeSchematic = (bh && bh.data && bh.data.schematic) || [];
 
     // RULE #1: the loaders below rebuild the tables via the same AddRow helpers
@@ -472,6 +520,7 @@ function _loadScenario(id) {
     localStorage.setItem('qp_lastScenarioId', id);
 
     qpPlaceSchematicEditor();
+    qpApplyTrajLock();
     qpUpdateDataBanner();
     setStatus('Scenario loaded');
   }).catch(err => {

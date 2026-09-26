@@ -625,6 +625,18 @@ body.dark .scenario-banner.info { background: #16303f; color: var(--text); }
 .qp-table td.editable.na input,
 .qp-table td.editable.na select { color: var(--text-dim); opacity: .55; cursor: not-allowed; }
 
+/* Trajectory at scenario level: read-only view of the borehole trajectory */
+.traj-lock-note { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 8px; padding: 6px 10px; border-radius: 4px;
+  background: var(--bg-calc); color: var(--text-dim); font-size: 12px; }
+.traj-lock-note[hidden] { display: none; }
+.traj-lock-note .add-row-btn { margin: 0; }
+#panel-trajectory.traj-locked .opt-panel .qp-table td,
+#panel-trajectory.traj-locked .opt-panel .qp-table td input,
+#panel-trajectory.traj-locked .opt-panel .qp-table td select { background: var(--bg-calc) !important; color: var(--text-dim); }
+#panel-trajectory.traj-locked .opt-panel .drag-handle { pointer-events: none; opacity: .35; }
+#panel-trajectory.traj-locked .opt-panel .add-row-btn { opacity: .45; pointer-events: none; }
+
 /* BHA uppermost component: length derived from depth − the other components */
 .qp-table td input.bha-len-auto { color: var(--text-dim); font-style: italic; cursor: default; }
 
