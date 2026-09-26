@@ -21,6 +21,73 @@ const BHA_GRADES = ['S-135', 'G-105', 'X-95', 'E-75'];
 // catGrade = grade string for DP, ID string for DC, "conv"/"spiral" for HWDP
 // catConn  = connection string for DP/HWDP catalogue selects
 
+// Nom. Wt cell: <select> of catalogue weights + Custom… (reveals a number
+// input) + the hidden effective value .bha-cat-nomwt that everything reads.
+function _bhaNomWtOptions(weights, selected) {
+  return `<option value="">Wt…</option>` +
+    weights.map(w => `<option value="${w}"${selected != null && w == selected ? ' selected' : ''}>${w} ppf</option>`).join('') +
+    `<option value="custom"${selected === 'custom' ? ' selected' : ''}>Custom…</option>`;
+}
+
+function _bhaNomWtCellHTML(weights, catNomWt, SS) {
+  const has      = catNomWt !== '' && catNomWt != null;
+  const isCustom = has && !weights.some(w => w == catNomWt);
+  const safe     = has ? String(catNomWt).replace(/"/g, '&quot;') : '';
+  return `<select class="bha-nomwt-sel" ${SS} onchange="_bhaNomWtSelChanged(this)">
+      ${_bhaNomWtOptions(weights, isCustom ? 'custom' : (has ? catNomWt : null))}</select>
+    <input class="bha-nomwt-custom" type="number" step="0.1" min="0" placeholder="lb/ft"
+      value="${isCustom ? safe : ''}"
+      style="${isCustom ? '' : 'display:none;'}width:100%;font-size:10px;margin-top:2px;box-sizing:border-box"
+      onchange="_bhaNomWtCustomInput(this)">
+    <input class="bha-cat-nomwt" type="hidden" value="${safe}">`;
+}
+
+// Reset the Nom. Wt cell to a new catalogue list (OD changed).
+function _bhaNomWtReset(tr, weights) {
+  const sel = tr.querySelector('.bha-nomwt-sel');
+  const cus = tr.querySelector('.bha-nomwt-custom');
+  const hid = tr.querySelector('.bha-cat-nomwt');
+  if (sel) { sel.innerHTML = _bhaNomWtOptions(weights, null); sel.value = ''; }
+  if (cus) { cus.value = ''; cus.style.display = 'none'; }
+  if (hid) hid.value = '';
+}
+
+// Dropdown or custom input changed → update the hidden value, run the
+// per-type cascade (Grade / Connection) with it.
+function _bhaNomWtSelChanged(sel) {
+  const tr  = sel.closest('tr');
+  const cus = tr.querySelector('.bha-nomwt-custom');
+  const hid = tr.querySelector('.bha-cat-nomwt');
+  if (sel.value === 'custom') {
+    if (cus) { cus.style.display = ''; cus.focus(); }
+    hid.value = cus?.value || '';
+  } else {
+    if (cus) { cus.style.display = 'none'; cus.value = ''; }
+    hid.value = sel.value;
+  }
+  _bhaNomWtCascade(hid);
+}
+
+function _bhaNomWtCustomInput(inp) {
+  const hid = inp.closest('tr').querySelector('.bha-cat-nomwt');
+  hid.value = (inp.value !== '' && +inp.value > 0) ? String(+inp.value) : '';
+  _bhaNomWtCascade(hid);
+}
+
+function _bhaNomWtCascade(hid) {
+  const type = hid.closest('tr').querySelector('.bha-type')?.value;
+  if (type === 'Drill Pipe') _bhaDPNomWtChanged(hid);
+  else if (type === 'Casing') _bhaCasingNomWtChanged(hid);
+  else bhaSave();
+}
+
+// DP grades for OD + nominal weight; a custom (non-catalogue) weight offers the
+// generic grades so the tensile yield can still be chosen.
+function _bhaDPGrades(od, nomWt) {
+  const g = (od && od !== 'custom' && nomWt) ? dpGradesByODWt(od, nomWt) : [];
+  return g.length ? g : (nomWt ? BHA_GRADES : []);
+}
+
 function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
                          catOD, catGrade, catConn, catNomWt) {
   const p    = BHA_PRESETS[comp] || BHA_PRESETS['Drill Collar'];
@@ -100,21 +167,14 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
   }
 
   // ── Nom. Weight column (DP and Casing) ────────────────────────────────────
+  // Catalogue weights for the OD, or Custom… to type any lb/ft. The effective
+  // value lives in the hidden .bha-cat-nomwt (stored as catNomWt, as before).
   let nomWtCell;
   if (isDP) {
-    const nomWts = (catOD && catOD !== 'custom') ? dpNomWtsByOD(catOD) : [];
-    const nomWtOpts = nomWts.map(w =>
-      `<option value="${w}"${w == catNomWt ? ' selected' : ''}>${w} ppf</option>`).join('');
-    nomWtCell = `<select class="bha-cat-nomwt" ${SS} onchange="_bhaDPNomWtChanged(this)">
-        <option value="">Wt…</option>${nomWtOpts}</select>`;
+    nomWtCell = _bhaNomWtCellHTML((catOD && catOD !== 'custom') ? dpNomWtsByOD(catOD) : [], catNomWt, SS);
   } else if (isCasing) {
-    const wts = (catOD && catOD !== 'custom')
-      ? [...new Set(catalogueByOD(catOD).map(r => r[1]))]
-      : [];
-    const wtOpts = wts.map(w =>
-      `<option value="${w}"${w == catNomWt ? ' selected' : ''}>${w} ppf</option>`).join('');
-    nomWtCell = `<select class="bha-cat-nomwt" ${SS} onchange="_bhaCasingNomWtChanged(this)">
-        <option value="">Wt…</option>${wtOpts}</select>`;
+    nomWtCell = _bhaNomWtCellHTML((catOD && catOD !== 'custom')
+      ? [...new Set(catalogueByOD(catOD).map(r => r[1]))] : [], catNomWt, SS);
   } else {
     nomWtCell = ``;
   }
@@ -123,7 +183,7 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
   let gradeCell;
   if (isDP) {
     const grOpts = (catOD && catNomWt)
-      ? dpGradesByODWt(catOD, +catNomWt).map(g =>
+      ? _bhaDPGrades(catOD, +catNomWt).map(g =>
           `<option value="${g}"${g === catGrade ? ' selected' : ''}>${g}</option>`).join('')
       : '';
     gradeCell = `<select class="bha-cat-grade" ${SS} onchange="_bhaDPGradeChanged(this)">
@@ -225,11 +285,10 @@ function _bhaDPODChanged(sel) {
   const od        = sel.value;
   const odN       = tr.querySelector('.bha-od-n');
   const odCustom  = tr.querySelector('.bha-od-custom');
-  const nomWtSel  = tr.querySelector('.bha-cat-nomwt');
 
   if (od === 'custom') {
     if (odCustom) { odCustom.style.display = ''; odCustom.focus(); }
-    if (nomWtSel) nomWtSel.style.display = 'none';
+    _bhaNomWtReset(tr, []);                          // Custom… only
     const grSel = tr.querySelector('.bha-cat-grade');
     if (grSel) { grSel.innerHTML = '<option value="">Grade…</option>'; grSel.value = ''; }
     const connSel = tr.querySelector('.bha-cat-conn');
@@ -241,13 +300,7 @@ function _bhaDPODChanged(sel) {
   if (odCustom) odCustom.style.display = 'none';
   if (odN) odN.value = od ? _bhaFracToDecimal(od) : '';
 
-  if (nomWtSel) {
-    const nomWts = od ? dpNomWtsByOD(od) : [];
-    nomWtSel.innerHTML = `<option value="">Wt…</option>` +
-      nomWts.map(w => `<option value="${w}">${w} ppf</option>`).join('');
-    nomWtSel.value = '';
-    nomWtSel.style.display = od ? '' : 'none';
-  }
+  _bhaNomWtReset(tr, od ? dpNomWtsByOD(od) : []);
 
   const grSel = tr.querySelector('.bha-cat-grade');
   if (grSel) { grSel.innerHTML = '<option value="">Grade…</option>'; grSel.value = ''; }
@@ -263,7 +316,7 @@ function _bhaDPNomWtChanged(sel) {
   const nomWt   = +sel.value;
   const grSel   = tr.querySelector('.bha-cat-grade');
   if (grSel) {
-    const grades = (od && nomWt) ? dpGradesByODWt(od, nomWt) : [];
+    const grades = _bhaDPGrades(od, nomWt);
     grSel.innerHTML = `<option value="">Grade…</option>` +
       grades.map(g => `<option value="${g}">${g}</option>`).join('');
     grSel.value = '';
@@ -460,19 +513,16 @@ function _bhaCasingODChanged(sel) {
   const od       = sel.value;
   const custom   = tr.querySelector('.bha-od-custom');
   const odN      = tr.querySelector('.bha-od-n');
-  const nomWtSel = tr.querySelector('.bha-cat-nomwt');
   const grSel    = tr.querySelector('.bha-cat-grade');
 
   if (od === 'custom') {
     if (custom) custom.style.display = '';
-    if (nomWtSel) nomWtSel.innerHTML = '<option value="">Wt…</option>';
+    _bhaNomWtReset(tr, []);                          // Custom… only
     if (grSel)   grSel.innerHTML    = '<option value="">Grade…</option>';
   } else {
     if (custom) { custom.style.display = 'none'; custom.value = ''; }
     if (odN)    odN.value = od ? _bhaFracToDecimal(od) : '';
-    const wts = od ? [...new Set(catalogueByOD(od).map(r => r[1]))] : [];
-    if (nomWtSel) nomWtSel.innerHTML = '<option value="">Wt…</option>' +
-      wts.map(w => `<option value="${w}">${w} ppf</option>`).join('');
+    _bhaNomWtReset(tr, od ? [...new Set(catalogueByOD(od).map(r => r[1]))] : []);
     if (grSel)   grSel.innerHTML = '<option value="">Grade…</option>';
   }
   bhaSave();
@@ -560,27 +610,35 @@ function bhaSyncTopLength() {
   lenN.title = `Auto: depth ${Math.round(tdDisp).toLocaleString()} ${u} − other components ${Math.round(below).toLocaleString()} ${u}`;
 }
 
-// Casing rows: once a catalogue nominal weight (ppf) is picked, the Weight
-// column is that ppf × the row length — read-only, like the DP / HWDP catalogue
-// rows. (The casing cascade used to leave Weight at the preset, so a 16,000 ft
-// casing string weighed 47 lbs and the broomstick saw only the block.) Display
-// only, like bhaSyncTopLength: bhaSave stores it on the next edit.
-function _bhaSyncCasingWeights() {
+// Drill Pipe / Casing rows with a nominal weight (catalogue or Custom…): the
+// Weight column (total lbs) is derived and read-only — catalogue DP with Grade
+// + Connection: adjusted weight (tool joints included) × length, else nominal
+// lb/ft × length. (Without this a 16,000 ft string kept its 30 ft preset weight
+// and the T&D / broomstick saw almost no string.) Display only, like
+// bhaSyncTopLength: bhaSave stores it on the next edit.
+function _bhaSyncNomWeights() {
   for (const tr of document.getElementById('bhaBody').rows) {
-    if (tr.querySelector('.bha-type')?.value !== 'Casing') continue;
+    const type = tr.querySelector('.bha-type')?.value;
+    if (type !== 'Drill Pipe' && type !== 'Casing') continue;
     const wtN   = tr.querySelector('.bha-wt-n');
     const nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);    // lb/ft
-    const odSel = tr.querySelector('.bha-cat-od')?.value;
     if (!wtN) continue;
-    if (!nomWt || !odSel || odSel === 'custom') {                         // no catalogue weight → manual
+    if (!(nomWt > 0)) {                                                   // no nominal weight → manual
       if (wtN.readOnly) { wtN.readOnly = false; wtN.classList.remove('bha-wt-auto'); wtN.title = ''; }
       continue;
     }
+    let ppf = nomWt, how = `${nomWt} lb/ft nominal`;
+    if (type === 'Drill Pipe') {
+      const od = tr.querySelector('.bha-cat-od')?.value, grade = tr.querySelector('.bha-cat-grade')?.value;
+      const conn = tr.querySelector('.bha-conn')?.value;
+      const spec = (od && od !== 'custom' && grade && conn) ? dpSpecFull(od, nomWt, grade, conn) : null;
+      if (spec && spec.adjWt > 0) { ppf = spec.adjWt; how = `${spec.adjWt} lb/ft adjusted (tool joints)`; }
+    }
     const lenFt = QP_UNITS.fromDisplay('depth', +(tr.querySelector('.bha-len-n')?.value || 0));
-    wtN.value = +QP_UNITS.toDisplay('mass', nomWt * lenFt).toFixed(1);
+    wtN.value = +QP_UNITS.toDisplay('mass', ppf * lenFt).toFixed(1);
     wtN.readOnly = true;
     wtN.classList.add('bha-wt-auto');
-    wtN.title = `Auto: ${nomWt} lb/ft × length`;
+    wtN.title = `Auto: ${how} × length`;
   }
 }
 
@@ -588,7 +646,7 @@ function _bhaSyncCasingWeights() {
 
 function _bhaRecalc() {
   bhaSyncTopLength();
-  _bhaSyncCasingWeights();
+  _bhaSyncNomWeights();
   const rows = [...document.getElementById('bhaBody').rows];
 
   const data = rows.map(tr => {
