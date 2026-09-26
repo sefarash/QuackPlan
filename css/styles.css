@@ -646,8 +646,12 @@ body.dark .scenario-banner.info { background: #16303f; color: var(--text); }
 #panel-trajectory.traj-locked .opt-panel .add-row-btn { opacity: .45; pointer-events: none; }
 
 /* BHA uppermost component: length derived from depth − the other components */
+/* Auto-calculated BHA cells: italic grey, still editable (typing overrides) */
 .qp-table td input.bha-len-auto,
-.qp-table td input.bha-wt-auto { color: var(--text-dim); font-style: italic; cursor: default; }
+.qp-table td input.bha-wt-auto { color: var(--text-dim); font-style: italic; }
+/* A user override of an auto-calculated cell */
+.qp-table td input.bha-len-n[data-ovr],
+.qp-table td input.bha-wt-n[data-ovr] { font-weight: 600; box-shadow: inset 3px 0 0 #e0a020; }
 
 .qp-table td.calc-cell {
   background: var(--bg-calc) !important;

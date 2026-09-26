@@ -75,6 +75,7 @@ function _bhaNomWtCustomInput(inp) {
 }
 
 function _bhaNomWtCascade(hid) {
+  _bhaWtResetAuto(hid.closest('tr'));
   const type = hid.closest('tr').querySelector('.bha-type')?.value;
   if (type === 'Drill Pipe') _bhaDPNomWtChanged(hid);
   else if (type === 'Casing') _bhaCasingNomWtChanged(hid);
@@ -251,7 +252,7 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
     <td class="editable">${gradeCell}</td>
     <td class="editable">${connCell}</td>
     <td class="editable"><input class="bha-id-n" type="number" step="0.125" value="${_id}" onchange="bhaSave()"></td>
-    <td class="editable"><input class="bha-wt-n" type="number" step="1"     value="${+QP_UNITS.toDisplay('mass', _wt).toFixed(1)}" onchange="bhaSave()"></td>
+    <td class="editable"><input class="bha-wt-n" type="number" step="1"     value="${+QP_UNITS.toDisplay('mass', _wt).toFixed(1)}" onchange="_bhaWtChanged(this)"></td>
     <td class="editable"><input class="bha-len-n" type="number" step="1"    value="${+QP_UNITS.toDisplay('depth', _len).toFixed(2)}" onchange="_bhaLenChanged(this)"></td>
     <td class="calc-cell" data-col="ppf">—</td>
     <td class="calc-cell" data-col="cumwt">—</td>
@@ -369,27 +370,34 @@ function _bhaDPConnChanged(sel) {
     wtN.value = +QP_UNITS.toDisplay('mass', spec.adjWt * lenFt).toFixed(1);
   }
   if (connH) connH.value = spec.conn;
+  _bhaWtResetAuto(tr);
   bhaSave();
 }
 
-// Length changed — for DP rows, recalculate total weight to stay in sync
+// Auto-calculated fields (the uppermost component's Length, catalogue rows'
+// Weight) stay editable: typing a value OVERRIDES the calculation for that
+// cell (data-ovr, stored as the additive row keys lenOvr / wtOvr); clearing
+// the cell hands it back to the calculation.
+function _bhaMarkOverride(inp, autoCls) {
+  if (inp.value === '') delete inp.dataset.ovr;
+  else if (inp.classList.contains(autoCls) || inp.dataset.ovr) inp.dataset.ovr = '1';
+}
+
+// Length changed → override check; catalogue weights follow in _bhaRecalc
 function _bhaLenChanged(inp) {
-  const tr   = inp.closest('tr');
-  const type = tr.querySelector('.bha-type')?.value;
-  if (type === 'Drill Pipe') {
-    const od    = tr.querySelector('.bha-cat-od')?.value;
-    const nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);
-    const grade = tr.querySelector('.bha-cat-grade')?.value;
-    const conn  = tr.querySelector('.bha-conn')?.value;
-    if (od && od !== 'custom' && nomWt && grade && conn) {
-      const spec  = dpSpecFull(od, nomWt, grade, conn);
-      const wtN   = tr.querySelector('.bha-wt-n');
-      const lenFt = QP_UNITS.fromDisplay('depth', +(inp.value || 0));   // display → imperial ft
-      // spec.adjWt is lb/ft (imperial); total lbs → display mass for the field
-      if (spec && wtN && lenFt > 0) wtN.value = +QP_UNITS.toDisplay('mass', spec.adjWt * lenFt).toFixed(1);
-    }
-  }
+  _bhaMarkOverride(inp, 'bha-len-auto');
   bhaSave();
+}
+
+function _bhaWtChanged(inp) {
+  _bhaMarkOverride(inp, 'bha-wt-auto');
+  bhaSave();
+}
+
+// Picking a new catalogue item hands the row's Weight back to the calculation
+function _bhaWtResetAuto(tr) {
+  const wtN = tr.querySelector('.bha-wt-n');
+  if (wtN) delete wtN.dataset.ovr;
 }
 
 // Drill Collar — OD chosen → repopulate Grade/ID select, clear conn
@@ -437,7 +445,7 @@ function _bhaDCIDChanged(sel) {
   const wtN    = tr.querySelector('.bha-wt-n');
   const connEl = tr.querySelector('.bha-conn');
   if (idN)    idN.value    = spec.id_in;
-  if (wtN)    wtN.value    = Math.round(spec.unitWt * (+(lenN?.value || 30)));
+  _bhaWtResetAuto(tr);                       // Weight = unitWt × length (_bhaSyncCatalogueWeights)
   if (connEl) connEl.value = spec.conn;
   bhaSave();
 }
@@ -501,7 +509,7 @@ function _bhaHWDPConnChanged(sel) {
   const connH = tr.querySelector('.bha-conn');
   if (odN)   odN.value   = spec.od_in;
   if (idN)   idN.value   = spec.id_in;
-  if (wtN)   wtN.value   = Math.round(spec.pf * (+(lenN?.value || 30)));
+  _bhaWtResetAuto(tr);                       // Weight = pf × length (_bhaSyncCatalogueWeights)
   if (connH) connH.value = spec.conn;
   bhaSave();
 }
@@ -592,53 +600,88 @@ function bhaSyncTopLength() {
   const body = document.getElementById('bhaBody');
   if (!body) return;
   const rows = [...body.rows];
-  rows.forEach(tr => {                       // a row that is no longer on top is editable again
+  const top  = rows[rows.length - 1];
+  rows.forEach(tr => {                       // a row that is no longer on top is plain manual again
+    if (tr === top) return;
     const lenN = tr.querySelector('.bha-len-n');
-    if (lenN && lenN.readOnly) { lenN.readOnly = false; lenN.classList.remove('bha-len-auto'); lenN.title = ''; }
+    if (lenN) { lenN.classList.remove('bha-len-auto'); delete lenN.dataset.ovr; lenN.title = ''; }
   });
-  const top = rows[rows.length - 1];
   const tdFt = (typeof qpPhaseTD === 'function') ? qpPhaseTD() : 0;
-  if (!top || rows.length < 2 || !(tdFt > 0)) return;   // no depth yet → leave it manual
-
+  if (!top) return;
+  const lenN = top.querySelector('.bha-len-n');
+  if (rows.length < 2 || !(tdFt > 0)) {      // no depth yet → leave it manual
+    lenN.classList.remove('bha-len-auto'); lenN.title = ''; return;
+  }
+  const u      = QP_UNITS.label('depth');
   const tdDisp = QP_UNITS.toDisplay('depth', tdFt);
   const below  = rows.slice(0, -1).reduce((s, tr) => s + +(tr.querySelector('.bha-len-n')?.value || 0), 0);
-  const lenN   = top.querySelector('.bha-len-n');
+  const calc   = `depth ${Math.round(tdDisp).toLocaleString()} ${u} − other components ${Math.round(below).toLocaleString()} ${u}`;
+  if (lenN.dataset.ovr) {
+    lenN.classList.remove('bha-len-auto');
+    lenN.title = `Overridden (calculated: ${calc} = ${Math.round(Math.max(0, tdDisp - below)).toLocaleString()} ${u}) — clear the cell to recalculate`;
+    return;
+  }
   _bhaRowSetLength(top, Math.max(0, tdDisp - below));
-  lenN.readOnly = true;
   lenN.classList.add('bha-len-auto');
-  const u = QP_UNITS.label('depth');
-  lenN.title = `Auto: depth ${Math.round(tdDisp).toLocaleString()} ${u} − other components ${Math.round(below).toLocaleString()} ${u}`;
+  lenN.title = `Auto: ${calc} — type a value to override`;
 }
 
-// Drill Pipe / Casing rows with a nominal weight (catalogue or Custom…): the
-// Weight column (total lbs) is derived and read-only — catalogue DP with Grade
-// + Connection: adjusted weight (tool joints included) × length, else nominal
-// lb/ft × length. (Without this a 16,000 ft string kept its 30 ft preset weight
-// and the T&D / broomstick saw almost no string.) Display only, like
-// bhaSyncTopLength: bhaSave stores it on the next edit.
-function _bhaSyncNomWeights() {
+// Catalogue lb/ft for a row, or null (non-catalogue rows keep a manual Weight):
+//   Drill Pipe  nominal weight (catalogue or Custom…); with Grade + Connection
+//               the adjusted weight (tool joints included)
+//   Casing      nominal weight
+//   Drill Collar catalogue OD + bore → unit weight
+//   HWDP        catalogue nominal + type + connection → pf
+function _bhaRowCataloguePPF(tr) {
+  const type = tr.querySelector('.bha-type')?.value;
+  const od   = tr.querySelector('.bha-cat-od')?.value;
+  const cat  = od && od !== 'custom';
+  if (type === 'Drill Pipe' || type === 'Casing') {
+    const nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);
+    if (!(nomWt > 0)) return null;
+    if (type === 'Drill Pipe' && cat) {
+      const grade = tr.querySelector('.bha-cat-grade')?.value, conn = tr.querySelector('.bha-conn')?.value;
+      const spec  = (grade && conn) ? dpSpecFull(od, nomWt, grade, conn) : null;
+      if (spec && spec.adjWt > 0) return { ppf: spec.adjWt, how: `${spec.adjWt} lb/ft adjusted (tool joints)` };
+    }
+    return { ppf: nomWt, how: `${nomWt} lb/ft nominal` };
+  }
+  if (type === 'Drill Collar' && cat) {
+    const bore = tr.querySelector('.bha-cat-grade')?.value;
+    const spec = bore ? dcSpec(od, bore) : null;
+    return spec && spec.unitWt > 0 ? { ppf: spec.unitWt, how: `${spec.unitWt} lb/ft catalogue` } : null;
+  }
+  if (type === 'HWDP' && cat) {
+    const hwType = tr.querySelector('.bha-cat-grade')?.value || 'conv';
+    const conn   = tr.querySelector('.bha-cat-conn')?.value;
+    const spec   = conn ? hwdpSpec(hwType, od, conn) : null;
+    return spec && spec.pf > 0 ? { ppf: spec.pf, how: `${spec.pf} lb/ft catalogue` } : null;
+  }
+  return null;
+}
+
+// Catalogue rows: Weight (total) = catalogue lb/ft × length, recalculated as
+// the length changes (it used to be written once at selection — in display
+// units, so metric rows were wrong — and never followed the length). The cell
+// stays editable: a typed value overrides it (data-ovr), clearing it hands it
+// back. Display only, like bhaSyncTopLength: bhaSave stores it on the next edit.
+function _bhaSyncCatalogueWeights() {
   for (const tr of document.getElementById('bhaBody').rows) {
-    const type = tr.querySelector('.bha-type')?.value;
-    if (type !== 'Drill Pipe' && type !== 'Casing') continue;
-    const wtN   = tr.querySelector('.bha-wt-n');
-    const nomWt = +(tr.querySelector('.bha-cat-nomwt')?.value || 0);    // lb/ft
+    const wtN = tr.querySelector('.bha-wt-n');
     if (!wtN) continue;
-    if (!(nomWt > 0)) {                                                   // no nominal weight → manual
-      if (wtN.readOnly) { wtN.readOnly = false; wtN.classList.remove('bha-wt-auto'); wtN.title = ''; }
+    const c = _bhaRowCataloguePPF(tr);
+    if (!c) { wtN.classList.remove('bha-wt-auto'); delete wtN.dataset.ovr; wtN.title = ''; continue; }
+    const lenFt = QP_UNITS.fromDisplay('depth', +(tr.querySelector('.bha-len-n')?.value || 0));
+    const calc  = +QP_UNITS.toDisplay('mass', c.ppf * lenFt).toFixed(1);
+    const uM    = QP_UNITS.label('mass');
+    if (wtN.dataset.ovr) {
+      wtN.classList.remove('bha-wt-auto');
+      wtN.title = `Overridden (calculated: ${c.how} × length = ${calc.toLocaleString()} ${uM}) — clear the cell to recalculate`;
       continue;
     }
-    let ppf = nomWt, how = `${nomWt} lb/ft nominal`;
-    if (type === 'Drill Pipe') {
-      const od = tr.querySelector('.bha-cat-od')?.value, grade = tr.querySelector('.bha-cat-grade')?.value;
-      const conn = tr.querySelector('.bha-conn')?.value;
-      const spec = (od && od !== 'custom' && grade && conn) ? dpSpecFull(od, nomWt, grade, conn) : null;
-      if (spec && spec.adjWt > 0) { ppf = spec.adjWt; how = `${spec.adjWt} lb/ft adjusted (tool joints)`; }
-    }
-    const lenFt = QP_UNITS.fromDisplay('depth', +(tr.querySelector('.bha-len-n')?.value || 0));
-    wtN.value = +QP_UNITS.toDisplay('mass', ppf * lenFt).toFixed(1);
-    wtN.readOnly = true;
+    wtN.value = calc;
     wtN.classList.add('bha-wt-auto');
-    wtN.title = `Auto: ${how} × length`;
+    wtN.title = `Auto: ${c.how} × length — type a value to override`;
   }
 }
 
@@ -646,7 +689,7 @@ function _bhaSyncNomWeights() {
 
 function _bhaRecalc() {
   bhaSyncTopLength();
-  _bhaSyncNomWeights();
+  _bhaSyncCatalogueWeights();
   const rows = [...document.getElementById('bhaBody').rows];
 
   const data = rows.map(tr => {
@@ -716,6 +759,8 @@ function bhaLoadState(data) {
       row.grade, row.conn,
       row.catOD, row.catGrade, row.catConn, row.catNomWt
     );
+    if (row.lenOvr) tr.querySelector('.bha-len-n').dataset.ovr = '1';
+    if (row.wtOvr)  tr.querySelector('.bha-wt-n').dataset.ovr  = '1';
     body.appendChild(tr);
   });
   bhaSave();
@@ -739,6 +784,9 @@ function bhaSave() {
       catNomWt: tr.querySelector('.bha-cat-nomwt')?.value  || '',
       catGrade: tr.querySelector('.bha-cat-grade')?.value  || '',
       catConn:  tr.querySelector('.bha-cat-conn')?.value   || '',
+      // additive: the user overrode an auto-calculated Length / Weight
+      ...(tr.querySelector('.bha-len-n')?.dataset.ovr ? { lenOvr: true } : {}),
+      ...(tr.querySelector('.bha-wt-n')?.dataset.ovr  ? { wtOvr:  true } : {}),
     });
   }
   dbSaveScenarioData(qpState.currentScenarioId, 'bha', rows);

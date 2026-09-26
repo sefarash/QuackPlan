@@ -243,6 +243,7 @@ Quantities: `depth, diam, mw, press, force, torque, torque_k, flow, linwt, dls, 
 **Well Schematic TOC** (`trajectory-input.js`, `well-schematic-draw.js`): each string row has a Top of Cement column stored as the additive key `toc` (MD, imperial; `''` = blank). `_readSchematicRows` returns `toc` (number | null); `_schCementSegments(row, rows)` gives the cement sheath geometry (TOC → shoe against the enclosing casing ID / hole size) for the schematic and final diagram. Casing Design (`casing-triaxial.js`) uses TOC for the FMD collapse backup (run-in mud above TOC, cement slurry density `cdCementMW` — an `outputControls` key, quantity `mw` — below).
 
 **BHA** (`bha-input.js`): Drill Pipe, Drill Collar, and HWDP OD dropdowns include `Custom…`. Selecting it reveals a number input; typing updates the hidden `.bha-od-n` value via `_bhaOdCustomInput()`. Grade/Connection cascade clears when custom OD is active. The `catOD='custom'` value is persisted so the row restores correctly on reload.
+Auto-calculated cells (display-only sync in `_bhaRecalc`, never saved on load): the uppermost row's Length = analysis depth − the other rows (`bhaSyncTopLength`), and catalogue rows' Weight = catalogue lb/ft × length (`_bhaSyncCatalogueWeights`: DP nominal or adjusted, Casing nominal, DC unit weight, HWDP pf). Both stay editable — typing overrides (`data-ovr`, additive row keys `lenOvr` / `wtOvr`), clearing the cell hands it back to the calculation.
 
 ---
 
