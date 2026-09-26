@@ -21,6 +21,8 @@ let _editNodeId    = null;   // non-null when renaming
 //    borehole — borehole selected (no scenario)
 //               → overlay hidden, Trajectory / Well Schematic / PPFG / Activity active
 //               → Casing/BHA + Drilling Fluid grayed out, Run disabled
+//               → Torque / Buckling / Overpull / Broomstick / SPP-ECD / Surge-Swab
+//                 output tabs grayed out (they need a scenario's BHA + fluid)
 //    scenario — scenario selected
 //               → all tabs active, Run enabled
 //
@@ -54,9 +56,22 @@ function _updateGate() {
   _setTabDisabled('tabBha',   !hasScenario);
   _setTabDisabled('tabFluid', !hasScenario);
 
+  // Outputs that need the string / fluid of a scenario (T&D, hydraulics,
+  // surge/swab) are scenario-only; Profile, Casing Design, KT, AFE and the
+  // Final Diagram stay available at the borehole.
+  const SCENARIO_OUTPUTS = { otTorque: 'torque', otBuckling: 'buckling', otOverpull: 'overpull',
+                             otBroomstick: 'broomstick', otHydraulics: 'hydraulics', otSurgeSwab: 'surgeswab' };
+  Object.keys(SCENARIO_OUTPUTS).forEach(id => {
+    _setTabDisabled(id, !hasScenario);
+    const b = document.getElementById(id);
+    if (b) b.title = hasScenario ? '' : 'Open a scenario — this result needs its BHA and drilling fluid';
+  });
+
   // If the active tab just became disabled, fall back to Trajectory
   const activeTab = qpState.activeInputTab;
-  if (!hasScenario && (activeTab === 'bha' || activeTab === 'fluid')) {
+  const activeOut = qpState.activeOutputTab;
+  if (!hasScenario && (activeTab === 'bha' || activeTab === 'fluid'
+      || Object.values(SCENARIO_OUTPUTS).includes(activeOut))) {
     const trajBtn = document.querySelector('#inputTabs .input-tab');
     if (trajBtn) switchInputTab('trajectory', trajBtn);
   }

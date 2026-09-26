@@ -919,12 +919,12 @@
   </select>
   <nav id="outputTabs">
     <button class="output-tab" onclick="switchOutputTab('trajplot',this)">Profile</button>
-    <button class="output-tab" onclick="switchOutputTab('torque',this)">Torque</button>
-    <button class="output-tab" onclick="switchOutputTab('buckling',this)">Buckling</button>
-    <button class="output-tab" onclick="switchOutputTab('overpull',this)">Overpull</button>
-    <button class="output-tab" onclick="switchOutputTab('broomstick',this)">Broomstick</button>
-    <button class="output-tab" onclick="switchOutputTab('hydraulics',this)">SPP / ECD</button>
-    <button class="output-tab" onclick="switchOutputTab('surgeswab',this)">Surge / Swab</button>
+    <button class="output-tab" id="otTorque" onclick="switchOutputTab('torque',this)">Torque</button>
+    <button class="output-tab" id="otBuckling" onclick="switchOutputTab('buckling',this)">Buckling</button>
+    <button class="output-tab" id="otOverpull" onclick="switchOutputTab('overpull',this)">Overpull</button>
+    <button class="output-tab" id="otBroomstick" onclick="switchOutputTab('broomstick',this)">Broomstick</button>
+    <button class="output-tab" id="otHydraulics" onclick="switchOutputTab('hydraulics',this)">SPP / ECD</button>
+    <button class="output-tab" id="otSurgeSwab" onclick="switchOutputTab('surgeswab',this)">Surge / Swab</button>
     <button class="output-tab" onclick="switchOutputTab('cd',this)">Casing Design</button>
     <button class="output-tab" onclick="switchOutputTab('kt',this)">Kick Tolerance</button>
     <button class="output-tab" onclick="switchOutputTab('afe',this)">Initial AFE</button>

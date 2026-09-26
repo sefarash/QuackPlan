@@ -122,6 +122,14 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); }
 }
 .input-tab.tab-disabled:hover { background: transparent; }
 
+/* Scenario-only output tabs at borehole level. No pointer-events:none, so the
+   "open a scenario" tooltip still shows; the button itself is disabled. */
+.output-tab.tab-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.output-tab.tab-disabled:hover { background: transparent; }
+
 .header-right {
   margin-left: auto;
   display: flex;

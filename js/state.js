@@ -52,6 +52,7 @@ function switchInputTab(name, el) {
 
 // ── Output tab switching ────────────────────────────────────────────────────
 function switchOutputTab(name, el) {
+  if (el && el.disabled) return;          // scenario-only output while at the borehole
   // Deactivate all input panels
   document.querySelectorAll('.input-panel.active').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.input-tab').forEach(t => t.classList.remove('active'));
