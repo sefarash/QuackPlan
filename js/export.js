@@ -203,7 +203,7 @@ function exportKT() {
     _row('Section', 'Shoe MD (ft)', 'Shoe TVD (ft)',
          'FG at Shoe (ppg)', 'PP at TD (ppg)',
          'MAASP (psi)', 'Hole Diam (in)', 'Ann Capacity (bbl/ft)',
-         'KT static (bbl)', 'KT real-gas (bbl)', 'Scope', 'Status'),
+         'KT real-gas (bbl)', 'Scope', 'Status'),
     ...casingRows.map(row => {
       const shoeMD  = +(row.bot);
       const shoeTVD = _tvdAt(survey, shoeMD);
@@ -232,7 +232,6 @@ function exportKT() {
         fg.toFixed(2), pp.toFixed(2),
         Math.round(maasp), dh,
         annCap.toFixed(4),
-        kt !== null ? Math.round(kt) : 'N/A',
         gasKt != null ? (gas.infinite ? 'inf (>WP)' : gasKt.toFixed(1)) : 'N/A',
         gas ? (gas.swabbed ? 'swabbed' : 'true kick (use WellPlan/DrillBench)') : '',
         status,

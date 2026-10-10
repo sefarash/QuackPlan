@@ -445,7 +445,6 @@ function _renderKTTable(results, mw, meta) {
     const dP = v => Math.round(QP_UNITS.toDisplay('press', v)).toLocaleString();
     const dV = v => QP_UNITS.toDisplay('volume', v).toFixed(QP_UNITS.isMetric() ? 2 : 1);
     const uV = QP_UNITS.label('volume');
-    const ktTxt   = r.ob ? '∞' : r.kt   != null ? dV(r.kt) + ' ' + uV : '—';
     const gasTxt  = r.gasInf ? '∞ (>WP)' : r.ktGas != null ? dV(r.ktGas) + ' ' + uV : '—';
     const swab    = !r.gasSwab ? ' title="PP&gt;MW: true/induced kick — beyond the swabbed-kick scope; use WellPlan/DrillBench"' : '';
     const gasMark = !r.gasSwab && r.ktGas != null ? ' ⚠' : '';
@@ -456,7 +455,6 @@ function _renderKTTable(results, mw, meta) {
       <td style="text-align:right">${dM(r.pp)}</td>
       <td style="text-align:right">${dP(r.maasp)}</td>
       <td style="text-align:right">${r.dh}"</td>
-      <td style="text-align:right;color:var(--text-dim)">${ktTxt}</td>
       <td style="text-align:right;font-weight:bold"${swab}>${gasTxt}${gasMark}</td>
       <td style="${status.cls}">${status.txt}</td>
     </tr>`;
@@ -479,7 +477,6 @@ function _renderKTTable(results, mw, meta) {
           <th style="text-align:right">PP@TD (${uMW})</th>
           <th style="text-align:right">MAASP (${uP})</th>
           <th style="text-align:right">Hole (in)</th>
-          <th style="text-align:right" title="Simple incompressible estimate">KT static (${uVol})</th>
           <th style="text-align:right" title="Real-gas single-bubble (SPE-IADC 140113)">KT real-gas (${uVol})</th>
           <th>Status</th>
         </tr>
@@ -499,8 +496,7 @@ function _renderKTTable(results, mw, meta) {
       WellPlan/DrillBench); two-node temperature (surface + geothermal gradient); DC/DP two-section
       annulus from the BHA (stabilisers collapse to the collar OD). <strong>Influx:</strong> Methane
       models real-gas expansion (conservative — use for gas kicks); Fixed-gradient is incompressible
-      (no expansion — for oil/liquid kicks of known gradient only). <strong>KT static</strong> is the
-      older incompressible estimate, shown for comparison.
+      (no expansion — for oil/liquid kicks of known gradient only).
     </p>`;
 }
 
