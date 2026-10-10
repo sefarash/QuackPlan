@@ -158,8 +158,9 @@ Canvas elements also need `CI.attach(canvasId)` called once on `DOMContentLoaded
 
 Zoom / pan is a VIEW transform, not a per-chart feature: `_chartSetup` calls
 `QP_ZOOM.apply(ctx, canvasId)` after clearing, so draw code keeps working in base coordinates
-and is redrawn magnified (＋ / − / ⟲ buttons bottom-left, Ctrl/⌘ + wheel or pinch to zoom, wheel
-or drag to pan while zoomed; view state is in-memory, reset on scenario switch). Anything that
+and is redrawn magnified (drag a box to zoom into that area, wheel / pinch to zoom at the pointer,
+Shift + drag to move the view, ＋ / − / ⟲ buttons bottom-left; view state is in-memory, reset on
+scenario switch). Anything that
 maps the mouse onto a chart must convert first: `QP_ZOOM.eventToBase(canvas, e)` /
 `toBase(id, cx, cy)` (CI crosshair + right-click, the Profile and Final Diagram label drags,
 which also call `QP_ZOOM.cancelPan()` when they grab a label). A new chart canvas needs

@@ -475,7 +475,10 @@ body.dark .scenario-banner.info { background: #16303f; color: var(--text); }
 .qp-zoom-tools button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 .qp-zoom-tools .qz-reset { display: none; font-size: 11px; }
 .qp-zoom-tools.zoomed .qz-reset { display: inline-block; }
-canvas.qp-zoomed { cursor: grab; }
+canvas[data-zoom-attached] { cursor: crosshair; }   /* drag a box to zoom into it */
+/* Drag-a-box zoom selection */
+.qp-zoom-box { position: absolute; z-index: 4; pointer-events: none;
+  border: 1.5px dashed var(--accent); background: rgba(26,95,122,0.12); border-radius: 2px; }
 
 /* Chart beside a results table (Casing Design, Kick Tolerance). Side by side
    when there is room; on a narrow centre column the table drops BELOW the

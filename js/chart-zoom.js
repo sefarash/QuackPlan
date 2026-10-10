@@ -4,9 +4,10 @@
 // chart's own draw code runs unchanged in its normal ("base") coordinates and
 // comes out magnified — lines and text are redrawn sharp, not stretched.
 //
-//   ＋ / − / ⟲ buttons   bottom-left corner of each chart
-//   Ctrl/⌘ + wheel       zoom at the cursor (a trackpad pinch arrives as this)
-//   wheel / drag         pan, while zoomed in
+//   drag a box           zoom INTO that area (the rectangle fills the chart)
+//   wheel / pinch        zoom in / out at the pointer
+//   Shift + drag         move the view while zoomed in
+//   ＋ / − / ⟲ buttons   bottom-left corner of each chart (⟲ = back to 100%)
 //
 // Anything that maps the mouse back onto the chart (CI crosshair + right-click,
 // the label-drag handlers) goes through QP_ZOOM.eventToBase / toBase.
@@ -15,7 +16,8 @@
 const QP_ZOOM = (() => {
   const MAX_Z = 8, STEP = 1.4;
   const _st = {};                                   // id → { z, ox, oy, drawn, snap, timer, tools }
-  let _pan = null;                                  // active drag-pan
+  let _pan = null;                                  // active Shift+drag pan
+  let _box = null;                                  // active drag-a-box selection
 
   const get = id => _st[id] || (_st[id] = { z: 1, ox: 0, oy: 0, drawn: { z: 1, ox: 0, oy: 0 }, snap: null });
 
@@ -120,8 +122,19 @@ const QP_ZOOM = (() => {
   }
   function resetAll() { Object.keys(_st).forEach(id => { const s = _st[id]; s.z = 1; s.ox = 0; s.oy = 0; }); }
 
-  // A label-drag handler took this mousedown — don't pan as well.
-  function cancelPan() { _pan = null; }
+  // Zoom so the canvas-pixel rectangle (x, y, w, h) fills the chart (aspect kept)
+  function zoomToRect(id, x, y, w, h) {
+    const canvas = document.getElementById(id), s = get(id);
+    if (!canvas || w < 2 || h < 2) return;
+    const c  = toBase(id, x + w / 2, y + h / 2);                 // box centre, base coords
+    const z2 = Math.min(MAX_Z, Math.max(1, s.z * Math.min(canvas.width / w, canvas.height / h)));
+    s.z = z2; s.ox = c.x * z2 - canvas.width / 2; s.oy = c.y * z2 - canvas.height / 2;
+    _changed(id);
+  }
+
+  // A label-drag handler took this mousedown — don't pan / box-select as well.
+  function cancelPan() { _pan = null; _endBox(); }
+  function _endBox() { if (_box) { _box.el.remove(); _box = null; } }
 
   // ── Toolbar ──────────────────────────────────────────────────────────────────
   function _syncTools(id) {
@@ -146,8 +159,8 @@ const QP_ZOOM = (() => {
     tools.className = 'qp-zoom-tools';
     tools.innerHTML =
       '<button type="button" data-z="out" title="Zoom out">−</button>' +
-      '<button type="button" data-z="in"  title="Zoom in (or Ctrl/⌘ + scroll, pinch)">+</button>' +
-      '<button type="button" data-z="reset" class="qz-reset" title="Reset zoom">⟲ <span class="qz-pct">100%</span></button>';
+      '<button type="button" data-z="in"  title="Zoom in — or drag a box over the area you want to enlarge, or scroll at the pointer">+</button>' +
+      '<button type="button" data-z="reset" class="qz-reset" title="Back to the whole chart. While zoomed: Shift + drag moves the view.">⟲ <span class="qz-pct">100%</span></button>';
     tools.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.z === 'in') zoomBy(id, STEP);
@@ -158,25 +171,52 @@ const QP_ZOOM = (() => {
     s.tools = tools;
     _syncTools(id);
 
+    // Wheel / pinch: zoom at the pointer. At 100% a zoom-OUT tick is left
+    // alone so the page (or a chart + table panel) still scrolls normally.
     canvas.addEventListener('wheel', e => {
       const { cx, cy } = _canvasXY(canvas, e);
-      if (e.ctrlKey || e.metaKey) {                    // zoom (pinch = ctrl + wheel)
-        e.preventDefault();
-        zoomBy(id, Math.exp(-e.deltaY * 0.01), cx, cy);
-      } else if (s.z > 1) {                            // pan while zoomed
-        e.preventDefault();
-        s.ox += e.deltaX; s.oy += e.deltaY;
-        _changed(id);
-      }
+      const pinch = e.ctrlKey || e.metaKey;
+      const f = Math.exp(-e.deltaY * (pinch ? 0.01 : 0.0025));
+      if (s.z <= 1 && f <= 1) return;
+      e.preventDefault();
+      zoomBy(id, f, cx, cy);
     }, { passive: false });
 
     canvas.addEventListener('mousedown', e => {
-      if (e.button !== 0 || s.z <= 1) return;
-      _pan = { id, x: e.clientX, y: e.clientY, ox: s.ox, oy: s.oy, moved: false };
+      if (e.button !== 0) return;
+      if (e.shiftKey) {                                 // Shift + drag: move the view
+        if (s.z > 1) _pan = { id, x: e.clientX, y: e.clientY, ox: s.ox, oy: s.oy, moved: false };
+        return;
+      }
+      // Drag: rubber-band the area to enlarge
+      e.preventDefault();                               // no text selection while dragging
+      const el = document.createElement('div');
+      el.className = 'qp-zoom-box';
+      el.style.display = 'none';
+      host.appendChild(el);
+      _box = { id, el, x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY };
     });
   }
 
+  function _boxRect() {                                 // selection, clipped to the canvas, in client px
+    const canvas = document.getElementById(_box.id), r = canvas.getBoundingClientRect();
+    const cl = v => Math.min(Math.max(v, r.left), r.right), ct = v => Math.min(Math.max(v, r.top), r.bottom);
+    const xa = cl(_box.x0), xb = cl(_box.x1), ya = ct(_box.y0), yb = ct(_box.y1);
+    return { canvas, r, x: Math.min(xa, xb), y: Math.min(ya, yb), w: Math.abs(xb - xa), h: Math.abs(yb - ya) };
+  }
+
   window.addEventListener('mousemove', e => {
+    if (_box) {
+      _box.x1 = e.clientX; _box.y1 = e.clientY;
+      const b = _boxRect();
+      if (b.w < 6 && b.h < 6) { _box.el.style.display = 'none'; return; }
+      _box.el.style.display = 'block';
+      _box.el.style.left   = (b.canvas.offsetLeft + b.x - b.r.left) + 'px';
+      _box.el.style.top    = (b.canvas.offsetTop  + b.y - b.r.top)  + 'px';
+      _box.el.style.width  = b.w + 'px';
+      _box.el.style.height = b.h + 'px';
+      return;
+    }
     if (!_pan) return;
     const canvas = document.getElementById(_pan.id), s = get(_pan.id);
     if (!canvas) { _pan = null; return; }
@@ -187,7 +227,15 @@ const QP_ZOOM = (() => {
     s.ox = _pan.ox - dx; s.oy = _pan.oy - dy;
     _changed(_pan.id);
   });
-  window.addEventListener('mouseup', () => { _pan = null; });
+  window.addEventListener('mouseup', () => {
+    _pan = null;
+    if (!_box) return;
+    const b = _boxRect(), id = _box.id;
+    _endBox();
+    if (b.w < 12 || b.h < 12) return;                   // a click, not a selection
+    const k = b.canvas.width / (b.r.width || 1);        // client px → canvas px
+    zoomToRect(id, (b.x - b.r.left) * k, (b.y - b.r.top) * k, b.w * k, b.h * k);
+  });
 
-  return { attach, apply, toBase, eventToBase, toScreenRect, zoomBy, reset, resetAll, cancelPan, get };
+  return { attach, apply, toBase, eventToBase, toScreenRect, zoomBy, zoomToRect, reset, resetAll, cancelPan, get };
 })();
