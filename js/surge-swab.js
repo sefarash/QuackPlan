@@ -241,6 +241,7 @@ function drawSurgeSwab() {
   const { ctx, W, H } = c;
   const C = _qpColors();
 
+  if (_noBha(ctx, W, H, CID)) return;
   const g = _ssGeom();
   if (!g) { _noData(ctx, W, H, 'Run Compute first'); return; }
 

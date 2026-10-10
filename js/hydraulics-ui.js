@@ -8,6 +8,7 @@ function drawHydSweep(h) {
   if (!c) return;
   const { ctx, W, H } = c;
 
+  if (_noBha(ctx, W, H, CID)) return;
   if (!h?.sweep?.length) { _noData(ctx, W, H, 'Run Compute first'); return; }
 
   // h stores imperial (canonical); convert to display units for this chart
@@ -60,6 +61,7 @@ function drawHydPie(h) {
   const c = _chartSetup('hydPieCanvas');
   if (!c) return;
   const { ctx, W, H } = c;
+  if (_noBha(ctx, W, H)) return;
   const C = _qpColors();
 
   if (!h?.pumpPressure) { _noData(ctx, W, H, '—'); return; }

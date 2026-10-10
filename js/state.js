@@ -94,13 +94,16 @@ function redrawOutputPanel(name) {
   const h = qpState.hydResult;
   // A throw in any single draw function must not break tab switching or the
   // sliders that call this directly — contain it and surface a message.
+  // No BHA → the string outputs draw their "add BHA components" message
+  // even though there is no result to pass them.
+  const nb = typeof _bhaMissing === 'function' && _bhaMissing();
   try {
     if      (name === 'trajplot')                  drawTrajPlot();
-    else if (name === 'torque'     && r)           drawTorque(r);
-    else if (name === 'buckling'   && r)           drawBuckling(r);
-    else if (name === 'overpull'   && r)           drawOverpull(r);
-    else if (name === 'broomstick' && r)           drawBroomstick(r);
-    else if (name === 'hydraulics' && h)           { drawHydSweep(h); drawHydPie(h); }
+    else if (name === 'torque'     && (r || nb))   drawTorque(r);
+    else if (name === 'buckling'   && (r || nb))   drawBuckling(r);
+    else if (name === 'overpull'   && (r || nb))   drawOverpull(r);
+    else if (name === 'broomstick' && (r || nb))   drawBroomstick(r);
+    else if (name === 'hydraulics' && (h || nb))   { drawHydSweep(h); drawHydPie(h); }
     else if (name === 'surgeswab')                 drawSurgeSwab();
     else if (name === 'afe')                       drawAFE();
     else if (name === 'finaldiagram')              drawFinalDiagram();

@@ -157,6 +157,7 @@ function drawTorque(r) {
   const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
+  if (_noBha(ctx, W, H, CID)) return;
 
   // Display converters (compute stays imperial: kft·lb, klbf, ft)
   const toTq = v => QP_UNITS.toDisplay('torque_k', v);   // kft·lb → display
@@ -280,6 +281,7 @@ function drawBuckling(r) {
   const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
+  if (_noBha(ctx, W, H, CID)) return;
 
   const toF = v => QP_UNITS.toDisplay('force', v);   // klbf → display
   const toD = v => QP_UNITS.toDisplay('depth', v);
@@ -368,6 +370,7 @@ function drawOverpull(r) {
   const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
+  if (_noBha(ctx, W, H, CID)) return;
 
   const toF = v => QP_UNITS.toDisplay('force', v);
   const toD = v => QP_UNITS.toDisplay('depth', v);
@@ -502,6 +505,7 @@ function drawBroomstick(r) {
   const c = _chartSetup(CID);
   if (!c) return;
   const { ctx, W, H } = c;
+  if (_noBha(ctx, W, H, CID)) return;
 
   const toF = v => QP_UNITS.toDisplay('force', v);
   const toD = v => QP_UNITS.toDisplay('depth', v);
@@ -801,6 +805,24 @@ function _fitText(ctx, text, cx, y, maxW) {
   while (t.length > 4 && ctx.measureText(t).width > maxW) t = t.slice(0, -2).trimEnd() + '…';
   ctx.fillText(t, cx, y);
   ctx.restore();
+}
+
+// The string outputs (Torque, Buckling, Overpull, Broomstick, SPP / ECD,
+// Surge / Swab) need the string from the Casing / BHA tab. With an empty BHA
+// table the engines used to run on built-in defaults (5" drill pipe at
+// 19.5 lb/ft, 8.5" bit) and plot a string the user never entered — now the
+// panel says what is missing instead. Returns true when it drew the message.
+function _bhaMissing() {
+  return !(typeof bhaGet === 'function' && bhaGet().components.length);
+}
+function _noBha(ctx, W, H, canvasId) {
+  if (!_bhaMissing()) return false;
+  _noData(ctx, W, H, 'Add BHA components first (Casing / BHA tab)');
+  if (canvasId && typeof CI !== 'undefined') {            // no stale crosshair / freeze data
+    CI.storeLive(canvasId, []);
+    CI.register(canvasId, { pad: { l: 0, t: 0, pw: 0, ph: 0 }, xMax: 1, yMax: 1, xLabel: '', yLabel: '' });
+  }
+  return true;
 }
 
 function _noData(ctx, W, H, msg) {

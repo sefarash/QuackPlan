@@ -20,6 +20,16 @@ async function qpCompute() {
     setStatus('No trajectory — add stations first'); return;
   }
 
+  // No string entered → nothing to compute for T&D / hydraulics. Never run the
+  // engines on their built-in default string; clear the results and say so.
+  if (typeof _bhaMissing === 'function' && _bhaMissing()) {
+    ++_qpComputeGen;                           // drop any run still in flight
+    qpState.tdResult = null; qpState.hydResult = null;
+    if (qpState.activeOutputTab) redrawOutputPanel(qpState.activeOutputTab);
+    setStatus('Add BHA components (Casing / BHA tab) to compute T&D and hydraulics');
+    return;
+  }
+
   const gen = ++_qpComputeGen;
   setStatus('Computing…');
 
