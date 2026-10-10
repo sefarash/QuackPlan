@@ -112,7 +112,7 @@ ratings). Do after the calculation side is settled.
 
 ## Temperature model (reference)
 
-From an internal DrillPlan vs Landmark comparison (Beach Energy, Aug 2026):
+From an internal DrillPlan vs Landmark comparison (Aug 2026):
 
 | Tool | Static | Cementing / installed | Circulating | Production / injection | Notes |
 |---|---|---|---|---|---|

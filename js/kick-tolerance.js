@@ -1,12 +1,11 @@
 // ===== KICK TOLERANCE =====
 // Two models:
 //  1. Static (quick):  KT = MAASP / ((PP_TD - MW) × 0.052) × Ann_cap   — incompressible
-//  2. Real-gas (WECS / SPE-IADC 140113):  single methane bubble migrating from the
+//  2. Real-gas (SPE-IADC 140113):  single methane bubble migrating from the
 //     kick zone (TD) to the weak point (shoe), Hall-Yarborough Z-factor, non-isothermal,
 //     KT = min(shut-in at bottom, circulating at weak point with density-ratio expansion).
-//     Validated against the Beach WECS worked example (min KT = 15.0 bbl).
 
-const _KT_PPG = 0.051948;   // psi/ft per ppg (precise, matches WECS MAASP)
+const _KT_PPG = 0.051948;   // psi/ft per ppg (precise)
 const _KT_ATM = 14.7;       // psia
 const _KT_PP_TOL = 0.01;    // ppg tolerance on the pp==mw swabbed/balanced boundary
 // Methane pseudo-critical + gas constants (field units)
@@ -115,7 +114,7 @@ function _ktGasTolerance(o) {
   }
   const rhoK = gradWeak / _KT_PPG;                          // influx gradient in ppg
 
-  // Max allowable gas height (WECS / SPE-IADC 140113)
+  // Max allowable gas height (SPE-IADC 140113)
   const hmax = (maasp - _KT_PPG * (o.pp - o.mw) * o.tvdKick) / (_KT_PPG * (o.mw - rhoK));
   if (!(hmax > 0)) return { kt: 0, hmax: 0, maasp: Math.round(maasp), gradWeak, swabbed, infinite: false };
 
@@ -167,7 +166,7 @@ function drawKickTolerance() {
     return;
   }
 
-  // Real-gas (WECS) model inputs (display units) → imperial (canonical) for the engine
+  // Real-gas model inputs (display units) → imperial (canonical) for the engine
   const safetyPsi = QP_UNITS.fromDisplay('press', +(document.getElementById('ktSafety')?.value || 100));
   const surfT     = _ktTempToImp(document.getElementById('ktSurfTemp')?.value ?? 70);   // °F
   const geoGrad   = _ktGeoToImp(document.getElementById('ktGeoGrad')?.value ?? 1.5);     // °F/100ft
@@ -421,7 +420,7 @@ function _renderKTTable(results, mw, meta) {
   meta = meta || {};
 
   // Governing (minimum) real-gas KT over the swabbed-valid sections (PP ≤ MW).
-  // True-kick sections (PP > MW) are out of the WECS swabbed scope, so they are
+  // True-kick sections (PP > MW) are out of the swabbed-kick scope, so they are
   // excluded from the governing figure (but still shown per-row with a ⚠).
   const swabRows = results.filter(r => r.gasSwab && r.ktGas != null);
   const minGas   = swabRows.length ? Math.min(...swabRows.map(r => r.ktGas)) : null;
@@ -448,7 +447,7 @@ function _renderKTTable(results, mw, meta) {
     const uV = QP_UNITS.label('volume');
     const ktTxt   = r.ob ? '∞' : r.kt   != null ? dV(r.kt) + ' ' + uV : '—';
     const gasTxt  = r.gasInf ? '∞ (>WP)' : r.ktGas != null ? dV(r.ktGas) + ' ' + uV : '—';
-    const swab    = !r.gasSwab ? ' title="PP&gt;MW: true/induced kick — beyond the WECS swabbed scope; use WellPlan/DrillBench"' : '';
+    const swab    = !r.gasSwab ? ' title="PP&gt;MW: true/induced kick — beyond the swabbed-kick scope; use WellPlan/DrillBench"' : '';
     const gasMark = !r.gasSwab && r.ktGas != null ? ' ⚠' : '';
     return `<tr>
       <td>${r.name}</td>
@@ -481,7 +480,7 @@ function _renderKTTable(results, mw, meta) {
           <th style="text-align:right">MAASP (${uP})</th>
           <th style="text-align:right">Hole (in)</th>
           <th style="text-align:right" title="Simple incompressible estimate">KT static (${uVol})</th>
-          <th style="text-align:right" title="Real-gas single-bubble (WECS / SPE-IADC 140113)">KT real-gas (${uVol})</th>
+          <th style="text-align:right" title="Real-gas single-bubble (SPE-IADC 140113)">KT real-gas (${uVol})</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -495,8 +494,7 @@ function _renderKTTable(results, mw, meta) {
     </p>
     <p style="margin-top:6px;font-size:10px;color:var(--text-dim);line-height:1.5">
       <strong>Real-gas model</strong> — single bubble migrating kick-zone(TD)→weak-point(shoe),
-      KT = min(shut-in at bottom, circulating at weak point w/ density-ratio expansion). Validated
-      to the Beach WECS worked example (15.0 bbl).<br>
+      KT = min(shut-in at bottom, circulating at weak point w/ density-ratio expansion).<br>
       <strong>Caveats:</strong> swabbed-kick scope (PP≤MW; ⚠ rows are true/induced kicks — use
       WellPlan/DrillBench); two-node temperature (surface + geothermal gradient); DC/DP two-section
       annulus from the BHA (stabilisers collapse to the collar OD). <strong>Influx:</strong> Methane

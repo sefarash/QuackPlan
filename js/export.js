@@ -183,7 +183,7 @@ function exportKT() {
 
   if (!casingRows.length) { alert('Add casing strings in Well Schematic.'); return; }
 
-  // Real-gas (WECS) inputs + BHA geometry — mirror drawKickTolerance
+  // Real-gas inputs + BHA geometry — mirror drawKickTolerance
   const safetyPsi = +(document.getElementById('ktSafety')?.value   || 100);
   const surfT     = +(document.getElementById('ktSurfTemp')?.value || 70);
   const geoGrad   = +(document.getElementById('ktGeoGrad')?.value  || 1.5);
