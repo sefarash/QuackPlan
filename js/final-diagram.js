@@ -37,19 +37,26 @@ function _fdInitDrag(canvas) {
     return null;
   };
 
+  // Mouse position in the diagram's base coordinates (the view may be zoomed)
+  const pos = e => {
+    if (typeof QP_ZOOM !== 'undefined') return QP_ZOOM.eventToBase(canvas, e);
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
   canvas.addEventListener('mousedown', e => {
     if (e.button !== 0) return;                       // left-drag only (right-click = CI)
-    const r = canvas.getBoundingClientRect();
-    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    const p = pos(e);
+    const a = hit(p.x, p.y);
     if (!a) return;
+    if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.cancelPan();      // dragging a label, not the view
     const off = _fdDrag.offsets.get(a.key) || { dx: 0, dy: 0 };
-    _fdDrag.active = { key: a.key, startX: e.clientX - r.left, startY: e.clientY - r.top, origDX: off.dx, origDY: off.dy };
+    _fdDrag.active = { key: a.key, startX: p.x, startY: p.y, origDX: off.dx, origDY: off.dy };
     e.preventDefault();
   });
 
   canvas.addEventListener('mousemove', e => {
-    const r = canvas.getBoundingClientRect();
-    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const { x: mx, y: my } = pos(e);
     if (!_fdDrag.active) { if (hit(mx, my)) canvas.style.cursor = 'grab'; else if (canvas.style.cursor === 'grab') canvas.style.cursor = ''; return; }
     canvas.style.cursor = 'grabbing';
     const { key, startX, startY, origDX, origDY } = _fdDrag.active;
@@ -66,8 +73,8 @@ function _fdInitDrag(canvas) {
 
   // Double-click a label to reset it to the auto position.
   canvas.addEventListener('dblclick', e => {
-    const r = canvas.getBoundingClientRect();
-    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    const p = pos(e);
+    const a = hit(p.x, p.y);
     if (!a) return;
     _fdDrag.offsets.delete(a.key);
     _fdSave();

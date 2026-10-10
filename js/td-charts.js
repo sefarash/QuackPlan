@@ -40,6 +40,8 @@ function _chartSetup(canvasId) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // View zoom / pan (chart-zoom.js): everything below draws in base coordinates
+  if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.apply(ctx, canvasId);
   _lblReset();
   return { ctx, W: canvas.width, H: canvas.height, C };
 }

@@ -287,6 +287,8 @@ function _cmpDrawChart(results) {
   const W = canvas.width, H = canvas.height;
   ctx.fillStyle = '#0b1520';
   ctx.fillRect(0, 0, W, H);
+  window._cmpLastResults = results;                       // for a zoom redraw
+  if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.apply(ctx, 'cmpCanvas');
 
   const pad = { t: 20, b: 36, l: 62, r: 20 };
   const pw  = W - pad.l - pad.r;

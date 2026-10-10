@@ -147,11 +147,18 @@ const CI = (() => {
     const sy    = canvas.height / rect.height;
     const cx    = (e.clientX - rect.left) * sx;
     const cy    = (e.clientY - rect.top)  * sy;
-    const { pad: { l, t, pw, ph } } = s.meta;
-
-    if (cx < l || cx > l + pw || cy < t || cy > t + ph) {
+    // Zoomed view (chart-zoom.js): hit-test and read values in the chart's base
+    // coordinates; draw the crosshair where the plot is on screen.
+    const Z  = (typeof QP_ZOOM !== 'undefined') ? QP_ZOOM : null;
+    const b  = Z ? Z.toBase(id, cx, cy) : { x: cx, y: cy };
+    const bp = s.meta.pad;
+    if (b.x < bp.l || b.x > bp.l + bp.pw || b.y < bp.t || b.y > bp.t + bp.ph) {
       _clearOv(ov, canvas); _tip.style.display = 'none'; return;
     }
+    const sp = Z ? Z.toScreenRect(id, bp) : bp;
+    const l  = Math.max(0, sp.l), t = Math.max(0, sp.t);
+    const pw = Math.min(canvas.width,  sp.l + sp.pw) - l;
+    const ph = Math.min(canvas.height, sp.t + sp.ph) - t;
 
     ov.width  = canvas.width;
     ov.height = canvas.height;
@@ -164,7 +171,7 @@ const CI = (() => {
     oc.beginPath(); oc.moveTo(l, cy);     oc.lineTo(l + pw, cy); oc.stroke();
     oc.setLineDash([]);
 
-    const coords      = _toData(cx, cy, s.meta);
+    const coords      = _toData(b.x, b.y, s.meta);
     _tip.textContent  = coords.label;
     _tip.style.display = 'block';
     _tip.style.left    = (e.clientX + 16) + 'px';
@@ -188,8 +195,9 @@ const CI = (() => {
     _closeMenu();
 
     const rect = canvas.getBoundingClientRect();
-    const cx   = (e.clientX - rect.left) * (canvas.width  / rect.width);
-    const cy   = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    let cx     = (e.clientX - rect.left) * (canvas.width  / rect.width);
+    let cy     = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    if (typeof QP_ZOOM !== 'undefined') { const b = QP_ZOOM.toBase(id, cx, cy); cx = b.x; cy = b.y; }   // base coords
     const s    = _st(id);
     const inPl = s.meta && _inPlot(cx, cy, s.meta.pad);
     const coords = (s.meta && inPl) ? _toData(cx, cy, s.meta) : null;

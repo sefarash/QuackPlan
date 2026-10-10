@@ -31,17 +31,24 @@ function _vsInitDrag(canvas) {
     a => mx >= a.x && mx <= a.x + a.w && my >= a.y && my <= a.y + a.h
   );
 
-  canvas.addEventListener('mousedown', e => {
+  // Mouse position in the chart's base coordinates (the view may be zoomed)
+  const pos = e => {
+    if (typeof QP_ZOOM !== 'undefined') return QP_ZOOM.eventToBase(canvas, e);
     const r = canvas.getBoundingClientRect();
-    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
+  canvas.addEventListener('mousedown', e => {
+    const p = pos(e);
+    const a = hit(p.x, p.y);
     if (!a) return;
+    if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.cancelPan();      // dragging a label, not the view
     const off = _vsDrag.offsets.get(a.key) || { dx: 0, dy: 0 };
-    _vsDrag.active = { key: a.key, startX: e.clientX - r.left, startY: e.clientY - r.top, origDX: off.dx, origDY: off.dy };
+    _vsDrag.active = { key: a.key, startX: p.x, startY: p.y, origDX: off.dx, origDY: off.dy };
   });
 
   canvas.addEventListener('mousemove', e => {
-    const r = canvas.getBoundingClientRect();
-    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const { x: mx, y: my } = pos(e);
     if (!_vsDrag.active) { canvas.style.cursor = hit(mx, my) ? 'grab' : ''; return; }
     canvas.style.cursor = 'grabbing';
     const { key, startX, startY, origDX, origDY } = _vsDrag.active;
@@ -58,8 +65,8 @@ function _vsInitDrag(canvas) {
 
   // Double-click resets label to default position
   canvas.addEventListener('dblclick', e => {
-    const r = canvas.getBoundingClientRect();
-    const a = hit(e.clientX - r.left, e.clientY - r.top);
+    const p = pos(e);
+    const a = hit(p.x, p.y);
     if (!a) return;
     _vsDrag.offsets.delete(a.key);
     _vsSave();

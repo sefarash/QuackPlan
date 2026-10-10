@@ -154,6 +154,17 @@ When calling `CI.register()`, set `depthDown: true` only for `_chartGridDepthDow
 
 Canvas elements also need `CI.attach(canvasId)` called once on `DOMContentLoaded` (in the inline script at the bottom of `index.html`).
 
+### Chart zoom (`js/chart-zoom.js`, `QP_ZOOM`)
+
+Zoom / pan is a VIEW transform, not a per-chart feature: `_chartSetup` calls
+`QP_ZOOM.apply(ctx, canvasId)` after clearing, so draw code keeps working in base coordinates
+and is redrawn magnified (＋ / − / ⟲ buttons bottom-left, Ctrl/⌘ + wheel or pinch to zoom, wheel
+or drag to pan while zoomed; view state is in-memory, reset on scenario switch). Anything that
+maps the mouse onto a chart must convert first: `QP_ZOOM.eventToBase(canvas, e)` /
+`toBase(id, cx, cy)` (CI crosshair + right-click, the Profile and Final Diagram label drags,
+which also call `QP_ZOOM.cancelPan()` when they grab a label). A new chart canvas needs
+`QP_ZOOM.attach(id)` in the DOMContentLoaded list in `index.html`, next to `CI.attach`.
+
 ### Chart labels and legends (no fixed positions)
 
 Canvas labels must not be drawn at fixed spots with `ctx.fillText` — at smaller window sizes they
@@ -174,7 +185,7 @@ collide. Use the shared layout helpers in `td-charts.js` (`_chartSetup` resets t
 1. Add `<div id="panel-{name}" class="output-panel">` with a `<canvas id="{name}Canvas">` in `index.html`
 2. Add `<button class="output-tab" onclick="switchOutputTab('{name}',this)">` in the footer
 3. Add `else if (name === '{name}') drawMyChart();` in `redrawOutputPanel()` in `state.js`
-4. Add `CI.attach('{name}Canvas')` to the DOMContentLoaded array in `index.html`
+4. Add `CI.attach('{name}Canvas')` and `QP_ZOOM.attach('{name}Canvas')` to the DOMContentLoaded arrays in `index.html`
 5. Create `js/my-chart.js` following the pattern: `_chartSetup` → compute data → `CI.storeLive` → `CI.register` → `CI.drawFrozen` → draw lines → `CI.drawAnnotations`
 6. Add `<script src="js/my-chart.js">` before `compare-ui.js` in `index.html`
 

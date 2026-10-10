@@ -1007,6 +1007,7 @@
 <!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
 <script src="js/units.js"></script>
 <script src="js/chart-interaction.js"></script>
+<script src="js/chart-zoom.js"></script>
 <script src="js/survey-engine.js"></script>
 <script src="js/rheology-engine.js"></script>
 <script src="js/td-engine.js"></script>
@@ -1068,6 +1069,11 @@
      'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
      'hydSweepCanvas','surgeSwabCanvas','afeCanvas','cdTriaxialCanvas','ktCanvas',
      'finalDiagramCanvas'].forEach(id => CI.attach(id));
+    // Zoom / pan on every chart canvas (after CI.attach, which creates the overlay)
+    ['trajVsCanvas','trajPlanCanvas',
+     'torqueCanvas','bucklingCanvas','overpullCanvas','broomstickCanvas',
+     'hydSweepCanvas','hydPieCanvas','surgeSwabCanvas','afeCanvas','cdTriaxialCanvas','ktCanvas',
+     'finalDiagramCanvas','cmpCanvas'].forEach(id => QP_ZOOM.attach(id));
 
     makeRowsDraggable('traj1Body',      traj1Recalc);
     makeRowsDraggable('traj2Body',      traj2Recalc);

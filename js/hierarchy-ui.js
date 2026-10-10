@@ -434,6 +434,7 @@ function _loadBorehole(id) {
     qpState.loadingScenario = true;            // RULE #1: loads never write
     try {
       if (typeof CI !== 'undefined' && CI.clearAll) CI.clearAll();
+      if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.resetAll();   // a new well starts un-zoomed
       ['traj1Body', 'traj2Body', 'tortBody', 'schematicBody', 'bhaBody', 'nozzleBody', 'mwdBody',
        'activityBody', 'servicesBody', 'casingCostBody', 'handoverBody'].forEach(i => { const el = document.getElementById(i); if (el) el.innerHTML = ''; });
       qpState.inherited = {};
@@ -487,6 +488,7 @@ function _loadScenario(id) {
       // Clear frozen chart snapshots / annotations so one well's overlays don't
       // ghost onto the next scenario's charts
       if (typeof CI !== 'undefined' && CI.clearAll) CI.clearAll();
+      if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.resetAll();   // a new well starts un-zoomed
 
       // Clear all tables first so stale rows don't persist
       document.getElementById('traj1Body').innerHTML      = '';
