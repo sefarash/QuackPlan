@@ -128,10 +128,19 @@ function _renderNode(parent, node, depth) {
   row.dataset.level = depth;
   row.dataset.id    = node.id;
 
-  const isActive = node.id === qpState.currentScenarioId
-                || node.id === qpState.currentBoreholeId
-                || node.id === qpState.currentWellId;
-  if (isActive) row.classList.add('active');
+  // ONE row is the selection (solid highlight): the node the user clicked,
+  // else — after a reload restored the last scenario — the deepest current
+  // level. Its ancestors only get the light "on-path" tint, so the level the
+  // user is on is unambiguous.
+  const selId = qpState.selectedNodeId || qpState.currentScenarioId
+             || qpState.currentBoreholeId || qpState.currentWellId;
+  if (node.id === selId) {
+    row.classList.add('active');
+    for (let wrap = parent; wrap && wrap.id !== 'hierarchyTree'; wrap = wrap.parentElement?.parentElement) {
+      const anc = wrap.parentElement?.querySelector(':scope > .tree-node');
+      if (anc) anc.classList.add('on-path');
+    }
+  }
 
   // Collapse toggle arrow — hidden until children are known
   const toggle = document.createElement('span');
@@ -212,6 +221,7 @@ function _renderNode(parent, node, depth) {
 // ── Node selection ────────────────────────────────────────────────────────────
 
 function _selectNode(node) {
+  qpState.selectedNodeId = node.id;          // the one highlighted tree row
   if (node.type === 'scenario') {
     qpState.currentScenarioId = node.id;
     qpState.currentBoreholeId = node.parentId;
@@ -662,6 +672,7 @@ function _promptRename(node) {
 
 function _confirmDelete(node) {
   if (!confirm('Delete "' + node.name + '" and all its children?')) return;
+  if (node.id === qpState.selectedNodeId)     qpState.selectedNodeId     = null;
   if (node.id === qpState.currentScenarioId)  qpState.currentScenarioId  = null;
   if (node.id === qpState.currentBoreholeId) qpState.currentBoreholeId = null;
   if (node.id === qpState.currentWellId)     qpState.currentWellId     = null;

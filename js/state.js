@@ -22,6 +22,7 @@ let qpState = {
   trajFrom:        null,     // open scenario's trajectory: 'borehole' | 'scenario' (legacy) | 'none'
   boreholeSchematic: [],     // the borehole's own casing program (read-only view while a scenario is open)
   currentWellId:      null,
+  selectedNodeId:     null,   // the tree row the user clicked (any level) — the single highlighted row
   currentBoreholeId:  null,
   currentScenarioId:  null,
   wellDatums:      null,   // { rkb, gl } from the parent well node
