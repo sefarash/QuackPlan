@@ -62,7 +62,8 @@ function drawAFE() {
   const C = _qpColors();
   ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
 
-  // Grid + axis labels
+  // Grid + axis labels (tick values follow the zoom window — chart-zoom.js)
+  const zw = _zoomWin(ctx, { l, t, pw, ph });
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
     const y = t + ph * i / 5;
@@ -74,17 +75,17 @@ function drawAFE() {
     // Left axis — Depth, 0 at top, maxDepth at bottom
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText(Math.round(toD(maxDepth * i / 5)).toLocaleString(), l - 5, y);
+    ctx.fillText(Math.round(toD(maxDepth * zw.fy(i / 5))).toLocaleString(), l - 5, y);
 
     // Top axis — Cum. Days, 0 at left, maxDays at right
     ctx.fillStyle = '#2a7fa8';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText((maxDays * i / 5).toFixed(1), x, t - 5);
+    ctx.fillText((maxDays * zw.fx(i / 5)).toFixed(1), x, t - 5);
 
     // Right axis — Cum. Cost, $0 at bottom, $maxCost at top
     ctx.fillStyle = '#1a7a4a';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    const costVal = maxCost * (1 - i / 5);
+    const costVal = maxCost * (1 - zw.fy(i / 5));
     ctx.fillText('$' + (costVal >= 1e6 ? (costVal / 1e6).toFixed(1) + 'M'
                                         : (costVal / 1000).toFixed(0) + 'K'),
       l + pw + 4, y);
@@ -118,6 +119,7 @@ function drawAFE() {
     xLabel: 'Cum. Days', yLabel: `Depth (${uD})`,
     depthDown: true,
   });
+  _zoomBegin(ctx);            // the data drawn after this goes through the zoom window
   CI.drawFrozen(ctx, 'afeCanvas');
 
   // Days curve: x=days, y=depth (depth-down)

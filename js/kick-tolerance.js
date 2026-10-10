@@ -405,7 +405,7 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
     ctx.setLineDash([]);
     ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText(`${row.size}"`, g.l + 2, y - 1);
+    _lblQueue(`${row.size}"`, g.l, y, { dx: 2, dy: -12, pinX: true, color: ctx.fillStyle, font: ctx.font, bounds: g, dir: -1 });
   });
 
   _legend(ctx, W, g.t, ['PP', 'FG', 'MW'], ['#1a7a4a', '#c0392b', '#7a4aa0']);

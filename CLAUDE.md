@@ -156,22 +156,38 @@ Canvas elements also need `CI.attach(canvasId)` called once on `DOMContentLoaded
 
 ### Chart zoom (`js/chart-zoom.js`, `QP_ZOOM`)
 
-Zoom / pan is a VIEW transform, not a per-chart feature: `_chartSetup` calls
-`QP_ZOOM.apply(ctx, canvasId)` after clearing, so draw code keeps working in base coordinates
-and is redrawn magnified (drag a box to zoom into that area, wheel / pinch to zoom at the pointer,
-Shift + drag to move the view, ＋ / − / ⟲ buttons bottom-left; view state is in-memory, reset on
-scenario switch). Anything that
-maps the mouse onto a chart must convert first: `QP_ZOOM.eventToBase(canvas, e)` /
-`toBase(id, cx, cy)` (CI crosshair + right-click, the Profile and Final Diagram label drags,
-which also call `QP_ZOOM.cancelPan()` when they grab a label). A new chart canvas needs
-`QP_ZOOM.attach(id)` in the DOMContentLoaded list in `index.html`, next to `CI.attach`.
+Drag a box to zoom into that area, wheel / pinch to zoom at the pointer, Shift + drag to move the
+view, ＋ / − / ⟲ buttons top-left. View state is in-memory, reset on scenario switch. At 100%
+nothing is clipped, transformed or patched.
+
+- **Plot mode (charts with axes)** — the axes stay put and read the zoomed range; only the data
+  moves. A grid function calls `_zoomWin(ctx, {l,t,pw,ph}, {uniform?})` (td-charts.js wrapper of
+  `QP_ZOOM.plotWindow`), labels its ticks through `zw.fx(f)` / `zw.fy(f)` ("fraction f across /
+  down the plot" → fraction of the full axis; `zw.sx/sy` give the screen position of an axis
+  fraction), then calls `_zoomBegin(ctx)`. After that the chart's draw code runs unchanged in base
+  coordinates through a clip + transform; the context is patched while it is on so strokes keep
+  their width, text and marker circles keep their size, and text / swatches drawn in the margins
+  are held back and drawn in place. `_legend`, `_lblFlush`, `_noData` and `CI.drawAnnotations`
+  call `_zoomEnd` — every chart draw must end in one of them.
+- **Fixed overlays inside the plot** (notes, tables, multi-line label blocks): draw them between
+  `QP_ZOOM.pause(ctx)` / `resume(ctx)`, or after `_zoomEnd`, positioning data-anchored ones with
+  `QP_ZOOM.pt(id, x, y)` (base → screen) and skipping them when `!QP_ZOOM.visible(...)`.
+- **Canvas mode (no axes: Final Diagram, pie, Compare)** — `_chartSetup` → `QP_ZOOM.apply` just
+  magnifies the whole canvas.
+- Anything that maps the mouse onto a chart converts first: `QP_ZOOM.toBase(id, cx, cy)` /
+  `eventToBase(canvas, e)` (CI crosshair + right-click, the Final Diagram label drag). Label-drag
+  handlers call `QP_ZOOM.cancelPan()` when they grab a label.
+- A new chart canvas needs `QP_ZOOM.attach(id)` in the DOMContentLoaded list in `index.html`.
 
 ### Chart labels and legends (no fixed positions)
 
 Canvas labels must not be drawn at fixed spots with `ctx.fillText` — at smaller window sizes they
 collide. Use the shared layout helpers in `td-charts.js` (`_chartSetup` resets them per draw):
 
-- `_lblQueue(text, x, y, {align, font, color, bounds, dir})` — queue a label (`y` = top of text);
+- `_lblQueue(text, x, y, {align, font, color, bounds, dir, dx, dy, pin, pinX, pinY, clampY})` —
+  queue a label at the BASE point it belongs to (`dx`/`dy` = pixel offset, `y + dy` = top of text;
+  `pin` = fixed note, `pinX`/`pinY` = only the other axis follows the data, `clampY` = stay in
+  view). Zoomed, a label whose anchor is outside the visible plot is not drawn;
   `_lblFlush(ctx)` places each one clamped inside `bounds` and stepped down/up a line until it is
   clear of everything already placed. `_lblReserve(x, y, w, h)` blocks out a box (a marker dot, a
   hand-drawn label).

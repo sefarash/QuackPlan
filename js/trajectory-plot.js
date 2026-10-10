@@ -31,9 +31,9 @@ function _vsInitDrag(canvas) {
     a => mx >= a.x && mx <= a.x + a.w && my >= a.y && my <= a.y + a.h
   );
 
-  // Mouse position in the chart's base coordinates (the view may be zoomed)
+  // Casing labels are drawn in screen space (they keep their size when the plot
+  // is zoomed), so hit-testing and drag offsets are plain canvas pixels.
   const pos = e => {
-    if (typeof QP_ZOOM !== 'undefined') return QP_ZOOM.eventToBase(canvas, e);
     const r = canvas.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
@@ -147,6 +147,10 @@ function _drawVS(survey) {
   ctx.stroke();
 
   // ── Casing / liner shoe markers ──
+  // Drawn in screen space so the 3-line labels keep their size and spacing when
+  // the plot is zoomed; SP maps a base point through the zoom window.
+  const ZM = (typeof QP_ZOOM !== 'undefined') ? QP_ZOOM : null;
+  const SP = (x, y) => ZM ? ZM.pt(CID, x, y) : { x, y };
   const LINE_H = 12;   // px per text line
   const LBL_H  = LINE_H * 3 + 4;  // total label block height (3 lines)
 
@@ -156,8 +160,10 @@ function _drawVS(survey) {
     if (!md) return;
     const st  = _interpSurvey(survey, md);
     const dep = toD(Math.sqrt(st.north * st.north + st.east * st.east));
-    const sy  = g.t + (toD(st.tvd) / yMax) * g.ph;
-    const bx  = g.l + (dep         / xMax) * g.pw;
+    // Screen position (through the zoom window); a shoe outside the view is skipped
+    const sp  = SP(g.l + (dep / xMax) * g.pw, g.t + (toD(st.tvd) / yMax) * g.ph);
+    if (ZM && !ZM.visible(CID, sp.x, sp.y, 2)) return;
+    const sy  = sp.y, bx = sp.x;
     if (sy < g.t - 2 || sy > g.t + g.ph + 2) return;
 
     const grade = row.grade     || '';
@@ -194,6 +200,7 @@ function _drawVS(survey) {
   }
 
   // Draw dashes + triangles first (behind labels)
+  if (ZM) ZM.pause(ctx);
   shoeItems.forEach(({ sy, bx }) => {
     ctx.strokeStyle = C.border; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
     ctx.beginPath(); ctx.moveTo(g.l, sy); ctx.lineTo(bx, sy); ctx.stroke();
@@ -241,8 +248,9 @@ function _drawVS(survey) {
 
     // Record hit area for drag detection
     _vsDrag.areas.push({ key, x: lx - 2, y: fy - 2, w: 150, h: LBL_H + 4 });
-    _lblReserve(lx - 2, fy - 1, lblW + 4, LBL_H + 2);     // later labels keep clear of it
+    _lblReserve(lx - 2, fy - 1, lblW + 4, LBL_H + 2, true);     // later labels keep clear of it
   });
+  if (ZM) ZM.resume(ctx);
 
   // ── MD tick labels ── (interval nice in display units; interp stays imperial)
   const last     = pts[pts.length - 1];               // pts.md is display
@@ -257,17 +265,18 @@ function _drawVS(survey) {
     ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
     // Left of the curve when there is room inside the plot, else to its right
     const mdTxt = Math.round(mdD) + ' ' + uD;
-    const onLeft = px - 3 - ctx.measureText(mdTxt).width >= g.l + 2;
-    _lblQueue(mdTxt, onLeft ? px - 3 : px + 6, py - 12,
-      { align: onLeft ? 'right' : 'left', color: C.dim, bounds: { l: g.l, t: g.t, pw: W - g.l, ph: g.ph } });
+    const onLeft = SP(px, py).x - 3 - ctx.measureText(mdTxt).width >= g.l + 2;
+    _lblQueue(mdTxt, px, py,
+      { dx: onLeft ? -3 : 6, dy: -12, align: onLeft ? 'right' : 'left', color: C.dim,
+        bounds: { l: g.l, t: g.t, pw: W - g.l, ph: g.ph } });
   }
 
   // ── Surface marker ──
   ctx.fillStyle = '#2a7fa8';
   ctx.beginPath(); ctx.arc(g.l, g.t, 5, 0, Math.PI * 2); ctx.fill();
   const allCanvas = { l: 0, t: 0, pw: W, ph: H };
-  _lblPending.unshift({ text: `Surface  0 ${uD} MD`, x: g.l + 8, y: g.t + 3,
-                        opt: { bounds: { l: g.l, t: g.t, pw: W - g.l, ph: g.ph } } });
+  _lblPending.unshift({ text: `Surface  0 ${uD} MD`, x: g.l, y: g.t,
+                        opt: { dx: 8, dy: 3, bounds: { l: g.l, t: g.t, pw: W - g.l, ph: g.ph } } });
 
   // ── TD marker ── (last.dep/tvd/md already in display units)
   const tdx = g.l + (last.dep / xMax) * g.pw;
@@ -279,9 +288,10 @@ function _drawVS(survey) {
   _lblReserve(tdx - 6, tdy - 6, 12, 12);
   const tdTxt = `TD  ${Math.round(last.tvd).toLocaleString()} ${uD} TVD · ${Math.round(last.md).toLocaleString()} ${uD} MD`;
   ctx.font = 'bold 9px sans-serif';
-  const tdLeft = tdx + 8 + ctx.measureText(tdTxt).width > W - 3;
-  _lblPending.unshift({ text: tdTxt, x: tdLeft ? tdx - 8 : tdx + 8, y: tdy - 16,
-                        opt: { align: tdLeft ? 'right' : 'left', font: 'bold 9px sans-serif', bounds: allCanvas, dir: -1 } });
+  const tdLeft = SP(tdx, tdy).x + 8 + ctx.measureText(tdTxt).width > W - 3;
+  _lblPending.unshift({ text: tdTxt, x: tdx, y: tdy,
+                        opt: { dx: tdLeft ? -8 : 8, dy: -16, align: tdLeft ? 'right' : 'left',
+                               font: 'bold 9px sans-serif', bounds: allCanvas, dir: -1 } });
   _lblFlush(ctx);
 
   CI.drawAnnotations(ctx, CID);
@@ -320,20 +330,23 @@ function _drawPlan(survey) {
   const toD = v => QP_UNITS.toDisplay('depth', v);
   const uD  = QP_UNITS.label('depth');
 
-  // Grid
+  // Grid — lines fixed on screen, values follow the zoom window (chart-zoom.js);
+  // a plan view keeps equal scales on both axes, so its zoom is uniform.
   const ticks = 4;
   const C = _qpColors();
+  const zw = _zoomWin(ctx, { l: PP.l, t: PP.t, pw, ph }, { uniform: true });
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= ticks; i++) {
-    const e = E0 + (i / ticks) * range;
-    const n = N0 + (i / ticks) * range;
-    ctx.beginPath(); ctx.moveTo(toX(e), PP.t); ctx.lineTo(toX(e), PP.t + ph); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(PP.l, toY(n)); ctx.lineTo(PP.l + pw, toY(n)); ctx.stroke();
+    const gx = PP.l + pw * i / ticks, gy = PP.t + ph * (1 - i / ticks);
+    const e = E0 + zw.fx(i / ticks) * range;
+    const n = N0 + (1 - zw.fy(1 - i / ticks)) * range;
+    ctx.beginPath(); ctx.moveTo(gx, PP.t); ctx.lineTo(gx, PP.t + ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PP.l, gy); ctx.lineTo(PP.l + pw, gy); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '8px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(_shortNum(toD(e)), toX(e), PP.t + ph + 3);
+    ctx.fillText(_shortNum(toD(e)), gx, PP.t + ph + 3);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText(_shortNum(toD(n)), PP.l - 2, toY(n));
+    ctx.fillText(_shortNum(toD(n)), PP.l - 2, gy);
   }
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
   ctx.strokeRect(PP.l, PP.t, pw, ph);
@@ -351,6 +364,7 @@ function _drawPlan(survey) {
   ctx.fillText('Plan View', PP.l + pw / 2, PP.t - 14);
 
   // Wellpath
+  _zoomBegin(ctx);            // the data drawn after this goes through the zoom window
   ctx.strokeStyle = '#1a5f7a'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
   ctx.beginPath();
   _densify(survey, 50).forEach((s, i) => {
@@ -368,6 +382,8 @@ function _drawPlan(survey) {
   ctx.fillStyle = '#c0392b';
   ctx.beginPath(); ctx.arc(toX(last.east), toY(last.north), 5, 0, Math.PI * 2); ctx.fill();
 
+  // North arrow + legend: fixed on screen
+  _zoomEnd(ctx);
   // North arrow (inside top-right of plot)
   const arX = PP.l + pw - 18, arY = PP.t + 26;
   ctx.strokeStyle = C.text; ctx.fillStyle = C.text; ctx.lineWidth = 1.5;

@@ -53,6 +53,7 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   const b = 36, l = 70, r = 20;
   const pw = W - l - r, ph = H - t - b;
   const C  = _qpColors();
+  const zw = _zoomWin(ctx, { l, t, pw, ph });          // visible window (chart-zoom.js)
 
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
@@ -62,15 +63,16 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     // Axes are axial force (klbf) and differential pressure (psi) → display labels
-    ctx.fillText(Math.round(QP_UNITS.toDisplay('force', -xR + 2 * xR * i / 5)).toLocaleString(), gx, t + ph + 4);
+    ctx.fillText(Math.round(QP_UNITS.toDisplay('force', -xR + 2 * xR * zw.fx(i / 5))).toLocaleString(), gx, t + ph + 4);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText(Math.round(QP_UNITS.toDisplay('press', yR - 2 * yR * i / 5)).toLocaleString(), l - 5, gy);
+    ctx.fillText(Math.round(QP_UNITS.toDisplay('press', yR - 2 * yR * zw.fy(i / 5))).toLocaleString(), l - 5, gy);
   }
 
-  const x0 = l + pw / 2, y0 = t + ph / 2;
+  // Zero axes — where they are in the visible window (not drawn when scrolled away)
+  const x0 = zw.sx(0.5), y0 = zw.sy(0.5);
   ctx.strokeStyle = C.dim; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-  ctx.beginPath(); ctx.moveTo(x0, t);  ctx.lineTo(x0, t + ph); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(l, y0);  ctx.lineTo(l + pw, y0); ctx.stroke();
+  if (x0 != null) { ctx.beginPath(); ctx.moveTo(x0, t);  ctx.lineTo(x0, t + ph); ctx.stroke(); }
+  if (y0 != null) { ctx.beginPath(); ctx.moveTo(l, y0);  ctx.lineTo(l + pw, y0); ctx.stroke(); }
   ctx.setLineDash([]);
 
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
@@ -89,6 +91,7 @@ function _cdGrid2D(ctx, W, H, xR, yR) {
   ctx.fillText(`↓ Collapse   Diff. Pressure (${QP_UNITS.label('press')})   Burst ↑`, 0, 0);
   ctx.restore();
 
+  _zoomBegin(ctx);            // the data drawn after this goes through the zoom window
   return { l, t, pw, ph, xR, yR };
 }
 
@@ -306,19 +309,19 @@ function drawCasingTriaxial() {
     const dfOpt = { color: '#d35fb7', bounds: g };
     if (by > 0) {
       const pt = _cdPt({ x: xMidBox, y: by }, g);
-      _lblQueue(`DF = ${sfBurst.toFixed(2)}`, pt.cx, pt.cy + 2, { ...dfOpt, align: 'center' });
+      _lblQueue(`DF = ${sfBurst.toFixed(2)}`, pt.cx, pt.cy, { ...dfOpt, dy: 2, align: 'center' });
     }
     // Collapse DF — just inside bottom edge
     if (cy_b > 0) {
       const pt = _cdPt({ x: xMidBox, y: -cy_b }, g);
-      _lblQueue(`DF = ${sfCollapse.toFixed(2)}`, pt.cx, pt.cy - 14, { ...dfOpt, align: 'center', dir: -1 });
+      _lblQueue(`DF = ${sfCollapse.toFixed(2)}`, pt.cx, pt.cy, { ...dfOpt, dy: -14, align: 'center', dir: -1 });
     }
     // Tension DF — just inside right edge (vertical midpoint)
     const rPt = _cdPt({ x: bx_pos, y: yMidBox }, g);
-    _lblQueue(`DF = ${sfTension.toFixed(2)}`, rPt.cx - 3, rPt.cy - 6, { ...dfOpt, align: 'right' });
+    _lblQueue(`DF = ${sfTension.toFixed(2)}`, rPt.cx, rPt.cy, { ...dfOpt, dx: -3, dy: -6, align: 'right' });
     // Compression DF — just inside left edge
     const lPt = _cdPt({ x: -bx_neg, y: yMidBox }, g);
-    _lblQueue(`DF = ${sfCompression.toFixed(2)}`, lPt.cx + 3, lPt.cy - 6, dfOpt);
+    _lblQueue(`DF = ${sfCompression.toFixed(2)}`, lPt.cx, lPt.cy, { ...dfOpt, dx: 3, dy: -6 });
   }
 
   // ── Von Mises ellipses ──────────────────────────────────────────────────────
@@ -384,8 +387,9 @@ function drawCasingTriaxial() {
     ctx.font = '10px sans-serif';
     const textW = ctx.measureText(pt.label).width;
     const goLeft = (pt.cx + 8 + textW) > (g.l + g.pw - 4);
-    _lblQueue(pt.label, goLeft ? pt.cx - 8 : pt.cx + 8, pt.cy + (pt.labelAbove ? -24 : 10),
-      { align: goLeft ? 'right' : 'left', font: '10px sans-serif', bounds: g, dir: pt.labelAbove ? -1 : 1 });
+    _lblQueue(pt.label, pt.cx, pt.cy,
+      { dx: goLeft ? -8 : 8, dy: pt.labelAbove ? -24 : 10,
+        align: goLeft ? 'right' : 'left', font: '10px sans-serif', bounds: g, dir: pt.labelAbove ? -1 : 1 });
   });
   _lblPending.push(...dfQueued);
 

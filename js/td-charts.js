@@ -42,7 +42,7 @@ function _chartSetup(canvasId) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   // View zoom / pan (chart-zoom.js): everything below draws in base coordinates
   if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.apply(ctx, canvasId);
-  _lblReset();
+  _lblReset(); _lblCanvasId = canvasId;
   return { ctx, W: canvas.width, H: canvas.height, C };
 }
 
@@ -52,19 +52,44 @@ function _chartSetup(canvasId) {
 // QUEUES its labels (_lblQueue) and the legend flushes them (_lblFlush) after
 // reserving its own box: each label is clamped inside its bounds and stepped
 // down (or up) a line at a time until it is clear of everything placed so far.
-let _lblBoxes = [], _lblPending = [];
+let _lblBoxes = [], _lblPending = [], _lblCanvasId = null;
 function _lblReset() { _lblBoxes = []; _lblPending = []; }
-function _lblReserve(x, y, w, h) { _lblBoxes.push({ x, y, w, h }); }
+// A box later labels must avoid. Base coordinates by default (mapped through the
+// zoom window, keeping its size); pass screen=true for a box already on screen.
+function _lblReserve(x, y, w, h, screen) {
+  if (!screen && typeof QP_ZOOM !== 'undefined' && _lblCanvasId) {
+    const c = QP_ZOOM.pt(_lblCanvasId, x + w / 2, y + h / 2);
+    x = c.x - w / 2; y = c.y - h / 2;
+  }
+  _lblBoxes.push({ x, y, w, h });
+}
 function _lblHit(b) {
   return _lblBoxes.some(o => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
 }
-// opt: { align:'left'|'right'|'center', font, color, bounds:{l,t,pw,ph}, dir: 1 (step down) | -1 (step up) }
-// y is the TOP of the text.
+// Queue a label at base point (x, y) — the data point it belongs to — plus a
+// pixel offset. opt: { align:'left'|'right'|'center', font, color,
+//   bounds:{l,t,pw,ph}, dir: 1 (step down) | -1 (step up),
+//   dx, dy   pixel offset from the anchor (y + dy = TOP of the text),
+//   pin      fixed on screen (a note, not tied to data): never moves with zoom,
+//   pinY     only x follows the data (a label at the top of a vertical line),
+//   pinX     only y follows the data (a label at the left of a horizontal line),
+//   clampY   keep it in view vertically when its anchor scrolls off }
+// When zoomed, a label whose anchor is outside the visible plot is not drawn.
 function _lblQueue(text, x, y, opt) { _lblPending.push({ text, x, y, opt: opt || {} }); }
 function _lblFlush(ctx) {
+  _zoomEnd(ctx);                                          // labels are placed in screen space
   const C = _qpColors();
+  const id = ctx.canvas.id, Z = (typeof QP_ZOOM !== 'undefined') ? QP_ZOOM : null;
   const pending = _lblPending; _lblPending = [];
   pending.forEach(({ text, x, y, opt }) => {
+    if (Z && !opt.pin) {
+      const q = Z.pt(id, x, y), R = Z.get(id).rect;
+      const vx = opt.pinX ? R.l + 1 : q.x, vy = (opt.pinY || opt.clampY) ? R.t + 1 : q.y;
+      if (!Z.visible(id, vx, vy, 2)) return;
+      if (!opt.pinX) x = q.x;
+      if (!opt.pinY) y = opt.clampY ? Math.max(R.t, Math.min(q.y, R.t + R.ph)) : q.y;
+    }
+    x += opt.dx || 0; y += opt.dy || 0;
     ctx.save();
     ctx.font = opt.font || '9px sans-serif';
     const px = parseInt((ctx.font.match(/(\d+)px/) || [0, 10])[1], 10);
@@ -84,7 +109,7 @@ function _lblFlush(ctx) {
       }
       if (found) break;
     }
-    _lblReserve(bx - 2, by, w + 4, h);
+    _lblBoxes.push({ x: bx - 2, y: by, w: w + 4, h });
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
     ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = C.bg;   // halo: readable over curves
     ctx.strokeText(text, bx, by + 1);
@@ -94,10 +119,29 @@ function _lblFlush(ctx) {
   });
 }
 
+// ── Zoom-aware axes ───────────────────────────────────────────────────────────
+// _zoomWin: the visible window of the plot (chart-zoom.js) as tick mappers; a
+// plain 0..1 window when the module is absent. _zoomBegin: start drawing the
+// data through that window. _tickFmt: a tick value with enough decimals for the
+// visible span (unchanged whole numbers at 100%).
+function _zoomWin(ctx, g, opts) {
+  if (typeof QP_ZOOM !== 'undefined') return QP_ZOOM.plotWindow(ctx, g, opts);
+  return { zoomed: false, fx: f => f, fy: f => f, sx: f => g.l + f * g.pw, sy: f => g.t + f * g.ph };
+}
+function _zoomBegin(ctx) { if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.begin(ctx); }
+function _zoomEnd(ctx)   { if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.end(ctx); }
+function _tickFmt(v, span, zoomed) {
+  if (!zoomed) return v.toFixed(0);
+  const step = Math.abs(span) / 5;
+  return v.toFixed(step >= 5 ? 0 : step >= 0.5 ? 1 : step >= 0.05 ? 2 : 3);
+}
+
 function _chartGrid(ctx, W, H, xMax, yMax, xLabel, yLabel) {
   const { t, b, l, r } = CHART_PAD;
   const pw = W - l - r, ph = H - t - b;
   const C = _qpColors();
+  const zw = _zoomWin(ctx, { l, t, pw, ph });
+  const xSpan = xMax * (zw.fx(1) - zw.fx(0)), ySpan = yMax * (zw.fy(1) - zw.fy(0));
 
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
@@ -107,9 +151,9 @@ function _chartGrid(ctx, W, H, xMax, yMax, xLabel, yLabel) {
     ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText((xMax * i / 5).toFixed(0), x, t - 14);
+    ctx.fillText(_tickFmt(xMax * zw.fx(i / 5), xSpan, zw.zoomed), x, t - 14);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText((yMax * (5 - i) / 5).toFixed(0), l - 5, y);
+    ctx.fillText(_tickFmt(yMax * (1 - zw.fy(i / 5)), ySpan, zw.zoomed), l - 5, y);
   }
 
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
@@ -124,6 +168,7 @@ function _chartGrid(ctx, W, H, xMax, yMax, xLabel, yLabel) {
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
+  _zoomBegin(ctx);            // the data drawn after this goes through the zoom window
   return { l, t, pw, ph };
 }
 
@@ -150,7 +195,8 @@ function _rigLimitLine(ctx, g, xVal, xMax, label) {
   ctx.beginPath(); ctx.moveTo(x, g.t); ctx.lineTo(x, g.t + g.ph); ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
-  _lblQueue(label, x - 4, g.t + 4, { align: 'right', font: 'bold 9px sans-serif', color: '#c0392b', bounds: g });
+  // the label rides at the top of the visible line, whatever the zoom
+  _lblQueue(label, x, g.t, { dx: -4, dy: 4, pinY: true, align: 'right', font: 'bold 9px sans-serif', color: '#c0392b', bounds: g });
 }
 
 // ── Torque chart ──────────────────────────────────────────────────────────────
@@ -253,10 +299,10 @@ function drawTorque(r) {
       if (seen.has(key)) return;
       seen.add(key);
       const x = g.l + Math.min(toTq(seg.mutK) / xMax, 1) * g.pw;
-      const y = g.t + (toD(seg.topMD) / yMax) * g.ph + 4;
+      const y = g.t + (toD(seg.topMD) / yMax) * g.ph;
       const rightSide = x < g.l + g.pw * 0.7;      // label on the side of the line that has room
-      _lblQueue(`${seg.label}: ${toTq(seg.mutK).toFixed(1)} ${uTq}`, rightSide ? x + 3 : x - 4, y,
-        { align: rightSide ? 'left' : 'right', color: '#c0392b', bounds: g });
+      _lblQueue(`${seg.label}: ${toTq(seg.mutK).toFixed(1)} ${uTq}`, x, y,
+        { dx: rightSide ? 3 : -4, dy: 4, clampY: true, align: rightSide ? 'left' : 'right', color: '#c0392b', bounds: g });
     });
   }
 
@@ -434,7 +480,7 @@ function drawOverpull(r) {
   const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, `Hook Load (${uF})`, `MD (${uD})`);
 
   _lblQueue(`BF=${BF.toFixed(3)}  MW=${QP_UNITS.toDisplay('mw',mw).toFixed(1)} ${uMW}  Block=${toF(blockWt).toFixed(0)} ${uF}`,
-    g.l + g.pw - 4, g.t + g.ph - 14, { align: 'right', color: _qpColors().dim, bounds: g, dir: -1 });
+    g.l + g.pw - 4, g.t + g.ph - 14, { pin: true, align: 'right', color: _qpColors().dim, bounds: g, dir: -1 });
 
   const toLine = sts => sts.map(s => ({ x: toF(toV(s)), y: toD(s.md) }));
   const liveCurves = [
@@ -483,10 +529,10 @@ function drawOverpull(r) {
       if (seen.has(key)) return;
       seen.add(key);
       const x = g.l + Math.min(toF(seg.yieldK) / xMax, 1) * g.pw;
-      const y = g.t + (toD(seg.topMD) / yMax) * g.ph + 4;
+      const y = g.t + (toD(seg.topMD) / yMax) * g.ph;
       const rightSide = x < g.l + g.pw * 0.7;      // label on the side of the line that has room
-      _lblQueue(`${seg.label}: ${toF(seg.yieldK).toFixed(0)} ${uF}`, rightSide ? x + 3 : x - 4, y,
-        { align: rightSide ? 'left' : 'right', color: YIELD_CLR, bounds: g });
+      _lblQueue(`${seg.label}: ${toF(seg.yieldK).toFixed(0)} ${uF}`, x, y,
+        { dx: rightSide ? 3 : -4, dy: 4, clampY: true, align: rightSide ? 'left' : 'right', color: YIELD_CLR, bounds: g });
     });
   }
 
@@ -620,16 +666,20 @@ function drawBroomstick(r) {
   [[2, ffHi], [1, ffMid], [0, ffLo], [4, ffLo], [5, ffMid], [6, ffHi]].forEach(([ci, ff]) => {
     const c = liveCurves[ci], last = c.pts[c.pts.length - 1];
     if (!last) return;
-    _lblQueue(`${ff}FF`, g.l + (last.x / xMax) * pw, g.t + ph - 13, { align: 'center', color: c.color, bounds: g, dir: -1 });
+    _lblQueue(`${ff}FF`, g.l + (last.x / xMax) * pw, g.t + (last.y / yMax) * ph,
+      { dy: -13, align: 'center', color: c.color, bounds: g, dir: -1 });
   });
-  _lblQueue('Slack off', g.l + 6, labelMidY - 7, { font: bold11, bounds: g });
-  _lblQueue('Pick up', g.l + pw - 6, labelMidY - 7, { align: 'right', font: bold11, bounds: g });
-  const rotPts = liveCurves[3].pts, rotMidPt = rotPts[Math.floor(rotPts.length / 2)];
+  _lblQueue('Slack off', g.l + 6, labelMidY - 7, { pin: true, font: bold11, bounds: g });
+  _lblQueue('Pick up', g.l + pw - 6, labelMidY - 7, { pin: true, align: 'right', font: bold11, bounds: g });
+  // on the rotating curve, at the point nearest the label band
+  const rotPts = liveCurves[3].pts;
+  const rotMidPt = rotPts.length ? rotPts.reduce((a, p) =>
+    Math.abs(g.t + (p.y / yMax) * ph - (labelMidY + 20)) < Math.abs(g.t + (a.y / yMax) * ph - (labelMidY + 20)) ? p : a) : null;
   if (rotMidPt) {
-    _lblQueue('Rotation Off Bottom', g.l + (rotMidPt.x / xMax) * pw + 6, labelMidY + 14,
-      { font: 'bold 10px sans-serif', color: '#8e44ad', bounds: g });
+    _lblQueue('Rotation Off Bottom', g.l + (rotMidPt.x / xMax) * pw, g.t + (rotMidPt.y / yMax) * ph,
+      { dx: 6, dy: -6, font: 'bold 10px sans-serif', color: '#8e44ad', bounds: g });
   }
-  _lblQueue(bsNote, g.l + 4, g.t + 4, { color: _qpColors().dim, bounds: g });
+  _lblQueue(bsNote, g.l + 4, g.t + 4, { pin: true, color: _qpColors().dim, bounds: g });
 
   const bsLegLabels = [`RIH ${ffLo}`, `RIH ${ffMid}`, `RIH ${ffHi}`,
      'Rot Off Btm',
@@ -648,6 +698,8 @@ function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel, opts) {
   const pw = W - l - r, ph = H - t - b;
   const C = _qpColors();
   const bottomX = opts && opts.bottomX;
+  const zw = _zoomWin(ctx, { l, t, pw, ph });
+  const xSpan = xMax * (zw.fx(1) - zw.fx(0)), ySpan = yMax * (zw.fy(1) - zw.fy(0));
 
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
@@ -658,13 +710,13 @@ function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel, opts) {
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     if (bottomX) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText((xMax * i / 5).toFixed(0), x, t + ph + 4);
+      ctx.fillText(_tickFmt(xMax * zw.fx(i / 5), xSpan, zw.zoomed), x, t + ph + 4);
     } else {
       ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.fillText((xMax * i / 5).toFixed(0), x, t - 14);
+      ctx.fillText(_tickFmt(xMax * zw.fx(i / 5), xSpan, zw.zoomed), x, t - 14);
     }
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText((yMax * i / 5).toFixed(0), l - 5, y);
+    ctx.fillText(_tickFmt(yMax * zw.fy(i / 5), ySpan, zw.zoomed), l - 5, y);
   }
 
   ctx.strokeStyle = C.border; ctx.lineWidth = 1.5;
@@ -679,6 +731,7 @@ function _chartGridDepthDown(ctx, W, H, xMax, yMax, xLabel, yLabel, opts) {
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
+  _zoomBegin(ctx);            // the data drawn after this goes through the zoom window
   return { l, t, pw, ph };
 }
 
@@ -699,6 +752,8 @@ function _chartGridDepthDownSigned(ctx, W, H, xMin, xMax, yMax, xLabel, yLabel) 
   const pw = W - l - r, ph = H - t - b;
   const xRange = xMax - xMin;
   const C = _qpColors();
+  const zw = _zoomWin(ctx, { l, t, pw, ph });
+  const xSpan = xRange * (zw.fx(1) - zw.fx(0)), ySpan = yMax * (zw.fy(1) - zw.fy(0));
 
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
@@ -708,13 +763,13 @@ function _chartGridDepthDownSigned(ctx, W, H, xMin, xMax, yMax, xLabel, yLabel) 
     ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l + pw, y); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText((xMin + xRange * i / 5).toFixed(0), x, t - 14);
+    ctx.fillText(_tickFmt(xMin + xRange * zw.fx(i / 5), xSpan, zw.zoomed), x, t - 14);
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText((yMax * i / 5).toFixed(0), l - 5, y);
+    ctx.fillText(_tickFmt(yMax * zw.fy(i / 5), ySpan, zw.zoomed), l - 5, y);
   }
 
-  if (xMin < 0 && xMax > 0) {
-    const xZero = l + (-xMin / xRange) * pw;
+  const xZero = (xMin < 0 && xMax > 0) ? zw.sx(-xMin / xRange) : null;   // null when scrolled out of view
+  if (xZero != null) {
     ctx.strokeStyle = C.dim; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.moveTo(xZero, t); ctx.lineTo(xZero, t + ph); ctx.stroke();
     ctx.setLineDash([]);
@@ -735,6 +790,7 @@ function _chartGridDepthDownSigned(ctx, W, H, xMin, xMax, yMax, xLabel, yLabel) 
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
 
+  _zoomBegin(ctx);            // the data drawn after this goes through the zoom window
   return { l, t, pw, ph };
 }
 
@@ -756,6 +812,7 @@ function _chartLineDepthDownSigned(ctx, pts, color, lw, g, xMin, xMax, yMax) {
 // left axis), on a backing panel. Reserves its box, then places the queued
 // labels around it. `bounds` = {l, pw} of the plot; defaults to CHART_PAD.
 function _legend(ctx, W, t, labels, colors, bounds) {
+  _zoomEnd(ctx);                                          // the legend is fixed on screen
   const C = _qpColors();
   const l  = bounds ? bounds.l  : CHART_PAD.l;
   const pw = bounds ? bounds.pw : W - CHART_PAD.l - CHART_PAD.r;
@@ -778,7 +835,7 @@ function _legend(ctx, W, t, labels, colors, bounds) {
     ctx.globalAlpha = 0.86; ctx.fillStyle = C.bg;
     ctx.fillRect(right - blockW, top, blockW, blockH);
     ctx.globalAlpha = 1;
-    _lblReserve(right - blockW, top, blockW, blockH);
+    _lblReserve(right - blockW, top, blockW, blockH, true);
     rows.forEach((r, ri) => {
       let x = right - PADX - widthOf(r);
       const y = top + PADY + ri * ROW_H + ROW_H / 2;
@@ -828,6 +885,7 @@ function _noBha(ctx, W, H, canvasId) {
 }
 
 function _noData(ctx, W, H, msg) {
+  _zoomEnd(ctx);
   ctx.fillStyle = _qpColors().dim; ctx.font = '13px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(msg, W / 2, H / 2);

@@ -28,9 +28,7 @@ function drawHydSweep(h) {
   ctx.setLineDash([6, 3]);
   ctx.beginPath(); ctx.moveTo(g.l, limitY); ctx.lineTo(g.l + g.pw, limitY); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = '#c0392b'; ctx.font = '10px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  ctx.fillText('SPP limit', g.l + 4, limitY - 2);
+  _lblQueue('SPP limit', g.l, limitY, { dx: 4, dy: -14, font: '10px sans-serif', color: '#c0392b', bounds: g, dir: -1, pinX: true });
 
   const sweepPts = h.sweep.map(s => ({ x: toF(s.q), y: toP(s.spp) }));
   CI.storeLive(CID, [{ pts: sweepPts, color: '#1a5f7a', label: 'SPP' }]);
@@ -45,14 +43,12 @@ function drawHydSweep(h) {
   const opY = g.t + (1 - toP(h.pumpPressure) / maxSPP) * g.ph;
   ctx.fillStyle = '#f0a500';
   ctx.beginPath(); ctx.arc(opX, opY, 5, 0, Math.PI * 2); ctx.fill();
-  const C = _qpColors();
-  ctx.fillStyle = C.text; ctx.font = '10px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  ctx.fillText(`${Math.round(toF(h.flowRate))} ${uF} / ${Math.round(toP(h.pumpPressure))} ${uP}`, opX + 8, opY - 2);
-
-  ctx.fillStyle = C.text; ctx.font = '11px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(`ECD at bit: ${toM(h.ecdAtBit).toFixed(uM === 'ppg' ? 2 : 0)} ${uM}   HSI: ${h.hsi?.toFixed(2) ?? '—'}`, g.l, g.t + 4);
+  _lblReserve(opX - 6, opY - 6, 12, 12);
+  _lblQueue(`${Math.round(toF(h.flowRate))} ${uF} / ${Math.round(toP(h.pumpPressure))} ${uP}`, opX, opY,
+    { dx: 8, dy: -15, font: '10px sans-serif', bounds: g, dir: -1 });
+  _lblQueue(`ECD at bit: ${toM(h.ecdAtBit).toFixed(uM === 'ppg' ? 2 : 0)} ${uM}   HSI: ${h.hsi?.toFixed(2) ?? '—'}`,
+    g.l + 2, g.t + 4, { pin: true, font: '11px sans-serif', bounds: g });
+  _lblFlush(ctx);
 
   CI.drawAnnotations(ctx, CID);
 }

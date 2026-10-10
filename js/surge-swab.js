@@ -313,11 +313,14 @@ function drawSurgeSwab() {
   const cy = mdD  => T + (mdD  / yMaxD) * ph;
 
   // ── Grid ──────────────────────────────────────────────────────────────────────
+  // Tick positions are fixed on screen; their VALUES follow the visible window
+  // (chart-zoom.js), so a zoomed chart reads the range actually shown.
   const N_X = 6, N_Y = 6;
+  const zw = _zoomWin(ctx, { l: L, t: T, pw, ph });
   ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
   for (let i = 0; i <= N_X; i++) {
-    const ecdD = xMinD + (xMaxD - xMinD) * i / N_X;
-    const gx   = cx(ecdD);
+    const ecdD = xMinD + (xMaxD - xMinD) * zw.fx(i / N_X);
+    const gx   = L + pw * i / N_X;
     ctx.beginPath(); ctx.moveTo(gx, T); ctx.lineTo(gx, T + ph); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -329,8 +332,8 @@ function drawSurgeSwab() {
     }
   }
   for (let i = 0; i <= N_Y; i++) {
-    const mdImp = maxMD * i / N_Y;          // imperial for the survey lookup
-    const gy    = cy(toD(mdImp));
+    const mdImp = maxMD * zw.fy(i / N_Y);   // imperial for the survey lookup
+    const gy    = T + ph * i / N_Y;
     ctx.beginPath(); ctx.moveTo(L, gy); ctx.lineTo(L + pw, gy); ctx.stroke();
     ctx.fillStyle = C.dim; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
@@ -362,6 +365,8 @@ function drawSurgeSwab() {
   ctx.fillStyle = C.dim;
   ctx.fillText(`TVD (${uD})`, 0, 0);
   ctx.restore();
+
+  _zoomBegin(ctx);            // the data drawn after this goes through the zoom window
 
   // ── CI storage — both fans, so freeze/tooltip see swab too (display coords) ─
   CI.storeLive(CID, SS_SPEEDS.flatMap((v, i) => [
@@ -429,6 +434,7 @@ function drawSurgeSwab() {
   ctx.restore(); // end clip
 
   // ── Speed tables (Show Data) ──────────────────────────────────────────────────
+  _zoomEnd(ctx);              // tables, legend and caption are fixed on screen
   if (showData) {
     const intervals = _ssIntervals(surgeProfs, swabProfs, ppfgPts, survey);
     if (intervals) {

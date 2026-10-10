@@ -56,7 +56,8 @@ const CI = (() => {
         });
         ctx.stroke();
       });
-      // Label tag — colored swatch + label text
+      // Label tag — colored swatch + label text (fixed on screen, not zoomed)
+      if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.pause(ctx);
       ctx.globalAlpha = 0.80;
       ctx.setLineDash([]);
       const tagColor = snap.curves[0]?.color || '#1a5f7a';
@@ -67,6 +68,7 @@ const CI = (() => {
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillStyle = '#1a2b38';
       ctx.fillText(`❄ ${snap.label}`, l + 15, ty);
+      if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.resume(ctx);
     });
     ctx.restore();
     ctx.setLineDash([]);
@@ -74,12 +76,17 @@ const CI = (() => {
 
   function drawAnnotations(ctx, id) {
     const s = _st(id);
+    // Last call of every chart draw → always leave the zoom window here
+    if (typeof QP_ZOOM !== 'undefined') QP_ZOOM.end(ctx);
     if (!s.meta || !s.annotations.length) return;
     const { pad: { l, t, pw, ph }, xMax, yMax, depthDown } = s.meta;
+    const Z = (typeof QP_ZOOM !== 'undefined') ? QP_ZOOM : null;
+    if (Z) Z.end(ctx);                                    // pins are drawn in screen space
 
     s.annotations.forEach(ann => {
-      const cx = l + (ann.xVal / xMax) * pw;
-      const cy = depthDown ? t + (ann.yVal / yMax) * ph : t + (1 - ann.yVal / yMax) * ph;
+      let cx = l + (ann.xVal / xMax) * pw;
+      let cy = depthDown ? t + (ann.yVal / yMax) * ph : t + (1 - ann.yVal / yMax) * ph;
+      if (Z) { const q = Z.pt(id, cx, cy); if (!Z.visible(id, q.x, q.y, 2)) return; cx = q.x; cy = q.y; }
 
       ctx.fillStyle = '#c0392b';
       ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
@@ -152,13 +159,11 @@ const CI = (() => {
     const Z  = (typeof QP_ZOOM !== 'undefined') ? QP_ZOOM : null;
     const b  = Z ? Z.toBase(id, cx, cy) : { x: cx, y: cy };
     const bp = s.meta.pad;
-    if (b.x < bp.l || b.x > bp.l + bp.pw || b.y < bp.t || b.y > bp.t + bp.ph) {
+    // …and the pointer itself must be over the plot (zoomed, a margin point maps inside it)
+    if (b.x < bp.l || b.x > bp.l + bp.pw || b.y < bp.t || b.y > bp.t + bp.ph || (Z && !Z.visible(id, cx, cy, 0))) {
       _clearOv(ov, canvas); _tip.style.display = 'none'; return;
     }
-    const sp = Z ? Z.toScreenRect(id, bp) : bp;
-    const l  = Math.max(0, sp.l), t = Math.max(0, sp.t);
-    const pw = Math.min(canvas.width,  sp.l + sp.pw) - l;
-    const ph = Math.min(canvas.height, sp.t + sp.ph) - t;
+    const { l, t, pw, ph } = Z ? Z.visibleRect(id, bp) : bp;     // the plot as it is on screen
 
     ov.width  = canvas.width;
     ov.height = canvas.height;
@@ -197,9 +202,10 @@ const CI = (() => {
     const rect = canvas.getBoundingClientRect();
     let cx     = (e.clientX - rect.left) * (canvas.width  / rect.width);
     let cy     = (e.clientY - rect.top)  * (canvas.height / rect.height);
+    const onPlot = (typeof QP_ZOOM === 'undefined') || QP_ZOOM.visible(id, cx, cy, 0);
     if (typeof QP_ZOOM !== 'undefined') { const b = QP_ZOOM.toBase(id, cx, cy); cx = b.x; cy = b.y; }   // base coords
     const s    = _st(id);
-    const inPl = s.meta && _inPlot(cx, cy, s.meta.pad);
+    const inPl = s.meta && onPlot && _inPlot(cx, cy, s.meta.pad);
     const coords = (s.meta && inPl) ? _toData(cx, cy, s.meta) : null;
 
     const items = [
