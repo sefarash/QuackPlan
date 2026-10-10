@@ -179,6 +179,12 @@ function _drawVS(survey) {
       if (it.ly < prevBottom + 4) it.ly = prevBottom + 4;
     }
   });
+  // …and back up from the bottom, so the deepest label is never cut off by the
+  // canvas edge on a short chart
+  for (let i = shoeItems.length - 1; i >= 0; i--) {
+    const floor = (i === shoeItems.length - 1 ? H - 3 : shoeItems[i + 1].ly - 4) - LBL_H;
+    if (shoeItems[i].ly > floor) shoeItems[i].ly = Math.max(g.t + 2, floor);
+  }
 
   // Draw dashes + triangles first (behind labels)
   shoeItems.forEach(({ sy, bx }) => {
@@ -197,8 +203,16 @@ function _drawVS(survey) {
   shoeItems.forEach(({ bx, sy, ly, lines }) => {
     const key = lines[0];
     const off = _vsDrag.offsets.get(key) || { dx: 0, dy: 0 };
-    const lx = bx + 9 + off.dx;
-    const fy = ly + off.dy;
+    // Widest line of the label → keep the whole label on the canvas: to the
+    // right of the shoe when it fits, else to its left (never clipped).
+    const lblW = Math.max(...lines.map((line, li) => {
+      ctx.font = (li === 0 ? 'bold ' : '') + '9px sans-serif';
+      return ctx.measureText(line).width;
+    }));
+    let lx = bx + 9 + off.dx;
+    if (lx + lblW > W - 3) lx = (bx - 9 - lblW >= 2 && !off.dx) ? bx - 9 - lblW : W - 3 - lblW;
+    lx = Math.max(2, lx);
+    const fy = Math.max(2, Math.min(ly + off.dy, H - 3 - LBL_H));
 
     // Thin vertical leader when label is displaced from its shoe line
     const displaced = fy > sy + LBL_H || off.dx !== 0 || off.dy !== 0;
@@ -220,6 +234,7 @@ function _drawVS(survey) {
 
     // Record hit area for drag detection
     _vsDrag.areas.push({ key, x: lx - 2, y: fy - 2, w: 150, h: LBL_H + 4 });
+    _lblReserve(lx - 2, fy - 1, lblW + 4, LBL_H + 2);     // later labels keep clear of it
   });
 
   // ── MD tick labels ── (interval nice in display units; interp stays imperial)
@@ -233,28 +248,34 @@ function _drawVS(survey) {
     const py  = g.t + (toD(st.tvd) / yMax) * g.ph;
     ctx.fillStyle = C.border;
     ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = C.dim;
-    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-    ctx.fillText(Math.round(mdD) + ' ' + uD, px - 3, py - 2);
+    // Left of the curve when there is room inside the plot, else to its right
+    const mdTxt = Math.round(mdD) + ' ' + uD;
+    const onLeft = px - 3 - ctx.measureText(mdTxt).width >= g.l + 2;
+    _lblQueue(mdTxt, onLeft ? px - 3 : px + 6, py - 12,
+      { align: onLeft ? 'right' : 'left', color: C.dim, bounds: { l: g.l, t: g.t, pw: W - g.l, ph: g.ph } });
   }
 
   // ── Surface marker ──
   ctx.fillStyle = '#2a7fa8';
   ctx.beginPath(); ctx.arc(g.l, g.t, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  ctx.fillText(`Surface  0 ${uD} MD`, g.l + 7, g.t - 1);
+  const allCanvas = { l: 0, t: 0, pw: W, ph: H };
+  _lblPending.unshift({ text: `Surface  0 ${uD} MD`, x: g.l + 8, y: g.t + 3,
+                        opt: { bounds: { l: g.l, t: g.t, pw: W - g.l, ph: g.ph } } });
 
   // ── TD marker ── (last.dep/tvd/md already in display units)
   const tdx = g.l + (last.dep / xMax) * g.pw;
   const tdy = g.t  + (last.tvd / yMax) * g.ph;
   ctx.fillStyle = '#c0392b';
   ctx.beginPath(); ctx.arc(tdx, tdy, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = C.text; ctx.font = 'bold 9px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  const tdIndent = ctx.measureText('TD  ').width;
-  ctx.fillText(`TD  ${Math.round(last.tvd).toLocaleString()} ${uD} TVD`, tdx + 7, tdy + 2);
-  ctx.fillText(`${Math.round(last.md).toLocaleString()} ${uD} MD`,       tdx + 7 + tdIndent, tdy + 13);
+  // One line, placed clear of the shoe labels and kept on the canvas (it used
+  // to run off the right edge on top of the deepest shoe label)
+  _lblReserve(tdx - 6, tdy - 6, 12, 12);
+  const tdTxt = `TD  ${Math.round(last.tvd).toLocaleString()} ${uD} TVD · ${Math.round(last.md).toLocaleString()} ${uD} MD`;
+  ctx.font = 'bold 9px sans-serif';
+  const tdLeft = tdx + 8 + ctx.measureText(tdTxt).width > W - 3;
+  _lblPending.unshift({ text: tdTxt, x: tdLeft ? tdx - 8 : tdx + 8, y: tdy - 16,
+                        opt: { align: tdLeft ? 'right' : 'left', font: 'bold 9px sans-serif', bounds: allCanvas, dir: -1 } });
+  _lblFlush(ctx);
 
   CI.drawAnnotations(ctx, CID);
 }

@@ -814,13 +814,13 @@
         <button class="hdr-btn" onclick="drawCasingDesign()">Compute</button>
         <button class="hdr-btn" onclick="exportChartPNG('cdTriaxialCanvas','triaxial.png')">⬇ PNG</button>
       </div>
-      <div style="display:flex;flex:1;gap:12px;min-height:0">
+      <div class="chart-split">
         <!-- Triaxial / Von Mises chart -->
-        <div class="output-canvas-wrap" style="flex:3">
+        <div class="output-canvas-wrap" style="flex:3 1 380px">
           <canvas id="cdTriaxialCanvas"></canvas>
         </div>
         <!-- Casing selection + ratings -->
-        <div style="flex:0 0 300px;min-width:0;overflow-y:auto;padding-right:4px">
+        <div class="chart-side" style="flex:1 1 300px">
           <div id="cdRatingsDiv"></div>
         </div>
       </div>
@@ -846,13 +846,13 @@
         <button class="hdr-btn" onclick="exportKT()">⬇ KT CSV</button>
         <button class="hdr-btn" onclick="exportChartPNG('ktCanvas','ppfg_kt.png')">⬇ PNG</button>
       </div>
-      <div style="display:flex;flex:1;gap:10px;min-height:0">
+      <div class="chart-split">
         <!-- Left: PPFG chart -->
-        <div class="output-canvas-wrap" style="flex:1">
+        <div class="output-canvas-wrap" style="flex:1 1 300px">
           <canvas id="ktCanvas"></canvas>
         </div>
         <!-- Right: KT results -->
-        <div style="flex:1;min-width:0;overflow-y:auto;padding-right:4px">
+        <div class="chart-side" style="flex:1 1 300px">
           <div class="section-label" style="margin-bottom:6px">Kick Tolerance per Section</div>
           <div id="ktResultsDiv"></div>
         </div>

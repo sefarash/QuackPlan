@@ -154,6 +154,21 @@ When calling `CI.register()`, set `depthDown: true` only for `_chartGridDepthDow
 
 Canvas elements also need `CI.attach(canvasId)` called once on `DOMContentLoaded` (in the inline script at the bottom of `index.html`).
 
+### Chart labels and legends (no fixed positions)
+
+Canvas labels must not be drawn at fixed spots with `ctx.fillText` — at smaller window sizes they
+collide. Use the shared layout helpers in `td-charts.js` (`_chartSetup` resets them per draw):
+
+- `_lblQueue(text, x, y, {align, font, color, bounds, dir})` — queue a label (`y` = top of text);
+  `_lblFlush(ctx)` places each one clamped inside `bounds` and stepped down/up a line until it is
+  clear of everything already placed. `_lblReserve(x, y, w, h)` blocks out a box (a marker dot, a
+  hand-drawn label).
+- `_legend(ctx, W, t, labels, colors, bounds?)` — measured, wraps onto extra rows inside the plot
+  width, reserves its box, then calls `_lblFlush`. A chart with no legend calls `_lblFlush` itself.
+- `_fitText(ctx, text, cx, y, maxW)` — one centred header line that shrinks, then ellipsises.
+- A chart beside a results table uses the `.chart-split` container (table wraps below the chart
+  when the centre column is narrow).
+
 ### Adding a new output tab
 
 1. Add `<div id="panel-{name}" class="output-panel">` with a `<canvas id="{name}Canvas">` in `index.html`

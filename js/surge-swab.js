@@ -443,24 +443,27 @@ function drawSurgeSwab() {
   }
 
   // ── Legend ────────────────────────────────────────────────────────────────────
-  const lgW = SS_SPEEDS.length * 76;
-  let lx = L + (pw - lgW) / 2;
+  // Item pitch follows the canvas width; on a narrow chart the unit is dropped
+  // from the items (it is in the caption) so they never run into each other.
+  const lgStep = Math.min(76, (W - 12) / SS_SPEEDS.length);
+  const lgW = SS_SPEEDS.length * lgStep;
+  let lx = Math.max(6, Math.min(L + (pw - lgW) / 2, W - lgW - 6));
   SS_SPEEDS.forEach((v, i) => {
     ctx.fillStyle = SS_COLORS[i];
     ctx.fillRect(lx, T - 22, 16, 4);
     ctx.fillStyle = C.text; ctx.font = '9px sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`${fmtSpd(v)} ${uSpd}`, lx + 20, T - 20);
-    lx += 76;
+    ctx.fillText(lgStep >= 70 ? `${fmtSpd(v)} ${uSpd}` : `${fmtSpd(v)}`, lx + 20, T - 20);
+    lx += lgStep;
   });
 
   // ── Model caption ─────────────────────────────────────────────────────────────
   const turbAt = SS_SPEEDS.find((v, i) => surgeProfs[i].some(pt => pt.turb));
   ctx.fillStyle = C.dim; ctx.font = '9px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(`${g.rheoLabel} · closed-end string, K=${SS_CLING} · BHA steps from table · ` +
+  _fitText(ctx, `${g.rheoLabel} · closed-end string, K=${SS_CLING} · BHA steps from table · ` +
                (turbAt != null ? `turbulent annular flow from ${fmtSpd(turbAt)} ${uSpd}` : 'laminar throughout'),
-               L + pw / 2, T - 38);
+               W / 2, T - 38, W - 12);
 
   CI.drawAnnotations(ctx, CID);
 }

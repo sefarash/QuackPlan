@@ -302,25 +302,23 @@ function drawCasingTriaxial() {
     const yMidBox = (by - cy_b) / 2;
 
     // Burst DF — just inside top edge
+    // Queued (td-charts _lblQueue): placed clear of the load-point labels and legend
+    const dfOpt = { color: '#d35fb7', bounds: g };
     if (by > 0) {
       const pt = _cdPt({ x: xMidBox, y: by }, g);
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText(`DF = ${sfBurst.toFixed(2)}`, pt.cx, pt.cy + 2);
+      _lblQueue(`DF = ${sfBurst.toFixed(2)}`, pt.cx, pt.cy + 2, { ...dfOpt, align: 'center' });
     }
     // Collapse DF — just inside bottom edge
     if (cy_b > 0) {
       const pt = _cdPt({ x: xMidBox, y: -cy_b }, g);
-      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.fillText(`DF = ${sfCollapse.toFixed(2)}`, pt.cx, pt.cy - 2);
+      _lblQueue(`DF = ${sfCollapse.toFixed(2)}`, pt.cx, pt.cy - 14, { ...dfOpt, align: 'center', dir: -1 });
     }
     // Tension DF — just inside right edge (vertical midpoint)
     const rPt = _cdPt({ x: bx_pos, y: yMidBox }, g);
-    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText(`DF = ${sfTension.toFixed(2)}`, rPt.cx - 3, rPt.cy);
+    _lblQueue(`DF = ${sfTension.toFixed(2)}`, rPt.cx - 3, rPt.cy - 6, { ...dfOpt, align: 'right' });
     // Compression DF — just inside left edge
     const lPt = _cdPt({ x: -bx_neg, y: yMidBox }, g);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`DF = ${sfCompression.toFixed(2)}`, lPt.cx + 3, lPt.cy);
+    _lblQueue(`DF = ${sfCompression.toFixed(2)}`, lPt.cx + 3, lPt.cy - 6, dfOpt);
   }
 
   // ── Von Mises ellipses ──────────────────────────────────────────────────────
@@ -374,17 +372,22 @@ function drawCasingTriaxial() {
   }
 
   // Dots and labels on top of lines
+  // Load-point labels go FIRST in the queue so they keep the spot next to their
+  // dot; the dots themselves are reserved so no label lands on one.
+  const dfQueued = _lblPending.splice(0);
   cPts.forEach(pt => {
     ctx.fillStyle = pt.color;
     ctx.beginPath(); ctx.arc(pt.cx, pt.cy, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = _qpColors().text; ctx.font = '10px sans-serif';
+    _lblReserve(pt.cx - 6, pt.cy - 6, 12, 12);
+  });
+  cPts.forEach(pt => {
+    ctx.font = '10px sans-serif';
     const textW = ctx.measureText(pt.label).width;
     const goLeft = (pt.cx + 8 + textW) > (g.l + g.pw - 4);
-    ctx.textAlign = goLeft ? 'right' : 'left';
-    const lx = goLeft ? pt.cx - 8 : pt.cx + 8;
-    ctx.textBaseline = pt.labelAbove ? 'bottom' : 'top';
-    ctx.fillText(pt.label, lx, pt.cy + (pt.labelAbove ? -12 : 12));
+    _lblQueue(pt.label, goLeft ? pt.cx - 8 : pt.cx + 8, pt.cy + (pt.labelAbove ? -24 : 10),
+      { align: goLeft ? 'right' : 'left', font: '10px sans-serif', bounds: g, dir: pt.labelAbove ? -1 : 1 });
   });
+  _lblPending.push(...dfQueued);
 
   // ── Pipe spec heading ───────────────────────────────────────────────────────
   const C = _qpColors();
@@ -396,7 +399,8 @@ function drawCasingTriaxial() {
     row.grade || null,
     row.def !== 'Open Hole' ? row.def : null,
   ].filter(Boolean).join('  ·  ');
-  ctx.fillText(specStr, g.l + g.pw / 2, g.t - 10);
+  const hdrW = W - 16, hdrX = Math.max(hdrW / 2 + 8, Math.min(g.l + g.pw / 2, W - hdrW / 2 - 8));
+  _fitText(ctx, specStr, hdrX, g.t - 10, hdrW);
 
   ctx.fillStyle = C.dim; ctx.font = '10px sans-serif';
   // Display helpers: force (klbf→kN), stress (psi → kpsi | MPa), dogleg
@@ -409,10 +413,10 @@ function drawCasingTriaxial() {
   const jointStr = (row.jointYield != null && +row.jointYield > 0 && +row.jointYield < bodyYield_klbf)
     ? `  ·  Joint Yield = ${_dF(+row.jointYield)} ${_uF}`
     : '';
-  ctx.fillText(
+  ctx.textBaseline = 'bottom';
+  _fitText(ctx,
     `σ_y = ${_dStress(σy)} ${_uStress}  ·  Body Yield = ${_dF(bodyYield_klbf)} ${_uF}${jointStr}  ·  ID = ${id_in.toFixed(3)}"`,
-    g.l + g.pw / 2, g.t - 28
-  );
+    hdrX, g.t - 28, hdrW);
   const _uMW = QP_UNITS.label('mw'), _uD = QP_UNITS.label('depth');
   const cemStr = hasTOC
     ? `FMD backup: ${QP_UNITS.toDisplay('mw', mwRun).toFixed(2)} ${_uMW} mud to TOC ${Math.round(QP_UNITS.toDisplay('depth', tocMD)).toLocaleString()} ${_uD}, ${QP_UNITS.toDisplay('mw', cemMW).toFixed(1)} ${_uMW} cement below`
@@ -420,13 +424,13 @@ function drawCasingTriaxial() {
   const bendStr = F_bend > 0.1
     ? `Bending: Max DLS = ${QP_UNITS.toDisplay('dls', DLS_max_deg).toFixed(2)} ${QP_UNITS.label('dls')}  ·  σ_b = ${_dStress1(σ_bend)} ${_uStress}  ·  ±${_dF(F_bend)} ${_uF} (dashed bars)`
     : '';
-  ctx.fillText([bendStr, cemStr].filter(Boolean).join('  ·  '), g.l + g.pw / 2, g.t - 46);
+  _fitText(ctx, [bendStr, cemStr].filter(Boolean).join('  ·  '), hdrX, g.t - 46, hdrW);
 
   // ── Legend ──────────────────────────────────────────────────────────────────
   const legendLabels = ['DF 1.0 (yield)', 'DF 1.1 (design)'];
   const legendColors = ['#e67e22', '#1a7a4a'];
   if (hasBox) { legendLabels.push('API box'); legendColors.push('#d35fb7'); }
 
-  _legend(ctx, W, g.t, legendLabels, legendColors);
+  _legend(ctx, W, g.t, legendLabels, legendColors, g);
   CI.drawAnnotations(ctx, CID);
 }

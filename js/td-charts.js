@@ -40,7 +40,56 @@ function _chartSetup(canvasId) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  _lblReset();
   return { ctx, W: canvas.width, H: canvas.height, C };
+}
+
+// ── Label layout (shared by every chart) ──────────────────────────────────────
+// Canvas labels used to be drawn at fixed spots, so at smaller window sizes
+// they landed on each other, on the legend, or ran off the plot. Now a chart
+// QUEUES its labels (_lblQueue) and the legend flushes them (_lblFlush) after
+// reserving its own box: each label is clamped inside its bounds and stepped
+// down (or up) a line at a time until it is clear of everything placed so far.
+let _lblBoxes = [], _lblPending = [];
+function _lblReset() { _lblBoxes = []; _lblPending = []; }
+function _lblReserve(x, y, w, h) { _lblBoxes.push({ x, y, w, h }); }
+function _lblHit(b) {
+  return _lblBoxes.some(o => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
+}
+// opt: { align:'left'|'right'|'center', font, color, bounds:{l,t,pw,ph}, dir: 1 (step down) | -1 (step up) }
+// y is the TOP of the text.
+function _lblQueue(text, x, y, opt) { _lblPending.push({ text, x, y, opt: opt || {} }); }
+function _lblFlush(ctx) {
+  const C = _qpColors();
+  const pending = _lblPending; _lblPending = [];
+  pending.forEach(({ text, x, y, opt }) => {
+    ctx.save();
+    ctx.font = opt.font || '9px sans-serif';
+    const px = parseInt((ctx.font.match(/(\d+)px/) || [0, 10])[1], 10);
+    const w = ctx.measureText(text).width, h = px + 3;
+    const bd = opt.bounds || { l: 0, t: 0, pw: ctx.canvas.width, ph: ctx.canvas.height };
+    const x0min = bd.l + 2, x0max = bd.l + bd.pw - w - 2;
+    let bx = opt.align === 'right' ? x - w : opt.align === 'center' ? x - w / 2 : x;
+    bx = Math.max(x0min, Math.min(bx, Math.max(x0min, x0max)));       // never off the plot
+    const yMin = bd.t + 1, yMax = bd.t + bd.ph - h;
+    const dir = opt.dir === -1 ? -1 : 1;
+    let by = Math.max(yMin, Math.min(y, yMax)), found = false;
+    for (const d of [dir, -dir]) {
+      for (let k = 0; k < 40 && !found; k++) {
+        const yy = Math.max(yMin, Math.min(y, yMax)) + d * k * h;
+        if (yy < yMin || yy > yMax) break;
+        if (!_lblHit({ x: bx - 2, y: yy, w: w + 4, h })) { by = yy; found = true; }
+      }
+      if (found) break;
+    }
+    _lblReserve(bx - 2, by, w + 4, h);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = C.bg;   // halo: readable over curves
+    ctx.strokeText(text, bx, by + 1);
+    ctx.fillStyle = opt.color || C.text;
+    ctx.fillText(text, bx, by + 1);
+    ctx.restore();
+  });
 }
 
 function _chartGrid(ctx, W, H, xMax, yMax, xLabel, yLabel) {
@@ -98,10 +147,8 @@ function _rigLimitLine(ctx, g, xVal, xMax, label) {
   ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2; ctx.setLineDash([7, 4]);
   ctx.beginPath(); ctx.moveTo(x, g.t); ctx.lineTo(x, g.t + g.ph); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = '#c0392b'; ctx.font = 'bold 9px sans-serif';
-  ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-  ctx.fillText(label, x - 4, g.t + 4);
   ctx.restore();
+  _lblQueue(label, x - 4, g.t + 4, { align: 'right', font: 'bold 9px sans-serif', color: '#c0392b', bounds: g });
 }
 
 // ── Torque chart ──────────────────────────────────────────────────────────────
@@ -204,9 +251,9 @@ function drawTorque(r) {
       seen.add(key);
       const x = g.l + Math.min(toTq(seg.mutK) / xMax, 1) * g.pw;
       const y = g.t + (toD(seg.topMD) / yMax) * g.ph + 4;
-      ctx.fillStyle = '#c0392b'; ctx.font = '9px sans-serif';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText(`${seg.label}: ${toTq(seg.mutK).toFixed(1)} ${uTq}`, x + 3, y);
+      const rightSide = x < g.l + g.pw * 0.7;      // label on the side of the line that has room
+      _lblQueue(`${seg.label}: ${toTq(seg.mutK).toFixed(1)} ${uTq}`, rightSide ? x + 3 : x - 4, y,
+        { align: rightSide ? 'left' : 'right', color: '#c0392b', bounds: g });
     });
   }
 
@@ -381,9 +428,8 @@ function drawOverpull(r) {
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, `Hook Load (${uF})`, `MD (${uD})`);
 
-  ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
-  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${QP_UNITS.toDisplay('mw',mw).toFixed(1)} ${uMW}  Block=${toF(blockWt).toFixed(0)} ${uF}`, g.l + g.pw - 4, g.t + g.ph - 4);
+  _lblQueue(`BF=${BF.toFixed(3)}  MW=${QP_UNITS.toDisplay('mw',mw).toFixed(1)} ${uMW}  Block=${toF(blockWt).toFixed(0)} ${uF}`,
+    g.l + g.pw - 4, g.t + g.ph - 14, { align: 'right', color: _qpColors().dim, bounds: g, dir: -1 });
 
   const toLine = sts => sts.map(s => ({ x: toF(toV(s)), y: toD(s.md) }));
   const liveCurves = [
@@ -433,9 +479,9 @@ function drawOverpull(r) {
       seen.add(key);
       const x = g.l + Math.min(toF(seg.yieldK) / xMax, 1) * g.pw;
       const y = g.t + (toD(seg.topMD) / yMax) * g.ph + 4;
-      ctx.fillStyle = YIELD_CLR; ctx.font = '9px sans-serif';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText(`${seg.label}: ${toF(seg.yieldK).toFixed(0)} ${uF}`, x + 3, y);
+      const rightSide = x < g.l + g.pw * 0.7;      // label on the side of the line that has room
+      _lblQueue(`${seg.label}: ${toF(seg.yieldK).toFixed(0)} ${uF}`, rightSide ? x + 3 : x - 4, y,
+        { align: rightSide ? 'left' : 'right', color: YIELD_CLR, bounds: g });
     });
   }
 
@@ -531,10 +577,7 @@ function drawBroomstick(r) {
 
   const g = _chartGridDepthDown(ctx, W, H, xMax, yMax, `Hookload (${uF})`, `MD (${uD})`);
 
-  ctx.fillStyle = _qpColors().dim; ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(`BF=${BF.toFixed(3)}  MW=${QP_UNITS.toDisplay('mw',mw).toFixed(1)} ${uMW}  Block=${toF(blockWt).toFixed(0)} ${uF}`,
-    g.l + 4, g.t + 4);
+  const bsNote = `BF=${BF.toFixed(3)}  MW=${QP_UNITS.toDisplay('mw',mw).toFixed(1)} ${uMW}  Block=${toF(blockWt).toFixed(0)} ${uF}`;
 
   CI.storeLive(CID, liveCurves);
   CI.register(CID, { pad: g, xMax, yMax, xLabel: `Hookload (${uF})`, yLabel: `MD (${uD})`, depthDown: true });
@@ -562,6 +605,26 @@ function drawBroomstick(r) {
   // Rig hook-load limit — vertical red line
   if (maxHL > 0) _rigLimitLine(ctx, g, toF(maxHL), xMax, `Max HL ${toF(maxHL).toFixed(0)} ${uF}`);
 
+  // ── Labels: queued, then placed clear of the legend and of each other ─────
+  const pw = g.pw, ph = g.ph;
+  const labelMidY = g.t + ph * 0.65;
+  const bold11 = 'bold 11px sans-serif';
+  // FF labels sit just inside the bottom of the plot at each curve's end, and
+  // stack upward where the curves end close together
+  [[2, ffHi], [1, ffMid], [0, ffLo], [4, ffLo], [5, ffMid], [6, ffHi]].forEach(([ci, ff]) => {
+    const c = liveCurves[ci], last = c.pts[c.pts.length - 1];
+    if (!last) return;
+    _lblQueue(`${ff}FF`, g.l + (last.x / xMax) * pw, g.t + ph - 13, { align: 'center', color: c.color, bounds: g, dir: -1 });
+  });
+  _lblQueue('Slack off', g.l + 6, labelMidY - 7, { font: bold11, bounds: g });
+  _lblQueue('Pick up', g.l + pw - 6, labelMidY - 7, { align: 'right', font: bold11, bounds: g });
+  const rotPts = liveCurves[3].pts, rotMidPt = rotPts[Math.floor(rotPts.length / 2)];
+  if (rotMidPt) {
+    _lblQueue('Rotation Off Bottom', g.l + (rotMidPt.x / xMax) * pw + 6, labelMidY + 14,
+      { font: 'bold 10px sans-serif', color: '#8e44ad', bounds: g });
+  }
+  _lblQueue(bsNote, g.l + 4, g.t + 4, { color: _qpColors().dim, bounds: g });
+
   const bsLegLabels = [`RIH ${ffLo}`, `RIH ${ffMid}`, `RIH ${ffHi}`,
      'Rot Off Btm',
      `PKP ${ffLo}`, `PKP ${ffMid}`, `PKP ${ffHi}`];
@@ -570,36 +633,6 @@ function drawBroomstick(r) {
      '#e07878', '#c0392b', '#8b1a1a'];
   if (maxHL > 0) { bsLegLabels.push('Rig Limit'); bsLegColors.push('#c0392b'); }
   _legend(ctx, W, g.t, bsLegLabels, bsLegColors);
-
-  // ── Chart section labels ──────────────────────────────────────────────────
-  const pw = g.pw, ph = g.ph;
-  const labelMidY = g.t + ph * 0.65;
-
-  ctx.fillStyle = _qpColors().text; ctx.font = 'bold 11px sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText('Slack off', g.l + 6, labelMidY);
-
-  ctx.textAlign = 'right';
-  ctx.fillText('Pick up', g.l + pw - 6, labelMidY);
-
-  const rotPts = liveCurves[3].pts, rotMidPt = rotPts[Math.floor(rotPts.length / 2)];
-  if (rotMidPt) {
-    const xRot = g.l + (rotMidPt.x / xMax) * pw;
-    ctx.fillStyle = '#8e44ad'; ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText('Rotation', xRot + 4, labelMidY + 20);
-    ctx.fillText('Off Bottom', xRot + 4, labelMidY + 32);
-  }
-
-  // ── Bottom FF labels at TD depth (where curves fan out most) ─────────────
-  const labelY = g.t + ph + 16;
-  ctx.font = '9px sans-serif'; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
-  [[2, ffHi], [1, ffMid], [0, ffLo], [4, ffLo], [5, ffMid], [6, ffHi]].forEach(([ci, ff]) => {
-    const c = liveCurves[ci], last = c.pts[c.pts.length - 1];
-    if (!last) return;
-    ctx.fillStyle = c.color;
-    ctx.fillText(`${ff}FF`, g.l + (last.x / xMax) * pw, labelY);
-  });
 
   CI.drawAnnotations(ctx, CID);
 }
@@ -712,19 +745,62 @@ function _chartLineDepthDownSigned(ctx, pts, color, lw, g, xMin, xMax, yMax) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function _legend(ctx, W, t, labels, colors) {
+// Legend at the top-right INSIDE the plot: real text widths, wrapped onto as
+// many rows as the plot width needs (it used to run a single row out past the
+// left axis), on a backing panel. Reserves its box, then places the queued
+// labels around it. `bounds` = {l, pw} of the plot; defaults to CHART_PAD.
+function _legend(ctx, W, t, labels, colors, bounds) {
   const C = _qpColors();
-  let x = W - CHART_PAD.r - labels.reduce((s, l) => s + l.length * 7 + 24, 0);
-  labels.forEach((lbl, i) => {
-    ctx.fillStyle   = colors[i];
-    ctx.fillRect(x, t + 4, 14, 4);
-    ctx.fillStyle   = C.text;
-    ctx.font        = '10px sans-serif';
-    ctx.textAlign   = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(lbl, x + 18, t + 6);
-    x += lbl.length * 7 + 24;
+  const l  = bounds ? bounds.l  : CHART_PAD.l;
+  const pw = bounds ? bounds.pw : W - CHART_PAD.l - CHART_PAD.r;
+  ctx.save();
+  ctx.font = '10px sans-serif';
+  const SW = 14, GAP = 4, ITEM_GAP = 12, ROW_H = 14, PADX = 6, PADY = 3;
+  const maxW = Math.max(60, pw - 8 - 2 * PADX);
+  const items = labels.map((lbl, i) => ({ lbl, color: colors[i], w: SW + GAP + ctx.measureText(lbl).width }));
+  const rows = [[]]; let rowW = 0;
+  items.forEach(it => {
+    const add = (rows[rows.length - 1].length ? ITEM_GAP : 0) + it.w;
+    if (rows[rows.length - 1].length && rowW + add > maxW) { rows.push([it]); rowW = it.w; }
+    else { rows[rows.length - 1].push(it); rowW += add; }
   });
+  const widthOf = r => r.reduce((a, it, k) => a + it.w + (k ? ITEM_GAP : 0), 0);
+  const blockW = Math.min(Math.max(...rows.map(widthOf)), maxW) + 2 * PADX;
+  const blockH = rows.length * ROW_H + 2 * PADY;
+  const right = l + pw - 4, top = t + 3;
+  if (labels.length) {
+    ctx.globalAlpha = 0.86; ctx.fillStyle = C.bg;
+    ctx.fillRect(right - blockW, top, blockW, blockH);
+    ctx.globalAlpha = 1;
+    _lblReserve(right - blockW, top, blockW, blockH);
+    rows.forEach((r, ri) => {
+      let x = right - PADX - widthOf(r);
+      const y = top + PADY + ri * ROW_H + ROW_H / 2;
+      r.forEach(it => {
+        ctx.fillStyle = it.color;
+        ctx.fillRect(x, y - 2, SW, 4);
+        ctx.fillStyle = C.text; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(it.lbl, x + SW + GAP, y);
+        x += it.w + ITEM_GAP;
+      });
+    });
+  }
+  ctx.restore();
+  _lblFlush(ctx);
+}
+
+// One line of text centred on cx that must fit maxW: shrinks the font (down to
+// 8px), then ends in an ellipsis. Uses the font / fillStyle / baseline already set.
+function _fitText(ctx, text, cx, y, maxW) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  const m = ctx.font.match(/(\d+(?:\.\d+)?)px/);
+  let px = m ? +m[1] : 10;
+  while (px > 8 && ctx.measureText(text).width > maxW) { px -= 0.5; ctx.font = ctx.font.replace(/\d+(?:\.\d+)?px/, px + 'px'); }
+  let t = text;
+  while (t.length > 4 && ctx.measureText(t).width > maxW) t = t.slice(0, -2).trimEnd() + '…';
+  ctx.fillText(t, cx, y);
+  ctx.restore();
 }
 
 function _noData(ctx, W, H, msg) {
