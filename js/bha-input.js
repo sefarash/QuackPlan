@@ -74,6 +74,13 @@ function _bhaNomWtCustomInput(inp) {
   _bhaNomWtCascade(hid);
 }
 
+// Drill Collar / HWDP typed nominal weight → Weight recalculates from it
+function _bhaNomWtPlainChanged(inp) {
+  if (inp.value !== '' && !(+inp.value > 0)) inp.value = '';
+  _bhaWtResetAuto(inp.closest('tr'));
+  bhaSave();
+}
+
 function _bhaNomWtCascade(hid) {
   _bhaWtResetAuto(hid.closest('tr'));
   const type = hid.closest('tr').querySelector('.bha-type')?.value;
@@ -176,6 +183,12 @@ function _makeBhaRowHTML(comp, od, id, wt, len, grade, conn,
   } else if (isCasing) {
     nomWtCell = _bhaNomWtCellHTML((catOD && catOD !== 'custom')
       ? [...new Set(catalogueByOD(catOD).map(r => r[1]))] : [], catNomWt, SS);
+  } else if (isDC || isHWDP) {
+    // Drill Collar / HWDP: a plain lb/ft input (stored as catNomWt, like DP).
+    // Blank → the catalogue weight (shown as the placeholder), else what is typed.
+    const v = (catNomWt !== '' && catNomWt != null) ? String(catNomWt).replace(/"/g, '&quot;') : '';
+    nomWtCell = `<input class="bha-cat-nomwt" type="number" step="0.1" min="0" placeholder="lb/ft"
+        value="${v}" ${IS} onchange="_bhaNomWtPlainChanged(this)">`;
   } else {
     nomWtCell = ``;
   }
@@ -630,8 +643,8 @@ function bhaSyncTopLength() {
 //   Drill Pipe  nominal weight (catalogue or Custom…); with Grade + Connection
 //               the adjusted weight (tool joints included)
 //   Casing      nominal weight
-//   Drill Collar catalogue OD + bore → unit weight
-//   HWDP        catalogue nominal + type + connection → pf
+//   Drill Collar the typed Nom. Wt, else catalogue OD + bore → unit weight
+//   HWDP        the typed Nom. Wt, else catalogue nominal + type + connection → pf
 function _bhaRowCataloguePPF(tr) {
   const type = tr.querySelector('.bha-type')?.value;
   const od   = tr.querySelector('.bha-cat-od')?.value;
@@ -646,18 +659,35 @@ function _bhaRowCataloguePPF(tr) {
     }
     return { ppf: nomWt, how: `${nomWt} lb/ft nominal` };
   }
-  if (type === 'Drill Collar' && cat) {
+  if (type === 'Drill Collar' || type === 'HWDP') {
+    const catPPF = _bhaCataloguePPF(tr);
+    const nomN   = tr.querySelector('.bha-cat-nomwt');
+    if (nomN) nomN.placeholder = catPPF ? String(catPPF) : 'lb/ft';   // what blank means
+    const typed  = +(nomN?.value || 0);
+    if (typed > 0) return { ppf: typed, how: `${typed} lb/ft entered` };
+    return catPPF ? { ppf: catPPF, how: `${catPPF} lb/ft catalogue` } : null;
+  }
+  return null;
+}
+
+// Catalogue lb/ft of a Drill Collar (OD + bore) or HWDP (nominal + type +
+// connection) row, or 0 when the catalogue item is not fully picked.
+function _bhaCataloguePPF(tr) {
+  const type = tr.querySelector('.bha-type')?.value;
+  const od   = tr.querySelector('.bha-cat-od')?.value;
+  if (!od || od === 'custom') return 0;
+  if (type === 'Drill Collar') {
     const bore = tr.querySelector('.bha-cat-grade')?.value;
     const spec = bore ? dcSpec(od, bore) : null;
-    return spec && spec.unitWt > 0 ? { ppf: spec.unitWt, how: `${spec.unitWt} lb/ft catalogue` } : null;
+    return spec && spec.unitWt > 0 ? spec.unitWt : 0;
   }
-  if (type === 'HWDP' && cat) {
+  if (type === 'HWDP') {
     const hwType = tr.querySelector('.bha-cat-grade')?.value || 'conv';
     const conn   = tr.querySelector('.bha-cat-conn')?.value;
     const spec   = conn ? hwdpSpec(hwType, od, conn) : null;
-    return spec && spec.pf > 0 ? { ppf: spec.pf, how: `${spec.pf} lb/ft catalogue` } : null;
+    return spec && spec.pf > 0 ? spec.pf : 0;
   }
-  return null;
+  return 0;
 }
 
 // Catalogue rows: Weight (total) = catalogue lb/ft × length, recalculated as
