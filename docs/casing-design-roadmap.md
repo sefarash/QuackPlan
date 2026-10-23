@@ -72,7 +72,7 @@ step 1 so people don't get a second change in results once they trust the curves
 Adopt the DrillPlan-level approach (public correlations; see "Temperature model"
 below) rather than StressCheck's simplified assumptions:
 
-- [ ] Static profile (surface temperature + geothermal gradient) moved out of Kick
+- [x] Static profile (surface temperature + geothermal gradient) moved out of Kick
       Tolerance into well data and persisted (Kick Tolerance keeps using it).
 - [ ] As-cemented profile — Kutasov & Taig'i cementing correlation, with the
       166 °F BHST rule (below it, use the static profile).
@@ -81,7 +81,8 @@ below) rather than StressCheck's simplified assumptions:
       rate and fluid; defaults 20 MMscf/d gas, 10 bbl/min at 70 °F injection.
 - [ ] Thermal axial load = operating − as-cemented, applied to the free length
       above TOC and the cemented interval; shifts the load points on the ellipse.
-- [ ] Per-grade yield de-rating with temperature (small table).
+- [ ] Per-grade yield de-rating with temperature (small table). *Interim (2026-10-23):
+      opt-in linear 0.03 %/°F above 68 °F at the shoe's static temperature (`cdTempDerate`).*
 - [ ] Verify the correlations against a published example before wiring in.
 
 Out of scope: transient thermal simulation, annular pressure buildup, wellhead

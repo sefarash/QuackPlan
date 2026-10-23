@@ -13,7 +13,8 @@
     "test:tour": "node test/tour.mjs",
     "test:surgeswab": "node test/surge-swab-reference.mjs",
     "test:rheology": "node test/rheology-reference.mjs",
-    "test:models": "node test/rheology-reference.mjs && node test/surge-swab-reference.mjs"
+    "test:kt": "node test/kick-tolerance-reference.mjs",
+    "test:models": "node test/rheology-reference.mjs && node test/surge-swab-reference.mjs && node test/kick-tolerance-reference.mjs"
   },
   "devDependencies": {
     "wrangler": "^3.90.0",

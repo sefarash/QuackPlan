@@ -405,10 +405,10 @@ function qpUpdateDataBanner() {
   // Only while an input panel is showing: output panels are absolutely
   // positioned over the centre column and their control bar sat on the text.
   if (!qpState.activeInputTab) { banner.hidden = true; return; }
-  const NAMES = { traj1: 'trajectory', traj2: 'trajectory', trajOpt: '', tort: 'tortuosity', schematic: 'schematic', ppfg: 'PPFG', activity: 'activity', handover: 'handover' };
+  const NAMES = { traj1: 'trajectory', traj2: 'trajectory', trajOpt: '', tort: 'tortuosity', schematic: 'schematic', ppfg: 'PPFG', thermal: 'temperature', activity: 'activity', handover: 'handover' };
   if (hasBorehole && !hasScenario) {
     banner.hidden = false; banner.classList.add('info');
-    if (text) text.innerHTML = '<strong>Building at the borehole.</strong> Trajectory, schematic, PPFG and activity are saved to the borehole and shared by every scenario under it. Add a scenario for Casing/BHA, drilling fluid and the results.';
+    if (text) text.innerHTML = '<strong>Building at the borehole.</strong> Trajectory, schematic, PPFG / temperature and activity are saved to the borehole and shared by every scenario under it. Add a scenario for Casing/BHA, drilling fluid and the results.';
     if (btn) btn.hidden = false;
     return;
   }
@@ -449,6 +449,7 @@ function _loadBorehole(id) {
       if (d.activity) activityLoadState(d.activity);
       handoverLoadState(d.handover);
       ppfgLoadState(d.ppfg || []);
+      if (typeof thermalLoadState === 'function') thermalLoadState(d.thermal);
       qpState.tdResult = null; qpState.hydResult = null;
       if (typeof qpPhaseRebuildSelector === 'function') qpPhaseRebuildSelector();
     } finally {
@@ -524,6 +525,7 @@ function _loadScenario(id) {
       if (d.activity)  activityLoadState(d.activity);
                        handoverLoadState(d.handover);
       if (d.ppfg)      ppfgLoadState(d.ppfg);
+      if (typeof thermalLoadState === 'function') thermalLoadState(d.thermal);
       cdRatingsLoadState(d.cdRatings);
 
       // Analysis phases derive from the schematic just loaded; the fluid

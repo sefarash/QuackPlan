@@ -555,6 +555,12 @@
         <button class="add-row-btn" onclick="exportPPFG()">⬇ Export CSV</button>
         <span class="text-dim" style="font-size:11px">Tip: copy TVD / PP / FG columns from Excel and paste into the table</span>
       </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap"
+           title="Static formation temperature = surface temperature + geothermal gradient × TVD. Used by Kick Tolerance, and (when switched on) the Hydraulics ECD and Casing Design yield derating.">
+        <span class="section-label" style="margin:0">Formation temperature</span>
+        <label style="font-size:12px">Surface T <input type="number" id="ktSurfTemp" value="70" step="5" style="width:56px" onchange="thermalChanged()"> <span id="uKtTemp">°F</span></label>
+        <label style="font-size:12px">Geothermal gradient <input type="number" id="ktGeoGrad" value="1.5" step="0.1" style="width:56px" onchange="thermalChanged()"> <span id="uKtGeo">°F/100ft</span></label>
+      </div>
       <table class="qp-table" id="ppfgTable">
         <thead>
           <tr>
@@ -732,6 +738,8 @@
             oninput="document.getElementById('hydFlowSlider').max=this.value;qpComputeDebounced()">
           &nbsp;<span id="hydFlowVal">280</span> <span class="unit" id="uHydFlow">gpm</span>
         </label>
+        <label style="font-size:12px" title="Correct the static mud density for pressure (compression) and the formation temperature profile (expansion, PPFG tab) — WBM / OBM / SBM coefficients from the Mud Type. Off = the surface mud weight all the way down.">
+          <input type="checkbox" id="hydTempCorr" onchange="qpCompute()"> P/T-corrected ECD</label>
         <button class="hdr-btn" onclick="qpCompute()">Recompute</button>
         <button class="hdr-btn" onclick="exportHydraulics()">⬇ CSV</button>
         <button class="hdr-btn" onclick="exportChartPNG('hydSweepCanvas','hydraulics.png')">⬇ PNG</button>
@@ -811,6 +819,10 @@
             style="width:60px" onchange="drawCasingDesign()">
           <span style="font-size:10px;color:var(--text-dim)" id="uCdCementMW">ppg</span>
         </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px"
+               title="Reduce minimum yield (and the entered ratings) by 0.03 %/°F above 68 °F at the shoe's static formation temperature (PPFG tab). Carbon / low-alloy steels; use mill data for CRA or above ~400 °F.">
+          <input type="checkbox" id="cdTempDerate" onchange="drawCasingDesign()"> Temperature derating
+        </label>
         <button class="hdr-btn" onclick="drawCasingDesign()">Compute</button>
         <button class="hdr-btn" onclick="exportChartPNG('cdTriaxialCanvas','triaxial.png')">⬇ PNG</button>
       </div>
@@ -829,12 +841,13 @@
     <!-- Kick Tolerance -->
     <div id="panel-kt" class="output-panel">
       <div class="chart-controls" style="flex-wrap:wrap;gap:8px 12px">
-        <span class="text-dim">MW: <strong id="ktMWdisplay">—</strong> <span id="ktMWunit">ppg</span> (from Fluid tab)</span>
+        <span class="text-dim">MW: <strong id="ktMWdisplay">—</strong> <span id="ktMWunit">ppg</span> (well default — each section uses its own from the Fluid Program)</span>
         <label style="font-size:12px" title="Choke-operator error + choke/kill-line & annular losses above the weak point (typically ≥100 psi)">
           Safety margin <input type="number" id="ktSafety" value="100" step="10" min="0" style="width:56px" onchange="drawKickTolerance()"> <span id="uKtSafety">psi</span></label>
-        <label style="font-size:12px">Surface T <input type="number" id="ktSurfTemp" value="70" step="5" style="width:48px" onchange="drawKickTolerance()"> <span id="uKtTemp">°F</span></label>
-        <label style="font-size:12px" title="Geothermal gradient — sets kick-zone &amp; weak-point temperature for real-gas density">
-          Geo grad <input type="number" id="ktGeoGrad" value="1.5" step="0.1" style="width:48px" onchange="drawKickTolerance()"> <span id="uKtGeo">°F/100ft</span></label>
+        <label style="font-size:12px" title="Kick intensity above each section's mud weight. Blank = use the PPFG table (highest pore pressure in the section). Enter a value to check pore-pressure sensitivity.">
+          Kick intensity <input type="number" id="ktKickInt" value="" placeholder="PPFG" step="0.1" min="0" style="width:56px" onchange="drawKickTolerance()"> <span id="uKtKickInt">ppg</span></label>
+        <label style="font-size:12px" title="Minimum acceptable kick tolerance volume — every section is validated against it">
+          Min KT <input type="number" id="ktMinVol" value="20" step="5" min="0" style="width:52px" onchange="drawKickTolerance()"> <span id="uKtMinVol">bbl</span></label>
         <label style="font-size:12px" title="Methane real-gas PVT, or a fixed influx gradient (default 0.1 psi/ft) for oil/known fluids">
           Influx
           <select id="ktInflux" style="font-size:12px" onchange="drawKickTolerance()">
@@ -842,6 +855,7 @@
             <option value="fixed">Fixed gradient</option>
           </select>
           <input type="number" id="ktInfluxGrad" value="0.1" step="0.01" style="width:52px" title="influx gradient (used when Influx = Fixed gradient)" onchange="drawKickTolerance()"> <span id="uKtInflux">psi/ft</span></label>
+        <span class="text-dim" style="font-size:11px" title="Formation temperature — edit on the PPFG input tab">T: <span id="ktThermalNote">—</span></span>
         <button class="hdr-btn" onclick="drawKickTolerance()">Compute</button>
         <button class="hdr-btn" onclick="exportKT()">⬇ KT CSV</button>
         <button class="hdr-btn" onclick="exportChartPNG('ktCanvas','ppfg_kt.png')">⬇ PNG</button>
@@ -1038,6 +1052,7 @@
 <script src="js/casing-design.js"></script>
 <script src="js/casing-triaxial.js"></script>
 <script src="js/kick-tolerance.js"></script>
+<script src="js/thermal.js"></script>
 <script src="js/row-drag.js"></script>
 <script src="js/output-controls.js"></script>
 <script src="js/scenario-io.js"></script>

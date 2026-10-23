@@ -127,14 +127,14 @@ function setHeaderContext(wellName, scenarioName) {
 
 
 // ── Borehole-level data ───────────────────────────────────────────────────────
-// Trajectory, schematic, PPFG, activity and handover describe the hole, not a
+// Trajectory, schematic, PPFG, formation temperature, activity and handover describe the hole, not a
 // design variant, so they can be built with only a BOREHOLE selected: they are
 // then stored on the borehole node (additive keys) and every scenario under it
 // shows them. A scenario may carry its own copy — legacy scenarios always do,
 // and editing one of these tables while a scenario is open forks a copy into
 // that scenario (its own key wins over the borehole's from then on). Nothing is
 // ever moved or deleted: a scenario's stored keys stay exactly as they were.
-const QP_BOREHOLE_KEYS = ['traj1', 'traj2', 'trajOpt', 'tort', 'schematic', 'ppfg', 'activity', 'handover'];
+const QP_BOREHOLE_KEYS = ['traj1', 'traj2', 'trajOpt', 'tort', 'schematic', 'ppfg', 'thermal', 'activity', 'handover'];
 
 function _qpHasData(v) {
   if (v == null || v === '') return false;

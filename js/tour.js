@@ -105,7 +105,7 @@ const QP_TOUR = (() => {
     { tab: 'SPP / ECD',      needs: ['Trajectory', 'Well Schematic', 'Casing / BHA (DP ID, nozzles, MWD loss)', 'Drilling Fluid (rheology, flow rate)'], opt: 'Fluid Program per section — then Run' },
     { tab: 'Surge / Swab',   needs: ['Trajectory', 'Well Schematic', 'Casing / BHA', 'Drilling Fluid'],   opt: 'PPFG for the safe trip-speed tables' },
     { tab: 'Casing Design',  needs: ['Well Schematic with catalogue weight & grade (and TOC)', 'Trajectory', 'PPFG', 'Drilling Fluid (mud weight)'], opt: 'ratings, P-test and cement density on the panel' },
-    { tab: 'Kick Tolerance', needs: ['PPFG', 'Trajectory', 'Well Schematic', 'Drilling Fluid (mud weight)', 'Casing / BHA'], opt: 'temperature and influx inputs on the panel' },
+    { tab: 'Kick Tolerance', needs: ['PPFG', 'Trajectory', 'Well Schematic', 'Drilling Fluid (mud weight)', 'Casing / BHA'], opt: 'kick intensity, minimum KT and influx inputs on the panel; formation temperature on the PPFG tab' },
     { tab: 'Initial AFE',    needs: ['Activity (activities, services, casing costs)', 'Well Schematic'], opt: '' },
     { tab: 'Final Diagram',  needs: ['Trajectory', 'Well Schematic'],                                     opt: 'Handover elements drawn along the path' },
   ];

@@ -1,9 +1,9 @@
 // ===== KICK TOLERANCE =====
-// Two models:
-//  1. Static (quick):  KT = MAASP / ((PP_TD - MW) × 0.052) × Ann_cap   — incompressible
-//  2. Real-gas (SPE-IADC 140113):  single methane bubble migrating from the
-//     kick zone (TD) to the weak point (shoe), Hall-Yarborough Z-factor, non-isothermal,
-//     KT = min(shut-in at bottom, circulating at weak point with density-ratio expansion).
+// Real-gas model (SPE-IADC 140113): single methane bubble migrating from the kick
+// zone (the section TD) to the weak point (the shoe, and the weakest open-hole
+// depth), Hall-Yarborough Z-factor, non-isothermal (formation temperature, thermal.js),
+// KT = min(shut-in at bottom, circulating at weak point with density-ratio expansion),
+// gas height laid along the deviated hole. See ktComputeSections().
 
 const _KT_PPG = 0.051948;   // psi/ft per ppg (precise)
 const _KT_ATM = 14.7;       // psia
@@ -50,6 +50,8 @@ function _ktUpdateLabels() {
   set('uKtTemp',   _ktUTemp());
   set('uKtGeo',    _ktUGeo());
   set('uKtInflux', QP_UNITS.label('pgrad'));
+  set('uKtKickInt', QP_UNITS.label('mw'));
+  set('uKtMinVol',  QP_UNITS.label('volume'));
   set('ktMWunit',  QP_UNITS.label('mw'));
   set('hdrPpfgTVD', `TVD (${QP_UNITS.label('depth')})`);
   set('hdrPpfgPP',  `Max Pore Pressure (${QP_UNITS.label('mw')})`);
@@ -86,19 +88,54 @@ function _ktGasDensity(P_psia, T_R) {
   return P_psia * _CH4.M / (Z * _CH4.R * T_R);
 }
 
+// Annulus of one open-hole interval, weak point → bit, as MD steps of ≤ 10 ft:
+// [{ md, tvd, cap }], cap = annular capacity (bbl/ft) of the step ENDING at that
+// point. The bit sits at the interval's TD: the bottom dcLen ft of string is the
+// collar section, drill pipe above it.
+function _ktAnnulusProfile(survey, topMD, bitMD, dh, dpOD, dcOD, dcLen) {
+  const capOf = od => Math.max(0, (dh * dh - od * od) / 1029.4);
+  const dcTop = bitMD - dcLen;
+  const mds = new Set([topMD, bitMD]);
+  for (let m = topMD + 10; m < bitMD; m += 10) mds.add(m);
+  if (dcTop > topMD && dcTop < bitMD) mds.add(dcTop);
+  for (const st of survey) if (st.md > topMD && st.md < bitMD) mds.add(st.md);
+  const arr = [...mds].sort((a, b) => a - b);
+  return arr.map((md, i) => {
+    const mid = i ? (md + arr[i - 1]) / 2 : md;
+    return { md, tvd: _tvdAt(survey, md), cap: capOf(mid >= dcTop ? dcOD : dpOD) };
+  });
+}
+
+// Annular volume (bbl) of a gas column `h` ft of VERTICAL height laid along the
+// hole — up from the bit (fromBit) or down from the weak point. A deviated step
+// holds length = height / cos(inc); a horizontal step adds volume with no height.
+// Around the string as it actually sits: drill pipe in the open hole first, the
+// rest around the collars. reached = the column ran out of hole.
+function _ktColumnVol(prof, h, fromBit) {
+  let vol = 0, rem = h;
+  const n = prof.length;
+  for (let k = 1; k < n; k++) {
+    const j = fromBit ? n - k : k;                 // step prof[j-1] → prof[j]
+    const a = prof[j - 1], b = prof[j];
+    const dL = b.md - a.md, dT = Math.abs(b.tvd - a.tvd);
+    if (dT >= rem) return { vol: vol + b.cap * dL * (dT > 0 ? rem / dT : 1), reached: false };
+    vol += b.cap * dL; rem -= dT;
+  }
+  return { vol, reached: true };
+}
+
 // Real-gas kick tolerance for one weak point / kick-zone pair.
 // opts: { mw, pp, fg, tvdKick, tvdWeak, tempKick_R, tempWeak_R, safetyPsi,
-//         capBHA, capDP, dcLen, influx: 'methane'|number(psi/ft) }
-// Returns { kt, hmax, maasp, gradWeak, swabbed, infinite } or null.
+//         influx: 'methane'|number(psi/ft), prof (weak point → bit, _ktAnnulusProfile) }
+// pp is the kick-zone pressure as EMW (a swabbed kick enters at pp = mw).
+// Returns { kt, hmax, maasp, gradWeak, volBottom, volCirc, infinite }.
 function _ktGasTolerance(o) {
-  // Swabbed convention is MW = PP; a small tolerance (well below the 0.1 ppg input
-  // granularity) keeps the pp == mw boundary swabbed despite display-unit rounding.
-  const swabbed = o.pp <= o.mw + _KT_PP_TOL;
   const Pfrac = o.fg * _KT_PPG * o.tvdWeak;               // fracture pressure at weak point (psig)
   const maasp = Pfrac - o.mw * _KT_PPG * o.tvdWeak - o.safetyPsi;   // adjusted/circulating MAASP
-  if (maasp <= 0) return { kt: 0, hmax: 0, maasp: Math.round(maasp), gradWeak: 0, swabbed, infinite: false };
+  const none = { kt: 0, hmax: 0, maasp: Math.round(maasp), gradWeak: 0, volBottom: 0, volCirc: 0, infinite: false };
+  if (maasp <= 0) return none;
 
-  // Influx density at the weak point (gas the shoe sees at Pfrac − safety)
+  // Influx density at the weak point (gas the weak point sees at Pfrac − safety)
   const Pweak = Math.max(_KT_ATM, Pfrac - o.safetyPsi + _KT_ATM);
   let denWeak, gradWeak, denBottom;
   if (o.influx === 'methane') {
@@ -116,103 +153,134 @@ function _ktGasTolerance(o) {
 
   // Max allowable gas height (SPE-IADC 140113)
   const hmax = (maasp - _KT_PPG * (o.pp - o.mw) * o.tvdKick) / (_KT_PPG * (o.mw - rhoK));
-  if (!(hmax > 0)) return { kt: 0, hmax: 0, maasp: Math.round(maasp), gradWeak, swabbed, infinite: false };
+  if (!(hmax > 0)) return { ...none, gradWeak };
 
-  // Shut-in: gas at bottom, height hmax (around DC then DP)
-  const volBottom = hmax > o.dcLen
-    ? o.capBHA * o.dcLen + o.capDP * (hmax - o.dcLen)
-    : o.capBHA * hmax;
-  // Circulating: gas at weak point around DP, converted to bottom-hole via density ratio
-  const volCirc = o.capDP * hmax * (denBottom > 0 ? denWeak / denBottom : 1);
+  // Shut-in: gas at the bottom, hmax of height up from the bit (collars, then DP)
+  const volBottom = _ktColumnVol(o.prof, hmax, true).vol;
+  // Circulating: gas just below the weak point, converted to bottom-hole volume
+  // via the density ratio
+  const volCirc = _ktColumnVol(o.prof, hmax, false).vol * (denBottom > 0 ? denWeak / denBottom : 1);
 
-  const kt = Math.min(volBottom, volCirc);
-  // Infinite if the gas column would extend above the weak point (shoe → surface open)
+  // Infinite if the gas column would extend above the weak point
   const infinite = hmax >= (o.tvdKick - o.tvdWeak);
-  return { kt, hmax, maasp: Math.round(maasp), gradWeak, swabbed, infinite };
+  return { kt: Math.min(volBottom, volCirc), hmax, maasp: Math.round(maasp), gradWeak, volBottom, volCirc, infinite };
 }
 
-function drawKickTolerance() {
-  // Phase-aware: the active drilling stage's fluid, survey and casing program
-  const fluid = (typeof qpPhaseFluid === 'function') ? qpPhaseFluid() : fluidGet();
-  const mw    = fluid.mudWeight || 10;   // imperial ppg (canonical)
-  const el    = document.getElementById('ktMWdisplay');
-  if (el) el.textContent = QP_UNITS.toDisplay('mw', mw).toFixed(QP_UNITS.isMetric() ? 0 : 1);
-  const uMWel = document.getElementById('ktMWunit');
-  if (uMWel) uMWel.textContent = QP_UNITS.label('mw');
+// Model inputs from the panel (display → imperial).
+function _ktInputs() {
+  const v = id => document.getElementById(id)?.value;
+  const influxSel = v('ktInflux') || 'methane';
+  const kiRaw = v('ktKickInt');
+  return {
+    safetyPsi: QP_UNITS.fromDisplay('press', +(v('ktSafety') || 100)),
+    influxSel,
+    influx: influxSel === 'methane' ? 'methane' : QP_UNITS.fromDisplay('pgrad', +(v('ktInfluxGrad') || 0.1)),
+    kickInt: (kiRaw === '' || kiRaw == null) ? null : Math.max(0, QP_UNITS.fromDisplay('mw', +kiRaw)),
+    minVol: QP_UNITS.fromDisplay('volume', +(v('ktMinVol') || 20)),
+    thermal: (typeof qpThermal === 'function') ? qpThermal() : { surfT: 70, geoGrad: 1.5 },
+  };
+}
 
-  const survey   = ((typeof qpSurveyForAnalysis === 'function') ? qpSurveyForAnalysis() : qpState.survey) || [];
-  const maxTVD   = survey.length ? survey[survey.length - 1].tvd : 10000;
-  const allRows  = (typeof qpPhaseRows === 'function') ? qpPhaseRows() : _readSchematicRows();
-  const ppfgPts  = _readPPFG();
-  const bha      = bhaGet();
-  const dpOD     = bha.topDpOD_in || 5.0;
-
-  _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD);
-
-  const resultsDiv = document.getElementById('ktResultsDiv');
-  if (!resultsDiv) return;
-
-  if (ppfgPts.length < 1) {
-    resultsDiv.innerHTML = '<p style="color:var(--text-dim);padding:8px 0">Add PPFG gradient points to the table</p>';
-    return;
-  }
+// Kick tolerance for every casing shoe (the conductor excluded). Each shoe is the
+// top of the hole section drilled below it and is checked against THAT section:
+// kick zone at the section's TD with the highest pore pressure in the interval
+// (or the section mud weight + kick intensity), the section's own mud weight and
+// hole size, the BHA with the bit at the section TD, and gas laid along the
+// actual (deviated) hole. Two weak points: the shoe, and the weakest point of
+// the open-hole interval (the one giving the lowest kick tolerance).
+// Returns { results, inp } or { error }. All values imperial.
+function ktComputeSections() {
+  const survey  = (typeof qpState !== 'undefined' && qpState.survey) || [];
+  const allRows = _readSchematicRows();
+  const ppfgPts = _readPPFG();
+  if (!ppfgPts.length) return { error: 'Add PPFG gradient points to the table' };
 
   const casingRows = allRows
     .filter(r => r.def !== 'Open Hole' && r.def !== 'Conductor' && +(r.bot || 0) > 0)  // no KT for the conductor
     .sort((a, b) => +(a.bot) - +(b.bot));
+  if (!casingRows.length) return { error: 'Add casing strings in Well Schematic' };
 
-  if (!casingRows.length) {
-    resultsDiv.innerHTML = '<p style="color:var(--text-dim);padding:8px 0">Add casing strings in Well Schematic</p>';
-    return;
-  }
+  const inp     = _ktInputs();
+  const tempR   = tvd => qpTempAt(tvd, inp.thermal) + 459.67;    // °F → °R
+  const phases  = (typeof qpPhaseList === 'function') ? qpPhaseList() : [];
+  const trajTD  = survey.length ? survey[survey.length - 1].md : 0;
+  const baseMW  = ((typeof fluidBase === 'function') ? fluidBase() : fluidGet()).mudWeight || 10;
 
-  // Real-gas model inputs (display units) → imperial (canonical) for the engine
-  const safetyPsi = QP_UNITS.fromDisplay('press', +(document.getElementById('ktSafety')?.value || 100));
-  const surfT     = _ktTempToImp(document.getElementById('ktSurfTemp')?.value ?? 70);   // °F
-  const geoGrad   = _ktGeoToImp(document.getElementById('ktGeoGrad')?.value ?? 1.5);     // °F/100ft
-  const influxSel = document.getElementById('ktInflux')?.value || 'methane';
-  const influxGrad= QP_UNITS.fromDisplay('pgrad', +(document.getElementById('ktInfluxGrad')?.value || 0.1));
-  const influx    = influxSel === 'methane' ? 'methane' : influxGrad;
-  const tempAtR   = tvd => surfT + geoGrad / 100 * tvd + 459.67;   // °F → °R
-
-  const comps  = bha.components || [];
-  const dcComps= comps.filter(c => c.type === 'Drill Collar');
+  const bha    = bhaGet();
+  const dpOD   = bha.topDpOD_in || 5.0;
+  const dcComps= (bha.components || []).filter(c => c.type === 'Drill Collar');
   const dcOD   = dcComps.length ? Math.max(...dcComps.map(c => +c.od || 0)) : (dpOD + 1.5);
   const dcLen  = dcComps.reduce((s, c) => s + (+c.lengthFt || 0), 0);
-  const tvdKick   = maxTVD;                     // kick zone = well TD
-  const tempKick_R= tempAtR(tvdKick);
 
   const results = casingRows.map(row => {
     const shoeMD  = +(row.bot);
     const shoeTVD = _tvdAt(survey, shoeMD);
-    const fg      = _ppfgInterp(ppfgPts, shoeTVD, 'fg');
-    const pp      = _ppfgInterp(ppfgPts, maxTVD,  'pp');
-    const maasp   = Math.max(0, (fg - mw) * 0.052 * shoeTVD);
-    const dh      = _holeSizeAt(allRows, shoeMD + 1);
-    const annCap  = Math.max(0, 0.000971 * (dh * dh - dpOD * dpOD));
-    const deltaPPg = pp - mw;
-    const ob = deltaPPg <= _KT_PP_TOL; // overbalanced/balanced (tolerant of display rounding at pp≈mw)
-    const kt = !ob && annCap > 0
-      ? (maasp / (deltaPPg * 0.052)) * annCap : null;
+    const fgShoe  = _ppfgInterp(ppfgPts, shoeTVD, 'fg');
+    const base    = { name: `${row.size}" ${row.def}`, shoeMD, shoeTVD, fgShoe };
 
-    // Real-gas KT: this shoe is the weak point, kick zone at TD
-    const capBHA = Math.max(0, (dh * dh - dcOD * dcOD) / 1029.4);
-    const capDP  = Math.max(0, (dh * dh - dpOD * dpOD) / 1029.4);
-    const gas = (shoeTVD > 0 && tvdKick > shoeTVD)
-      ? _ktGasTolerance({ mw, pp, fg, tvdKick, tvdWeak: shoeTVD,
-          tempKick_R, tempWeak_R: tempAtR(shoeTVD), safetyPsi, capBHA, capDP, dcLen, influx })
-      : null;
+    // The hole section drilled below this shoe (casing program), to the trajectory TD at most
+    const ph   = phases.find(p => Math.abs(p.holeTop - shoeMD) < 0.5);
+    const tdMD = ph ? (trajTD > 0 ? Math.min(ph.mdLimit, trajTD) : ph.mdLimit) : 0;
+    if (!ph || !(tdMD > shoeMD + 1)) return { ...base, noSection: true };
+    const tdTVD = _tvdAt(survey, tdMD);
+    const dh    = ph.holeSize;
+    const mw    = ((typeof fluidForSection === 'function') ? fluidForSection(ph.key).mudWeight : 0) || baseMW;
 
-    // Values kept imperial (canonical) for status/governing logic; converted for
-    // display in _renderKTTable.
-    return { name: `${row.size}" ${row.def}`, shoeTVD, fg, pp, maasp,
-             dh, kt, ob,
-             ktGas: gas && gas.kt != null ? +gas.kt.toFixed(2) : null,
-             gasInf: gas ? gas.infinite : false,
-             gasSwab: gas ? gas.swabbed : true };
+    const prof = _ktAnnulusProfile(survey, shoeMD, tdMD, dh, dpOD, dcOD, dcLen);
+    const tvdLo = Math.min(...prof.map(p => p.tvd)), tvdHi = Math.max(...prof.map(p => p.tvd));
+
+    // Highest pore pressure in the interval (piecewise linear: ends + breakpoints)
+    const ppCand = [tvdLo, tvdHi, ...ppfgPts.map(p => p.tvd).filter(t => t > tvdLo && t < tvdHi)];
+    const ppMax  = Math.max(...ppCand.map(t => _ppfgInterp(ppfgPts, t, 'pp')));
+    const pp     = inp.kickInt != null ? mw + inp.kickInt : ppMax;
+    const ppEff  = Math.max(pp, mw);              // swabbed kick (pp ≤ mw) enters at mw
+
+    const calc = (i, fg) => _ktGasTolerance({
+      mw, pp: ppEff, fg, tvdKick: tdTVD, tvdWeak: prof[i].tvd,
+      tempKick_R: tempR(tdTVD), tempWeak_R: tempR(prof[i].tvd),
+      safetyPsi: inp.safetyPsi, influx: inp.influx, prof: prof.slice(i) });
+    const ktOf = g => g.infinite ? Infinity : g.kt;
+
+    // Frac at the shoe
+    const gasShoe = calc(0, fgShoe);
+    // Weakest point of the open hole: the depth giving the lowest kick tolerance
+    let wi = 0, gasWeak = gasShoe;
+    for (let i = 1; i < prof.length - 1; i++) {
+      if (i % 3 && i !== prof.length - 2) continue;          // every ~30 ft MD
+      const g = calc(i, _ppfgInterp(ppfgPts, prof[i].tvd, 'fg'));
+      if (ktOf(g) < ktOf(gasWeak) - 1e-6) { wi = i; gasWeak = g; }
+    }
+    const weakTVD = prof[wi].tvd;
+    const ktGov   = Math.min(ktOf(gasShoe), ktOf(gasWeak));
+
+    return { ...base, tdMD, tdTVD, dh, mw, ppMax, pp, swabbed: pp <= mw + _KT_PP_TOL,
+             gasShoe, weakMD: prof[wi].md, weakTVD, fgWeak: _ppfgInterp(ppfgPts, weakTVD, 'fg'),
+             weakIsShoe: wi === 0, gasWeak, ktGov, pass: ktGov >= inp.minVol };
   });
+  return { results, inp };
+}
 
-  _renderKTTable(results, mw, { influxSel, safetyPsi });
+function drawKickTolerance() {
+  const survey  = (typeof qpState !== 'undefined' && qpState.survey) || [];
+  const maxTVD  = survey.length ? survey[survey.length - 1].tvd : 10000;
+  const mw      = ((typeof fluidBase === 'function') ? fluidBase() : fluidGet()).mudWeight || 10;   // well default (chart line)
+  const el      = document.getElementById('ktMWdisplay');
+  if (el) el.textContent = QP_UNITS.toDisplay('mw', mw).toFixed(QP_UNITS.isMetric() ? 0 : 1);
+  const uMWel = document.getElementById('ktMWunit');
+  if (uMWel) uMWel.textContent = QP_UNITS.label('mw');
+  const thEl = document.getElementById('ktThermalNote');
+  if (thEl && typeof qpThermalText === 'function') thEl.textContent = qpThermalText();
+
+  const out = ktComputeSections();
+  _drawPPFGChart(_readPPFG(), mw, _readSchematicRows(), survey, maxTVD, out.results || []);
+
+  const resultsDiv = document.getElementById('ktResultsDiv');
+  if (!resultsDiv) return;
+  if (out.error) {
+    resultsDiv.innerHTML = `<p style="color:var(--text-dim);padding:8px 0">${out.error}</p>`;
+    return;
+  }
+  _renderKTTable(out.results, out.inp);
 }
 
 // ── PPFG input table ──────────────────────────────────────────────────────────
@@ -323,7 +391,7 @@ function _holeSizeAt(schRows, md) {
 
 // ── PPFG Chart ────────────────────────────────────────────────────────────────
 
-function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
+function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD, results) {
   const c = _chartSetup('ktCanvas');
   if (!c) return;
   const { ctx, W, H } = c;
@@ -407,96 +475,110 @@ function _drawPPFGChart(ppfgPts, mw, allRows, survey, maxTVD) {
     _lblQueue(`${row.size}"`, g.l, y, { dx: 2, dy: -12, pinX: true, color: ctx.fillStyle, font: ctx.font, bounds: g, dir: -1 });
   });
 
-  _legend(ctx, W, g.t, ['PP', 'FG', 'MW'], ['#1a7a4a', '#c0392b', '#7a4aa0']);
+  // Weak points below the shoe (the open-hole depth giving the lowest KT)
+  const wps = (results || []).filter(r => r.weakTVD != null && !r.weakIsShoe && r.weakTVD <= chartMaxTVDimp);
+  wps.forEach(r => {
+    const x = px(toG(r.fgWeak)), y = py(toD(r.weakTVD));
+    ctx.fillStyle = '#e67e22';
+    ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 5, y); ctx.closePath(); ctx.fill();
+    _lblReserve(x - 5, y - 5, 10, 10);
+    _lblQueue(`WP ${r.name.split(' ')[0]}`, x, y, { dx: 7, dy: -6, color: '#e67e22', font: '9px sans-serif', bounds: g });
+  });
+
+  const lg = ['PP', 'FG', 'MW'], lc = ['#1a7a4a', '#c0392b', '#7a4aa0'];
+  if (wps.length) { lg.push('Weak point'); lc.push('#e67e22'); }
+  _legend(ctx, W, g.t, lg, lc);
 
   CI.drawAnnotations(ctx, 'ktCanvas');
 }
 
 // ── KT Results Table ──────────────────────────────────────────────────────────
 
-function _renderKTTable(results, mw, meta) {
+function _renderKTTable(results, inp) {
   const div = document.getElementById('ktResultsDiv');
   if (!div) return;
-  meta = meta || {};
 
-  // Governing (minimum) real-gas KT over the swabbed-valid sections (PP ≤ MW).
-  // True-kick sections (PP > MW) are out of the swabbed-kick scope, so they are
-  // excluded from the governing figure (but still shown per-row with a ⚠).
-  const swabRows = results.filter(r => r.gasSwab && r.ktGas != null);
-  const minGas   = swabRows.length ? Math.min(...swabRows.map(r => r.ktGas)) : null;
-  const trueKickOnly = minGas == null && results.some(r => r.ktGas != null && !r.gasSwab);
+  const dD = v => Math.round(QP_UNITS.toDisplay('depth', v)).toLocaleString();
+  const dM = v => QP_UNITS.toDisplay('mw', v).toFixed(QP_UNITS.isMetric() ? 0 : 2);
+  const dP = v => Math.round(QP_UNITS.toDisplay('press', v)).toLocaleString();
+  const dV = v => v === Infinity ? '∞' : QP_UNITS.toDisplay('volume', v).toFixed(QP_UNITS.isMetric() ? 2 : 1);
+  const uD = QP_UNITS.label('depth'), uMW = QP_UNITS.label('mw'),
+        uP = QP_UNITS.label('press'), uV = QP_UNITS.label('volume');
+  const ktTxt = g => g.infinite ? '∞' : dV(g.kt);
+  const ktTip = g => g.infinite ? 'gas column reaches the weak point before MAASP is used'
+    : `MAASP ${dP(g.maasp)} ${uP} · max gas height ${dD(g.hmax)} ${uD} TVD · shut-in ${dV(g.volBottom)} / circulating ${dV(g.volCirc)} ${uV}`;
+
+  const calc = results.filter(r => !r.noSection);
+  const gov  = calc.length ? calc.reduce((m, r) => (r.ktGov < m.ktGov ? r : m), calc[0]) : null;
 
   const rows = results.map(r => {
-    // The real-gas KT governs the status when it computed; an overbalanced 'OB'
-    // reading only applies to the static (no-influx) model, so it must NOT mask a
-    // finite swabbed real-gas tolerance.
-    const status = r.ktGas != null
-      ? (r.ktGas >= 20 ? { txt: '✓ OK',       cls: 'color:#2aad6a;font-weight:bold' }
-       : r.ktGas >= 10 ? { txt: '⚠ Low',      cls: 'color:#e0a020;font-weight:bold' }
-                       : { txt: '✕ Critical', cls: 'color:#e05555;font-weight:bold' })
-      : r.ob          ? { txt: '✓ OB',        cls: 'color:#2aad6a;font-weight:bold' }
-      : r.kt == null  ? { txt: '— no data',   cls: 'color:var(--text-dim)' }
-      : r.kt >= 20    ? { txt: '✓ OK',        cls: 'color:#2aad6a;font-weight:bold' }
-      : r.kt >= 10    ? { txt: '⚠ Low',       cls: 'color:#e0a020;font-weight:bold' }
-                      : { txt: '✕ Critical',  cls: 'color:#e05555;font-weight:bold' };
-    // Display converters (values above are imperial/canonical)
-    const dD = v => Math.round(QP_UNITS.toDisplay('depth', v)).toLocaleString();
-    const dM = v => QP_UNITS.toDisplay('mw', v).toFixed(QP_UNITS.isMetric() ? 0 : 2);
-    const dP = v => Math.round(QP_UNITS.toDisplay('press', v)).toLocaleString();
-    const dV = v => QP_UNITS.toDisplay('volume', v).toFixed(QP_UNITS.isMetric() ? 2 : 1);
-    const uV = QP_UNITS.label('volume');
-    const gasTxt  = r.gasInf ? '∞ (>WP)' : r.ktGas != null ? dV(r.ktGas) + ' ' + uV : '—';
-    const swab    = !r.gasSwab ? ' title="PP&gt;MW: true/induced kick — beyond the swabbed-kick scope; use WellPlan/DrillBench"' : '';
-    const gasMark = !r.gasSwab && r.ktGas != null ? ' ⚠' : '';
+    if (r.noSection) return `<tr>
+      <td>${r.name}</td><td style="text-align:right">${dD(r.shoeTVD)}</td>
+      <td colspan="8" style="color:var(--text-dim)">no hole section below this shoe in the casing program</td></tr>`;
+    const status = r.pass
+      ? { txt: '✓ OK',        cls: 'color:#2aad6a;font-weight:bold' }
+      : { txt: '✕ Below min', cls: 'color:#e05555;font-weight:bold' };
+    const ppTip = inp.kickInt != null
+      ? `MW ${dM(r.mw)} + kick intensity ${dM(inp.kickInt)} ${uMW} (highest PPFG pore pressure in the section: ${dM(r.ppMax)})`
+      : `Highest pore pressure between the shoe and the section TD${r.swabbed ? ' — at or below MW: swabbed kick, enters at MW' : ''}`;
+    const wp = r.weakIsShoe ? '<span style="color:var(--text-dim)">= shoe</span>'
+      : `${dD(r.weakTVD)} / ${dM(r.fgWeak)}`;
     return `<tr>
       <td>${r.name}</td>
       <td style="text-align:right">${dD(r.shoeTVD)}</td>
-      <td style="text-align:right">${dM(r.fg)}</td>
-      <td style="text-align:right">${dM(r.pp)}</td>
-      <td style="text-align:right">${dP(r.maasp)}</td>
-      <td style="text-align:right">${r.dh}"</td>
-      <td style="text-align:right;font-weight:bold"${swab}>${gasTxt}${gasMark}</td>
+      <td style="text-align:right" title="Section TD ${dD(r.tdMD)} ${uD} MD">${_qpFmtIn(r.dh)}" → ${dD(r.tdTVD)}</td>
+      <td style="text-align:right">${dM(r.mw)}</td>
+      <td style="text-align:right" title="${ppTip}">${dM(r.pp)}${inp.kickInt != null ? '*' : ''}</td>
+      <td style="text-align:right">${dM(r.fgShoe)}</td>
+      <td style="text-align:right;font-weight:bold" title="${ktTip(r.gasShoe)}">${ktTxt(r.gasShoe)}</td>
+      <td style="text-align:right" title="Weakest point of the open hole (lowest kick tolerance): TVD / fracture gradient">${wp}</td>
+      <td style="text-align:right;font-weight:bold" title="${ktTip(r.gasWeak)}">${r.weakIsShoe ? '<span style="color:var(--text-dim);font-weight:normal">—</span>' : ktTxt(r.gasWeak)}</td>
       <td style="${status.cls}">${status.txt}</td>
     </tr>`;
   }).join('');
 
-  const influxNote = meta.influxSel === 'methane'
+  const influxNote = inp.influxSel === 'methane'
     ? 'methane, real gas (Hall-Yarborough Z, non-isothermal)'
     : 'fixed influx gradient';
-  const uD = QP_UNITS.label('depth'), uMW = QP_UNITS.label('mw'),
-        uP = QP_UNITS.label('press'), uVol = QP_UNITS.label('volume');
-  const govDisp = v => QP_UNITS.toDisplay('volume', v).toFixed(QP_UNITS.isMetric() ? 2 : 1);
+  const ppNote = inp.kickInt != null
+    ? `kick intensity ${dM(inp.kickInt)} ${uMW} over each section's MW (*)`
+    : 'pore pressure from the PPFG table';
 
   div.innerHTML = `
+    <div style="overflow-x:auto">
     <table class="qp-table" style="width:100%;font-size:11px">
       <thead>
         <tr>
           <th>Section</th>
           <th style="text-align:right">Shoe TVD (${uD})</th>
+          <th style="text-align:right" title="Hole drilled below the shoe → section TD (TVD)">Hole → TD (${uD})</th>
+          <th style="text-align:right">MW (${uMW})</th>
+          <th style="text-align:right">PP (${uMW})</th>
           <th style="text-align:right">FG@shoe (${uMW})</th>
-          <th style="text-align:right">PP@TD (${uMW})</th>
-          <th style="text-align:right">MAASP (${uP})</th>
-          <th style="text-align:right">Hole (in)</th>
-          <th style="text-align:right" title="Real-gas single-bubble (SPE-IADC 140113)">KT real-gas (${uVol})</th>
-          <th>Status</th>
+          <th style="text-align:right" title="Real-gas single bubble (SPE-IADC 140113), weak point at the shoe">KT@shoe (${uV})</th>
+          <th style="text-align:right">Weak pt TVD / FG</th>
+          <th style="text-align:right" title="Real-gas single bubble, weak point at the weakest open-hole depth">KT@weak pt (${uV})</th>
+          <th>vs min ${dV(inp.minVol)} ${uV}</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
+    </div>
     <p style="margin-top:8px;font-size:11px">
-      <strong>Governing (min) real-gas KT: ${minGas != null ? govDisp(minGas) + ' ' + uVol
-        : trueKickOnly ? '— (true-kick sections only — use WellPlan/DrillBench)' : '—'}</strong>
-      &nbsp;·&nbsp; MW = ${QP_UNITS.toDisplay('mw', mw).toFixed(QP_UNITS.isMetric() ? 0 : 1)} ${uMW}
-      &nbsp;·&nbsp; safety margin ${Math.round(QP_UNITS.toDisplay('press', meta.safetyPsi || 100))} ${uP} &nbsp;·&nbsp; influx: ${influxNote}
+      <strong>Governing KT: ${gov ? `${dV(gov.ktGov)} ${uV} (${gov.name}) — ${gov.pass ? '<span style="color:#2aad6a">meets</span>' : '<span style="color:#e05555">below</span>'} the ${dV(inp.minVol)} ${uV} minimum` : '—'}</strong>
+      &nbsp;·&nbsp; safety margin ${dP(inp.safetyPsi)} ${uP} &nbsp;·&nbsp; ${ppNote} &nbsp;·&nbsp; influx: ${influxNote}
+      &nbsp;·&nbsp; T: ${typeof qpThermalText === 'function' ? qpThermalText() : ''}
     </p>
     <p style="margin-top:6px;font-size:10px;color:var(--text-dim);line-height:1.5">
-      <strong>Real-gas model</strong> — single bubble migrating kick-zone(TD)→weak-point(shoe),
-      KT = min(shut-in at bottom, circulating at weak point w/ density-ratio expansion).<br>
-      <strong>Caveats:</strong> swabbed-kick scope (PP≤MW; ⚠ rows are true/induced kicks — use
-      WellPlan/DrillBench); two-node temperature (surface + geothermal gradient); DC/DP two-section
-      annulus from the BHA (stabilisers collapse to the collar OD). <strong>Influx:</strong> Methane
-      models real-gas expansion (conservative — use for gas kicks); Fixed-gradient is incompressible
-      (no expansion — for oil/liquid kicks of known gradient only).
+      <strong>Per section</strong> — each shoe is checked against the hole drilled below it: kick at that
+      section's TD with its highest pore pressure, its own mud weight (Fluid Program) and hole size, the
+      bit at the section TD. <strong>Real-gas model</strong> — single bubble, KT = min(shut-in at the bottom,
+      circulating at the weak point with density-ratio expansion); the gas height is laid along the actual
+      hole (height ÷ cos inclination, horizontal hole adds volume), around drill pipe in the open hole and
+      the collars below it. <strong>Caveats:</strong> one BHA for every section (only the hole size
+      changes); two-section annulus (stabilisers collapse to the collar OD); static temperature profile.
+      <strong>Influx:</strong> Methane models real-gas expansion (use for gas kicks); Fixed-gradient is
+      incompressible (oil/liquid kicks of known gradient only).
     </p>`;
 }
 

@@ -146,7 +146,9 @@ function drawCasingTriaxial() {
 
   const od_in = +(row.size);
   const id_in = +row.id_in;
-  const σy    = CASING_GRADE_YLD[row.grade] || 80000;
+  // Opt-in temperature derating at the shoe's static temperature (thermal.js)
+  const derate = (typeof qpCasingDerate === 'function') ? qpCasingDerate(_tvdAt(survey, +(row.bot))) : { on: false, k: 1 };
+  const σy    = (CASING_GRADE_YLD[row.grade] || 80000) * derate.k;
   const A     = Math.PI / 4 * (od_in * od_in - id_in * id_in);
   const r_o   = od_in / 2, r_i = id_in / 2;
   const C_h   = (r_i * r_i + r_o * r_o) / (r_o * r_o - r_i * r_i);
@@ -230,17 +232,18 @@ function drawCasingTriaxial() {
 
   // API design box from user-entered ratings / SF
   const rr              = ratings[selKey] || {};
-  const burst_rating    = rr.burst       || row.burst    || 0;
-  const collapse_rating = rr.collapse    || row.collapse || 0;
-  const tension_rating  = rr.tension     || 0;
-  const comp_rating     = rr.compression || 0;
+  const burst_rating    = (rr.burst       || row.burst    || 0) * derate.k;
+  const collapse_rating = (rr.collapse    || row.collapse || 0) * derate.k;
+  const tension_rating  = (rr.tension     || 0) * derate.k;
+  const comp_rating     = (rr.compression || 0) * derate.k;
   const hasBox          = burst_rating > 0 || collapse_rating > 0 || tension_rating > 0 || comp_rating > 0;
 
   // Tension capacity = min(pipe body yield, joint strength). A threaded
   // connection can fail in tension before the pipe body, so the catalogue joint
   // yield (weakest available connection) caps the tensile design limit.
-  const tensionCap_klbf = (row.jointYield != null && +row.jointYield > 0)
-    ? Math.min(bodyYield_klbf, +row.jointYield)
+  const jointYield_klbf = (row.jointYield != null && +row.jointYield > 0) ? +row.jointYield * derate.k : null;
+  const tensionCap_klbf = jointYield_klbf != null
+    ? Math.min(bodyYield_klbf, jointYield_klbf)
     : bodyYield_klbf;
 
   // API box x-extents: use user-entered ratings if available, else the capacity above
@@ -414,12 +417,15 @@ function drawCasingTriaxial() {
   const _dStress  = psi => _met ? (psi * 0.00689476).toFixed(0) : (psi / 1000).toFixed(0);
   const _dStress1 = psi => _met ? (psi * 0.00689476).toFixed(1) : (psi / 1000).toFixed(1);
   const _uStress  = _met ? 'MPa' : 'kpsi';
-  const jointStr = (row.jointYield != null && +row.jointYield > 0 && +row.jointYield < bodyYield_klbf)
-    ? `  ·  Joint Yield = ${_dF(+row.jointYield)} ${_uF}`
+  const jointStr = (jointYield_klbf != null && jointYield_klbf < bodyYield_klbf)
+    ? `  ·  Joint Yield = ${_dF(jointYield_klbf)} ${_uF}`
+    : '';
+  const derateStr = derate.on
+    ? `  ·  ×${derate.k.toFixed(3)} at ${_ktTempToDisp(derate.T).toFixed(0)} ${_ktUTemp()} (shoe)`
     : '';
   ctx.textBaseline = 'bottom';
   _fitText(ctx,
-    `σ_y = ${_dStress(σy)} ${_uStress}  ·  Body Yield = ${_dF(bodyYield_klbf)} ${_uF}${jointStr}  ·  ID = ${id_in.toFixed(3)}"`,
+    `σ_y = ${_dStress(σy)} ${_uStress}${derateStr}  ·  Body Yield = ${_dF(bodyYield_klbf)} ${_uF}${jointStr}  ·  ID = ${id_in.toFixed(3)}"`,
     hdrX, g.t - 28, hdrW);
   const _uMW = QP_UNITS.label('mw'), _uD = QP_UNITS.label('depth');
   const cemStr = hasTOC

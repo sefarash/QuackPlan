@@ -25,11 +25,14 @@ const _OC_IDS = [
   // Analysis phase (footer selector — value is the phase key, no unit)
   'phaseSelect',
   // Casing design
-  'cdSFBurst', 'cdSFCollapse', 'cdCementMW',
-  // NOTE: the kick-tolerance model inputs (ktSafety/ktSurfTemp/ktGeoGrad/
-  // ktInflux/ktInfluxGrad) are intentionally NOT persisted here — they are
-  // display-unit (incl. temperature, an offset conversion) and output-controls
-  // stores raw values, which would corrupt them across a unit-system change.
+  'cdSFBurst', 'cdSFCollapse', 'cdCementMW', 'cdTempDerate',
+  // Hydraulics P/T-corrected ECD switch
+  'hydTempCorr',
+  // Kick tolerance: kick intensity (blank = PPFG) + minimum acceptable volume
+  'ktKickInt', 'ktMinVol',
+  // NOTE: the other kick-tolerance model inputs (ktSafety/ktInflux/ktInfluxGrad)
+  // are not persisted here. The formation temperature (ktSurfTemp/ktGeoGrad) is
+  // well data — the 'thermal' key, see thermal.js.
 ];
 
 const _OC_ID_SET = new Set(_OC_IDS);
@@ -48,6 +51,8 @@ const _OC_UNITS = {
   ssSpeedMin: 'speed', ssSpeedMax: 'speed',
   // Casing design cement slurry density
   cdCementMW: 'mw',
+  // Kick tolerance
+  ktKickInt: 'mw', ktMinVol: 'volume',
 };
 const _OC_SLIDER_SET = new Set(['hydMWmin','hydMWslider','hydMWmax','hydFlowMin','hydFlowSlider','hydFlowMax']);
 
@@ -75,7 +80,7 @@ function _readOutputControls() {
     const el = document.getElementById(id);
     if (!el) return;
     if (el.type === 'checkbox')      vals[id] = el.checked;
-    else if (_OC_UNITS[id])          vals[id] = +QP_UNITS.fromDisplay(_OC_UNITS[id], +el.value).toFixed(4);
+    else if (_OC_UNITS[id])          vals[id] = el.value === '' ? '' : +QP_UNITS.fromDisplay(_OC_UNITS[id], +el.value).toFixed(4);
     else                             vals[id] = el.value;
   });
   return vals;
@@ -105,6 +110,8 @@ function _ocDisplayValue(id, vals) {
   const el = document.getElementById(id);
   const q  = _OC_UNITS[id];
   if (q) {
+    // blank stays blank (e.g. kick intensity: blank = use the PPFG table)
+    if ((id in vals) ? vals[id] === '' : (el && el.defaultValue === '')) return '';
     const canonical = (id in vals) ? +vals[id] : (el ? +el.defaultValue : 0);
     return +QP_UNITS.toDisplay(q, canonical).toFixed(4);
   }

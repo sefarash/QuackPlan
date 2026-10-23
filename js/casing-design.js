@@ -107,10 +107,13 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
     const cVal     = r.collapse    ? dP(r.collapse)    : '';
     const tVal     = r.tension     ? dF(r.tension)     : '';
     const compVal  = r.compression ? dF(r.compression) : '';
-    const bLim     = r.burst       ? dP(r.burst       / sfBurst)       : null;
-    const cLim     = r.collapse    ? dP(r.collapse    / sfCollapse)    : null;
-    const tLim     = r.tension     ? dF(r.tension     / sfTension)     : null;
-    const compLim  = r.compression ? dF(r.compression / sfCompression) : null;
+    // Opt-in temperature derating at the shoe (thermal.js); k = 1 when off
+    const k        = (typeof qpCasingDerate === 'function') ? qpCasingDerate(_tvdAt(survey, +(row.bot))).k : 1;
+    const kTxt     = k < 1 ? ` × ${k.toFixed(3)}` : '';
+    const bLim     = r.burst       ? dP(r.burst       * k / sfBurst)       : null;
+    const cLim     = r.collapse    ? dP(r.collapse    * k / sfCollapse)    : null;
+    const tLim     = r.tension     ? dF(r.tension     * k / sfTension)     : null;
+    const compLim  = r.compression ? dF(r.compression * k / sfCompression) : null;
     const shoeTVD  = Math.round(QP_UNITS.toDisplay('depth', _tvdAt(survey, +(row.bot))));
     const checked  = (selectedKey ? key === selectedKey : idx === 0) ? 'checked' : '';
     const specLine = [row.grade, row.nomWt_ppf ? row.nomWt_ppf + ' ppf' : null]
@@ -128,22 +131,22 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
       <td style="padding:2px 4px">
         <input type="number" step="100" value="${bVal}" placeholder="${uP}"
           style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
-        ${bLim !== null ? `<div style="font-size:10px;color:#2aad6a">/ ${sfBurst} = ${bLim.toLocaleString()}</div>` : ''}
+        ${bLim !== null ? `<div style="font-size:10px;color:#2aad6a">${kTxt} / ${sfBurst} = ${bLim.toLocaleString()}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="100" value="${cVal}" placeholder="${uP}"
           style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
-        ${cLim !== null ? `<div style="font-size:10px;color:#b07ad0">/ ${sfCollapse} = ${cLim.toLocaleString()}</div>` : ''}
+        ${cLim !== null ? `<div style="font-size:10px;color:#b07ad0">${kTxt} / ${sfCollapse} = ${cLim.toLocaleString()}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="10" value="${tVal}" placeholder="${uF}"
           style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
-        ${tLim !== null ? `<div style="font-size:10px;color:#3aafd8">/ ${sfTension} = ${tLim}</div>` : ''}
+        ${tLim !== null ? `<div style="font-size:10px;color:#3aafd8">${kTxt} / ${sfTension} = ${tLim}</div>` : ''}
       </td>
       <td style="padding:2px 4px">
         <input type="number" step="10" value="${compVal}" placeholder="${uF}"
           style="width:72px" onchange="drawCasingDesign();cdRatingsSave()" onclick="event.stopPropagation()">
-        ${compLim !== null ? `<div style="font-size:10px;color:#e0a020">/ ${sfCompression} = ${compLim}</div>` : ''}
+        ${compLim !== null ? `<div style="font-size:10px;color:#e0a020">${kTxt} / ${sfCompression} = ${compLim}</div>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -163,5 +166,6 @@ function _renderCDRatingsTable(casingRows, survey, ratings, sfBurst, sfCollapse,
     </table>
     <p style="margin-top:8px;font-size:10px;color:var(--text-dim)">
       Enter catalogue burst &amp; collapse ratings to show the API design box on the triaxial chart.
+      ${document.getElementById('cdTempDerate')?.checked ? `<br>Temperature derating on: yield and ratings × k at each shoe's static temperature (${qpThermalText()}, 0.03 %/°F above 68 °F).` : ''}
     </p>`;
 }

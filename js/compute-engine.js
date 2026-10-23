@@ -96,6 +96,11 @@ function _computeHyd(survey, fluid, bha) {
   const _mSl = document.getElementById('hydMWslider')?.value;
   const activeFlow = (!_phase && _fSl != null && _fSl !== '') ? QP_UNITS.fromDisplay('flow', +_fSl) : flowRate;
   const activeMW   = (!_phase && _mSl != null && _mSl !== '') ? QP_UNITS.fromDisplay('mw',   +_mSl) : mudWeight;
+  // Opt-in: static mud density corrected for pressure + formation temperature
+  // (thermal.js). Off → the surface mud weight all the way down, as before.
+  const tempCorr   = !!document.getElementById('hydTempCorr')?.checked && typeof qpESD === 'function';
+  const thermal    = tempCorr ? qpThermal() : null;
+  const esdAt      = tvd => tempCorr ? qpESD(activeMW, fluid.mudType, tvd, thermal) : activeMW;
 
   const dpOD       = bha.topDpOD_in   ?? 5.0;
   const dpID       = bha.topDpID_in   ?? 4.276;
@@ -126,7 +131,7 @@ function _computeHyd(survey, fluid, bha) {
       const r = computeRheology(model, rheolParams,
         { dh, dp: dpOD, length: length / 3.28084, flowRate: activeFlow });
       const tvdShoe = _tvdAt(survey, bot);
-      const ecd = activeMW + (cumAnn + r.pressureLoss_psi) / (0.052 * (tvdShoe || 1));
+      const ecd = esdAt(tvdShoe) + (cumAnn + r.pressureLoss_psi) / (0.052 * (tvdShoe || 1));
       sections.push({ name: row.def, dh, lenM: length / 3.28084,
                       annPressLoss: Math.round(r.pressureLoss_psi),
                       annVel_fpm: Math.round(r.annularVelocity_fpm),
@@ -148,7 +153,7 @@ function _computeHyd(survey, fluid, bha) {
       const r = computeRheology(model, rheolParams,
         { dh: seg.dh, dp: dpOD, length: len / 3.28084, flowRate: activeFlow });
       const tvdShoe = _tvdAt(survey, seg.mdBot);
-      const ecd = activeMW + (cumAnn + r.pressureLoss_psi) / (0.052 * (tvdShoe || 1));
+      const ecd = esdAt(tvdShoe) + (cumAnn + r.pressureLoss_psi) / (0.052 * (tvdShoe || 1));
       sections.push({ name: seg.name, dh: seg.dh, lenM: len / 3.28084,
                       annPressLoss: Math.round(r.pressureLoss_psi),
                       annVel_fpm: Math.round(r.annularVelocity_fpm),
@@ -175,7 +180,8 @@ function _computeHyd(survey, fluid, bha) {
 
   const pumpPressure = Math.round(pipeLoss + bitDrop + cumAnn + 50 + mwdDrop);
   const pumpHP       = Math.round((pumpPressure * activeFlow) / (1714 * (pumpEff / 100)));
-  const ecdAtBit     = +( activeMW + cumAnn / (0.052 * (bitTVD_ft || 1)) ).toFixed(2);
+  const esdAtBit     = +esdAt(bitTVD_ft).toFixed(3);
+  const ecdAtBit     = +( esdAtBit + cumAnn / (0.052 * (bitTVD_ft || 1)) ).toFixed(2);
 
   // Build sweep (SPP vs flow rate) for chart — range = (flowMin−50) to (flowMax+50)
   const flowMin    = +(document.getElementById('hydFlowMin')?.value || 100);
@@ -217,7 +223,7 @@ function _computeHyd(survey, fluid, bha) {
     pipeLoss:     Math.round(pipeLoss),
     bitDrop:      Math.round(bitDrop),
     mwdDrop:      Math.round(mwdDrop),
-    pumpPressure, pumpHP, ecdAtBit, hsi,
+    pumpPressure, pumpHP, ecdAtBit, esdAtBit, tempCorr, hsi,
     nozzVel:      Math.round(nozzVel),
     mudWeight:    activeMW,
     flowRate:     activeFlow,
