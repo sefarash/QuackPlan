@@ -178,7 +178,7 @@ function exportKT() {
   if (!ppfgPts.length) { alert('Add PPFG points first.'); return; }
 
   const casingRows = allRows
-    .filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0)
+    .filter(r => r.def !== 'Open Hole' && r.def !== 'Conductor' && +(r.bot || 0) > 0)  // no KT for the conductor
     .sort((a, b) => +(a.bot) - +(b.bot));
 
   if (!casingRows.length) { alert('Add casing strings in Well Schematic.'); return; }

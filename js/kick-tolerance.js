@@ -158,7 +158,7 @@ function drawKickTolerance() {
   }
 
   const casingRows = allRows
-    .filter(r => r.def !== 'Open Hole' && +(r.bot || 0) > 0)
+    .filter(r => r.def !== 'Open Hole' && r.def !== 'Conductor' && +(r.bot || 0) > 0)  // no KT for the conductor
     .sort((a, b) => +(a.bot) - +(b.bot));
 
   if (!casingRows.length) {
