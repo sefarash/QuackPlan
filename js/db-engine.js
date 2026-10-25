@@ -39,7 +39,8 @@ async function _api(method, path, body) {
     let msg = 'Server error ' + res.status;
     try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (_) {}
     if (typeof setStatus === 'function') setStatus(msg, true);
-    throw new Error(msg);
+    const e = new Error(msg); e.status = res.status;
+    throw e;
   }
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : null;
@@ -87,13 +88,37 @@ function dbAllNodes()     { return _api('GET', '/nodes'); }
 // 3. SINGLE ORDERED FLUSHER — one sequential worker drains the log
 //    (next PATCH starts only after the previous resolved), so saves can never
 //    be reordered by the network.
+//
+// 4. PARKED SAVES — an entry the server REJECTS for good (4xx other than
+//    401 / 408 / 429: its node was deleted, belongs to another account, or the
+//    request is malformed) would otherwise be retried forever at the head of
+//    the log and block every save behind it. It is moved, unchanged, to
+//    'qp_parked_saves' (never cleared — recoverable from the console with
+//    dbParkedSaves()) and the flush carries on.
 const _WAL_KEY = 'qp_pending_saves';
+const _PARK_KEY = 'qp_parked_saves';
 let _walSeq = 0, _walFlushing = false, _walTimer = null;
 
 function _walRead()  { try { return JSON.parse(localStorage.getItem(_WAL_KEY) || '[]'); } catch (_) { return []; } }
 function _walWrite(a){ try { localStorage.setItem(_WAL_KEY, JSON.stringify(a)); } catch (_) {} _qpSaveIndicator(); }
 function _walAdd(e)  { const a = _walRead(); a.push(e); _walWrite(a); }
 function _walRemove(id) { _walWrite(_walRead().filter(x => x.id !== id)); }
+function _walPark(entry, status, msg) {
+  let a = [];
+  try { a = JSON.parse(localStorage.getItem(_PARK_KEY) || '[]'); } catch (_) {}
+  a.push({ ...entry, status, error: msg, parkedAt: Date.now() });
+  try { localStorage.setItem(_PARK_KEY, JSON.stringify(a)); } catch (_) { return false; }
+  return true;
+}
+// Console: the saves the server rejected, kept as they were queued.
+function dbParkedSaves() {
+  try { return JSON.parse(localStorage.getItem(_PARK_KEY) || '[]'); } catch (_) { return []; }
+}
+// A rejection that will never succeed on retry (see 4. above)
+function _walIsPermanent(e) {
+  const st = e && e.status;
+  return st >= 400 && st < 500 && st !== 401 && st !== 408 && st !== 429;
+}
 
 // Footer indicator: ✓ Saved · ● Saving… · ⚠ N unsaved (kept locally, retrying)
 function _qpSaveIndicator() {
@@ -129,6 +154,11 @@ async function qpFlushPendingSaves() {
         _walRemove(entry.id);
       } catch (e) {
         if (e && e.message === 'unauthorized') return;   // replay after next login
+        if (_walIsPermanent(e) && _walPark(entry, e.status, e.message)) {
+          _walRemove(entry.id);                          // parked (kept) — don't block the rest
+          console.warn('Save parked — the server rejected it:', e.status, e.message, entry.s, entry.k, '(dbParkedSaves())');
+          continue;
+        }
         _walScheduleRetry();                             // network/server — retry later
         return;
       }
@@ -158,5 +188,8 @@ function dbRename(id, newName) { return _api('PATCH', '/nodes/' + id + '/name', 
 //   dbHistory(id).then(console.table)          — last 20 prior versions
 //   dbRestoreVersion(id, histId)               — roll the node back (also
 //                                                 revives a soft-deleted node)
-function dbHistory(id)               { return _api('GET',  '/nodes/' + id + '/history'); }
+// dbHistory(id) → newest versions of every key; dbHistory(id, 'bha') → that key's only
+function dbHistory(id, key) {
+  return _api('GET', '/nodes/' + id + '/history' + (key ? '?op=' + encodeURIComponent('data:' + key) : ''));
+}
 function dbRestoreVersion(id, histId){ return _api('POST', '/nodes/' + id + '/history/' + histId + '/restore'); }

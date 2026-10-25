@@ -7,6 +7,9 @@
 //   3. Round-trip: data survives repeated opens; an edit stores the FULL array.
 //   4. Undo log: every mutation snapshots the prior state; restore rolls back.
 //   5. Soft delete: deleted nodes disappear from queries but are recoverable.
+//   8. A save the server rejects for good is parked, never blocks the queue.
+//   9. A debounced output-control save lands in the scenario it was made in.
+//  10. Undo-log retention is per key: chart-settings bursts can't evict BHA history.
 //
 // Run against a local dev server:
 //   npx wrangler d1 migrations apply quackplan-db --local
@@ -158,6 +161,60 @@ const on = await page.evaluate(async (scName) => {
   };
 }, 'DS-S');
 
+// ── Stuck-queue and wrong-scenario guards ───────────────────────────────────
+// 8. A queued save the server rejects for good (its scenario was deleted) is
+//    parked in 'qp_parked_saves' — kept, not retried forever at the head of the
+//    log — and the saves behind it still go through.
+// 9. A debounced output-control save lands in the scenario it was made in, even
+//    if another scenario is opened before the 200 ms debounce fires.
+const guard = await page.evaluate(async (scName) => {
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const sc = (await dbAllNodes()).find(n => n.name === scName);
+  localStorage.removeItem('qp_parked_saves');
+  const gone = await dbAdd({ parentId: sc.parentId, name: 'DS-GONE', type: 'scenario', data: { fluid: { mudWeight: 9 } } });
+  await dbDelete(gone);
+  dbSaveScenarioData(gone, 'fluid', { mudWeight: 11 });     // rejected: node deleted
+  dbSaveScenarioData(sc.id, 'parkProbe', { ok: 1 });         // queued behind it
+  await wait(1500);
+  const parked = dbParkedSaves();
+  const out = {
+    walLen: JSON.parse(localStorage.getItem('qp_pending_saves') || '[]').length,
+    parked: parked.length, parkedOk: parked[0] && parked[0].s === gone && parked[0].status === 404 && parked[0].v.mudWeight === 11,
+    behindLanded: (await dbGet(sc.id)).data.parkProbe?.ok === 1,
+  };
+
+  const b = await dbAdd({ parentId: sc.parentId, name: 'DS-OC-B', type: 'scenario', data: { outputControls: { cdSFBurst: '1.25' } } });
+  const prev = qpState.currentScenarioId;
+  qpState.currentScenarioId = sc.id;
+  const el = document.getElementById('cdSFBurst');
+  el.value = '1.40'; el.dispatchEvent(new Event('change', { bubbles: true }));
+  qpState.currentScenarioId = b;                 // a tree click switches the id before the load starts
+  await wait(1200);
+  out.ocA = (await dbGet(sc.id)).data.outputControls?.cdSFBurst;
+  out.ocB = (await dbGet(b)).data.outputControls?.cdSFBurst;
+  qpState.currentScenarioId = prev;
+  return out;
+}, 'DS-S');
+
+// 10. Undo-log retention is per key: a burst of chart-settings saves after a bad
+//     BHA write must not push the last good BHA version out of the history.
+const hist = await page.evaluate(async (scName) => {
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const drain = async () => { for (let i = 0; i < 100 && JSON.parse(localStorage.getItem('qp_pending_saves') || '[]').length; i++) await wait(100); };
+  const sc = (await dbAllNodes()).find(n => n.name === scName);
+  const row = l => ({ type: 'Drill Pipe', lengthFt: l });
+  const x = await dbAdd({ parentId: sc.parentId, name: 'DS-HIST', type: 'scenario', data: { bha: [row(1), row(2), row(3)] } });
+  dbSaveScenarioData(x, 'bha', [row(1), row(2), row(3), row(4)]);   // the good edit
+  dbSaveScenarioData(x, 'bha', []);                                   // a bug wipes it right after
+  for (let i = 0; i < 30; i++) dbSaveScenarioData(x, 'outputControls', { cdSFBurst: String(1 + i / 100) });
+  await drain();
+  const bhaHist = await dbHistory(x, 'bha');
+  const good = bhaHist.find(h => (h.data.bha || []).length === 4);
+  const ocHist = await dbHistory(x, 'outputControls');
+  if (good) await dbRestoreVersion(x, good.histId);
+  return { goodKept: !!good, ocVersions: ocHist.length, restoredRows: ((await dbGet(x)).data.bha || []).length };
+}, 'DS-S');
+
 // 7) Boot with the API unreachable: token must survive, app must recover
 let blockMe = 2;                       // fail the first 2 /auth/me probes
 await page.setRequestInterception(true);
@@ -198,6 +255,14 @@ check('offline tree says data is safe',     /data is safe/i.test(off.treeText) &
 check('reconnect flushes the WAL',          on.walLen === 0 && on.flushedBot === 5500 && /saved/i.test(on.indicator),
       `wal=${on.walLen}, bot=${on.flushedBot}`);
 check('tree recovers after reconnect',      on.treeOk === true);
+check('rejected save is parked, not stuck', guard.walLen === 0 && guard.parked === 1 && guard.parkedOk === true,
+      `wal=${guard.walLen}, parked=${guard.parked}`);
+check('saves behind a rejected one land',   guard.behindLanded === true);
+check('debounced control save hits its own scenario', guard.ocA === '1.40' && guard.ocB === '1.25',
+      `A=${guard.ocA}, B=${guard.ocB}`);
+check('good BHA survives a burst of chart saves', hist.goodKept === true && hist.restoredRows === 4,
+      `kept=${hist.goodKept}, restored rows=${hist.restoredRows}`);
+check('chart-settings bursts coalesce',     hist.ocVersions >= 1 && hist.ocVersions <= 5, `${hist.ocVersions} versions`);
 check('offline boot keeps the session',     during.tokenKept === true && during.loginShown === false,
       `token=${during.tokenKept}, login=${during.loginShown}, banner=${during.banner}`);
 check('boot recovers once server returns',  recovered.bootedTree === true && recovered.loginHidden === true,

@@ -139,15 +139,36 @@ async function handleApi(req, env, url) {
   // into node_history first (same atomic batch), deletes are soft (deleted_at),
   // and history can be listed/restored — so no future bug can make data
   // unrecoverable.
+  //
+  // Retention is PER OP (per data key): a burst of saves to one key can only
+  // evict older snapshots of that same key, never the history of the others
+  // (20 slider saves used to push every good BHA / casing version out).
+  // Chart settings (outputControls) keep fewer, and a chart-settings save within
+  // HIST_COALESCE_MS of the node's last snapshot of the same key is not
+  // snapshotted again (a slider drag is one version, not a hundred). Coalescing
+  // is for chart settings ONLY: for real data it would skip the snapshot holding
+  // a good edit made just before a bad write — the case this log exists for.
   const HIST_KEEP = 20;
+  const HIST_KEEP_OP = { 'data:outputControls': 5 };
+  const HIST_COALESCE_MS = 60000;
+  const HIST_COALESCE_OPS = new Set(['data:outputControls']);
+  const HIST_LIST_MAX = 200;
   const snapStmt = (nodeId, op) => env.DB.prepare(
     `INSERT INTO node_history (node_id,owner_id,parent_id,name,type,data,op,saved_at)
      SELECT id,owner_id,parent_id,name,type,data,?,? FROM nodes WHERE id=? AND owner_id=?`)
     .bind(op, Date.now(), nodeId, user.uid);
-  const pruneStmt = nodeId => env.DB.prepare(
-    `DELETE FROM node_history WHERE node_id=?1 AND id NOT IN (
-       SELECT id FROM node_history WHERE node_id=?1 ORDER BY id DESC LIMIT ${HIST_KEEP})`)
-    .bind(nodeId);
+  // Chart-settings saves: snapshot unless the node's newest snapshot is the same key and recent
+  const snapDataStmt = (nodeId, op) => !HIST_COALESCE_OPS.has(op) ? snapStmt(nodeId, op) : env.DB.prepare(
+    `INSERT INTO node_history (node_id,owner_id,parent_id,name,type,data,op,saved_at)
+     SELECT id,owner_id,parent_id,name,type,data,?1,?2 FROM nodes WHERE id=?3 AND owner_id=?4
+       AND NOT EXISTS (SELECT 1 FROM node_history h
+         WHERE h.id = (SELECT MAX(id) FROM node_history WHERE node_id=?3)
+           AND h.op=?1 AND h.saved_at > ?2 - ${HIST_COALESCE_MS})`)
+    .bind(op, Date.now(), nodeId, user.uid);
+  const pruneStmt = (nodeId, op) => env.DB.prepare(
+    `DELETE FROM node_history WHERE node_id=?1 AND op=?2 AND id NOT IN (
+       SELECT id FROM node_history WHERE node_id=?1 AND op=?2 ORDER BY id DESC LIMIT ?3)`)
+    .bind(nodeId, op, HIST_KEEP_OP[op] || HIST_KEEP);
 
   const listMatch = path === '/api/nodes';
   if (listMatch && method === 'GET') {
@@ -183,7 +204,7 @@ async function handleApi(req, env, url) {
     if (!sub && method === 'PUT') {
       const b = await req.json().catch(() => ({}));
       const [, , r] = await env.DB.batch([
-        snapStmt(id, 'update'), pruneStmt(id),
+        snapStmt(id, 'update'), pruneStmt(id, 'update'),
         env.DB.prepare(
           'UPDATE nodes SET name=?,type=?,parent_id=?,data=?,updated_at=? WHERE id=? AND owner_id=? AND deleted_at IS NULL')
           .bind(b.name ?? null, b.type ?? null, b.parentId ?? null,
@@ -196,7 +217,7 @@ async function handleApi(req, env, url) {
       if (!key) return err('key required');
       // Snapshot prior state + atomic per-key json_set, in one transaction.
       const [, , r] = await env.DB.batch([
-        snapStmt(id, 'data:' + key), pruneStmt(id),
+        snapDataStmt(id, 'data:' + key), pruneStmt(id, 'data:' + key),
         env.DB.prepare(
           "UPDATE nodes SET data=json_set(COALESCE(data,'{}'), '$.'||?, json(?)), updated_at=? WHERE id=? AND owner_id=? AND deleted_at IS NULL")
           .bind(key, JSON.stringify(value ?? null), Date.now(), id, user.uid),
@@ -206,7 +227,7 @@ async function handleApi(req, env, url) {
     if (sub === '/name' && method === 'PATCH') {
       const { name } = await req.json().catch(() => ({}));
       const [, , r] = await env.DB.batch([
-        snapStmt(id, 'rename'), pruneStmt(id),
+        snapStmt(id, 'rename'), pruneStmt(id, 'rename'),
         env.DB.prepare('UPDATE nodes SET name=?,updated_at=? WHERE id=? AND owner_id=? AND deleted_at IS NULL')
           .bind(name ?? null, Date.now(), id, user.uid),
       ]);
@@ -233,9 +254,14 @@ async function handleApi(req, env, url) {
 
     // --- history: list prior versions / restore one ---
     if (sub === '/history' && method === 'GET') {
+      // ?op=data:bha narrows to one key's versions; ?limit= (max HIST_LIST_MAX)
+      const hq = new URL(req.url).searchParams;
+      const op = hq.get('op');
+      const lim = Math.min(HIST_LIST_MAX, Math.max(1, +hq.get('limit') || HIST_LIST_MAX));
       const rows = await env.DB.prepare(
-        'SELECT id,op,saved_at,parent_id,name,type,data FROM node_history WHERE node_id=? AND owner_id=? ORDER BY id DESC LIMIT ?')
-        .bind(id, user.uid, HIST_KEEP).all();
+        `SELECT id,op,saved_at,parent_id,name,type,data FROM node_history
+         WHERE node_id=?1 AND owner_id=?2 AND (?3 IS NULL OR op=?3) ORDER BY id DESC LIMIT ?4`)
+        .bind(id, user.uid, op, lim).all();
       return json((rows.results || []).map(h => ({
         histId: h.id, op: h.op, savedAt: h.saved_at,
         parentId: h.parent_id, name: h.name, type: h.type,
@@ -250,7 +276,7 @@ async function handleApi(req, env, url) {
       if (!h) return err('History version not found', 404);
       // Snapshot the current state too, then restore (also revives soft-deleted).
       const [, , r] = await env.DB.batch([
-        snapStmt(id, 'pre-restore'), pruneStmt(id),
+        snapStmt(id, 'pre-restore'), pruneStmt(id, 'pre-restore'),
         env.DB.prepare(
           'UPDATE nodes SET name=?,type=?,parent_id=?,data=?,deleted_at=NULL,updated_at=? WHERE id=? AND owner_id=?')
           .bind(h.name, h.type, h.parent_id, h.data, Date.now(), id, user.uid),

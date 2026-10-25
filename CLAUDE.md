@@ -19,7 +19,8 @@ pre-server era, in browser IndexedDB/localStorage. This rule applies to EVERY ch
 - **Serialization/rename:** never rename or repurpose stored data keys (`traj1`, `bha`, `fluid`,
   `schematic`, …) without a migration that carries the old data forward.
 - **localStorage:** keys like `qp_token`, `qp_lastScenarioId`, `qp_sch_offsets_*`,
-  `qp_fd_offsets_*` may be added to, but not cleared or repurposed.
+  `qp_fd_offsets_*`, `qp_pending_saves` (the save queue) and `qp_parked_saves` may be added
+  to, but not cleared or repurposed.
 - **Verify before deploy:** any change that touches persistence must be proven data-safe
   (round-trip test: existing data still loads unchanged after the change).
 
@@ -32,12 +33,19 @@ recoverable, deleted data is not.
    `dbSaveScenarioData` drops all writes while it's set. Loads never write. (A real incident:
    loaders fire per-row saves via the AddRow helpers; out-of-order PATCH arrival truncated a
    user's casing table — commit 025d0b2.)
-2. **Write serialization** — `dbSaveScenarioData` chains saves per scenario so PATCHes can never
-   be reordered by the network.
+2. **Write serialization** — `dbSaveScenarioData` appends every save to a localStorage
+   write-ahead log (`qp_pending_saves`) drained by one sequential flusher, so PATCHes can never
+   be reordered by the network and offline edits survive. A save the server rejects for good
+   (4xx other than 401/408/429 — e.g. its scenario was deleted) is moved to `qp_parked_saves`
+   (kept; `dbParkedSaves()` in the console) so it can't block the queue. Debounced saves capture
+   their target scenario when scheduled, never when the timer fires (`saveOutputControls`).
 3. **Undo log** — the Worker snapshots a node's PRIOR state into `node_history` before every
-   mutation (same atomic batch, last 20 versions kept). List/restore:
-   `dbHistory(id)` / `dbRestoreVersion(id, histId)` from the console, or
-   `GET/POST /api/nodes/:id/history[/:hid/restore]`.
+   mutation (same atomic batch). Retention is **per key** (`op`, e.g. `data:bha`): 20 versions
+   each, so a burst of saves to one key can never evict another key's history; chart settings
+   (`data:outputControls`) keep 5 and a burst within 60 s is one version (coalescing is for chart
+   settings ONLY — on real data it would drop the good edit made just before a bad write).
+   List/restore: `dbHistory(id[, key])` / `dbRestoreVersion(id, histId)` from the console, or
+   `GET /api/nodes/:id/history[?op=data:bha&limit=N]`, `POST …/history/:hid/restore`.
 4. **Soft delete** — `DELETE /api/nodes/:id` sets `deleted_at` on the subtree (after
    snapshotting it); nothing is physically erased. `dbRestoreVersion` revives a deleted node.
 5. **Regression test (REQUIRED)** — before deploying ANY change touching persistence

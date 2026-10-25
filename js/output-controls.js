@@ -89,20 +89,28 @@ function _readOutputControls() {
 // Persist the current controls to the active scenario (debounced — the sliders
 // fire 'input' continuously during a drag).
 let _ocSaveTimer = null;
+let _ocPending = null;    // { sid, vals } — the debounced save, captured when scheduled
 let _ocLastLoaded = {};   // the scenario's stored outputControls, as loaded
+function _ocWritePending() {
+  const p = _ocPending;
+  _ocPending = null;
+  if (_ocSaveTimer) { clearTimeout(_ocSaveTimer); _ocSaveTimer = null; }
+  if (p) dbSaveScenarioData(p.sid, 'outputControls', p.vals);
+}
 function saveOutputControls() {
   if (typeof qpState === 'undefined' || !qpState.currentScenarioId) return;
   if (typeof dbSaveScenarioData !== 'function') return;
+  const sid = qpState.currentScenarioId;
+  // A save still pending for ANOTHER scenario goes out now, to that scenario
+  if (_ocPending && _ocPending.sid !== sid) _ocWritePending();
+  // RULE #1: the target scenario and the values are captured NOW, not when the
+  // timer fires — by then the user may have opened another scenario, and the
+  // old controls would land in it. Keys with no control any more (e.g. the
+  // removed broomstick bsDPwt) are carried forward from the loaded object.
+  _ocLastLoaded = { ..._ocLastLoaded, ..._readOutputControls() };
+  _ocPending = { sid, vals: _ocLastLoaded };
   if (_ocSaveTimer) clearTimeout(_ocSaveTimer);
-  _ocSaveTimer = setTimeout(() => {
-    _ocSaveTimer = null;
-    if (qpState.currentScenarioId) {
-      // RULE #1: keys with no control any more (e.g. the removed broomstick
-      // bsDPwt) are carried forward from the loaded object, never dropped.
-      _ocLastLoaded = { ..._ocLastLoaded, ..._readOutputControls() };
-      dbSaveScenarioData(qpState.currentScenarioId, 'outputControls', _ocLastLoaded);
-    }
-  }, 200);
+  _ocSaveTimer = setTimeout(_ocWritePending, 200);
 }
 
 // Display value for a control given the saved (canonical) vals object.
