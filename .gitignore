@@ -2,3 +2,6 @@ node_modules
 .wrangler
 .dev.vars
 package-lock.json
+
+# graphify knowledge-graph output (local only)
+graphify-out
