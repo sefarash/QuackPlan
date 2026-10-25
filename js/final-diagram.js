@@ -152,7 +152,21 @@ function _fdTubeWalls(pathPts, hw) {
     left.push({ x: cur.x + px * hw, y: cur.y + py * hw });
     right.push({ x: cur.x - px * hw, y: cur.y - py * hw });
   }
-  return { left, right };
+  return { left: _fdUnfold(left, pathPts), right: _fdUnfold(right, pathPts) };
+}
+
+// On the inside of a bend tighter than the offset, the offset wall runs
+// BACKWARDS for a few points and folds over itself — drawn, that is a spike.
+// Drop the points that would step against the direction of travel.
+function _fdUnfold(side, path) {
+  const out = [side[0]];
+  for (let i = 1; i < side.length; i++) {
+    const a = out[out.length - 1], b = side[i];
+    const tx = path[i].x - path[i - 1].x, ty = path[i].y - path[i - 1].y;
+    if ((b.x - a.x) * tx + (b.y - a.y) * ty > 0) out.push(b);
+  }
+  if (out.length < 2) out.push(side[side.length - 1]);
+  return out;
 }
 
 function _fdFillBand(ctx, a, b, fillStyle) {
@@ -165,6 +179,7 @@ function _fdFillBand(ctx, a, b, fillStyle) {
 
 function _fdStrokeLine(ctx, pts, color, lw, dash) {
   ctx.strokeStyle = color; ctx.lineWidth = lw;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
   ctx.setLineDash(dash || []);
   ctx.beginPath();
   pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
@@ -172,9 +187,11 @@ function _fdStrokeLine(ctx, pts, color, lw, dash) {
   ctx.setLineDash([]);
 }
 
-// Sample the survey at evenly-spaced MD intervals for a section
+// Sample the survey at evenly-spaced MD intervals for a section. Pass the
+// minimum-curvature densified survey (_densify): interpolating the raw stations
+// linearly turns every build / turn into a hard corner.
 function _fdSamplePath(survey, topMD, botMD, toX, toY) {
-  const n = Math.max(20, Math.ceil((botMD - topMD) / 40));
+  const n = Math.max(40, Math.ceil((botMD - topMD) / 20));
   const pts = [];
   for (let i = 0; i <= n; i++) {
     const md = topMD + (botMD - topMD) * i / n;
@@ -211,7 +228,7 @@ function drawFinalDiagram() {
   ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
 
   // ── Coordinate bounds ────────────────────────────────────────────────────────
-  const dense = _densify(survey, 30);
+  const dense = _densify(survey, 10);   // min-curvature arcs: smooth bends for every tube
   const xMax  = Math.max(...dense.map(s => Math.sqrt(s.north*s.north + s.east*s.east)), 10) * 1.18;
   const yMax  = Math.max(...dense.map(s => s.tvd), 100) * 1.08;
 
@@ -246,7 +263,7 @@ function drawFinalDiagram() {
     const idHW  = inToPx(_fdGetID(row)) / 2;
     const wCol  = SCH_WALL[row.def] || '#4a7fa8';
     const isOH  = row.def === 'Open Hole';
-    const pts   = _fdSamplePath(survey, topMD, botMD, toX, toY);
+    const pts   = _fdSamplePath(dense, topMD, botMD, toX, toY);
 
     // Bore fluid fill
     const { left: idL, right: idR } = _fdTubeWalls(pts, Math.max(idHW, 1));
@@ -273,7 +290,7 @@ function drawFinalDiagram() {
     if (!isOH && row.def !== 'Tubing' && row.toc != null && +row.toc < botMD && typeof _schCementSegments === 'function') {
       const pat = _schCementPattern(ctx);
       for (const seg of _schCementSegments(row, schRows)) {
-        const cpts = _fdSamplePath(survey, seg.from, seg.to, toX, toY);
+        const cpts = _fdSamplePath(dense, seg.from, seg.to, toX, toY);
         if (!cpts || cpts.length < 2) continue;
         const outHW = Math.max(inToPx(seg.outerDia) / 2, odHW + 1.5);
         const { left: cOdL, right: cOdR } = _fdTubeWalls(cpts, odHW);
@@ -287,8 +304,9 @@ function drawFinalDiagram() {
     // pointing up-hole, exactly like the well-schematic shoe (but oriented to the
     // local wellpath tangent).
     if (!isOH) {
+      // tangent over the last few samples — steadier than one short step
       const p  = pts[pts.length - 1];
-      const p2 = pts[pts.length - 2] || pts[0];
+      const p2 = pts[Math.max(0, pts.length - 4)];
       const tx = p.x - p2.x, ty = p.y - p2.y;
       const len = Math.sqrt(tx*tx + ty*ty) || 1;
       const tux = tx/len, tuy = ty/len;     // unit tangent, down-hole
@@ -321,7 +339,7 @@ function drawFinalDiagram() {
   hoRows.forEach(row => {
     const midMD = row.topMD != null ? row.topMD : row.botMD;
     if (midMD == null) return;
-    const st  = _interpSurvey(survey, midMD);
+    const st  = _interpSurvey(dense, midMD);
     const dep = Math.sqrt(st.north*st.north + st.east*st.east);
     const x   = toX(dep), y = toY(st.tvd);
 
@@ -346,7 +364,7 @@ function drawFinalDiagram() {
     // plot space, then draw the cross-bar perpendicular to it.
     const mdLo = Math.max(survey[0].md, midMD - 30);
     const mdHi = Math.min(survey[survey.length - 1].md, midMD + 30);
-    const sLo = _interpSurvey(survey, mdLo), sHi = _interpSurvey(survey, mdHi);
+    const sLo = _interpSurvey(dense, mdLo), sHi = _interpSurvey(dense, mdHi);
     const xLo = toX(Math.hypot(sLo.north, sLo.east)), yLo = toY(sLo.tvd);
     const xHi = toX(Math.hypot(sHi.north, sHi.east)), yHi = toY(sHi.tvd);
     let tx = xHi - xLo, ty = yHi - yLo;
@@ -373,7 +391,7 @@ function drawFinalDiagram() {
   // ── Casing labels (leader lines to shoe) ─────────────────────────────────────
   schRows.forEach(row => {
     const botMD = +(row.bot);
-    const st    = _interpSurvey(survey, botMD);
+    const st    = _interpSurvey(dense, botMD);
     const dep   = Math.sqrt(st.north*st.north + st.east*st.east);
     const x     = toX(dep), y = toY(st.tvd);
     const odHW  = inToPx(row.size) / 2;
