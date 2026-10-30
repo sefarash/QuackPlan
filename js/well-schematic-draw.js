@@ -114,7 +114,7 @@ function drawSchematic(survey) {
   // Positions stay in imperial (self-scaling); depth LABELS convert to display
   const _toD    = v => QP_UNITS.toDisplay('depth', v);
   const _uD     = QP_UNITS.label('depth');
-  const _uTick  = QP_UNITS.isMetric() ? 'm' : "'";
+  const _uTick  = QP_UNITS.unit('depth') === 'm' ? 'm' : "'";
 
   // ── Layout ─────────────────────────────────────────────────────────────────
   const PAD_T = 90, PAD_B = 24, PAD_L = 46, PAD_R = 8;
@@ -378,7 +378,7 @@ function _drawDatumLines(ctx, W, H, cx, PAD_T, PAD_B, scaleY, maxDepth) {
   const datums = qpState.wellDatums;
 
   // Datum distances (rkb/gl/water depth) are imperial ft → display for labels
-  const _bd = ft => Math.round(QP_UNITS.toDisplay('depth', ft)) + (QP_UNITS.isMetric() ? 'm' : "'");
+  const _bd = ft => Math.round(QP_UNITS.toDisplay('depth', ft)) + (QP_UNITS.unit('depth') === 'm' ? 'm' : "'");
 
   const X0   = 2;
   const X1   = cx - 4;

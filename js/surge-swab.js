@@ -196,8 +196,7 @@ function _ssDrawTable(ctx, C, rows, reverse, x, y, title) {
 
   // Rows hold imperial values (ft, ft/min) — convert at render only
   const toD    = v => Math.round(QP_UNITS.toDisplay('depth', v)).toLocaleString();
-  const metric = QP_UNITS.isMetric();
-  const fmtSpd = v => metric ? (Math.round(QP_UNITS.toDisplay('speed', v) * 10) / 10) : v;
+  const fmtSpd = v => +QP_UNITS.fmt('speed', v);
 
   ctx.fillStyle = 'rgba(20,30,45,0.82)';
   ctx.fillRect(x, y, TW, TH);
@@ -256,9 +255,8 @@ function drawSurgeSwab() {
   const uMW   = QP_UNITS.label('mw');
   const uD    = QP_UNITS.label('depth');
   const uSpd  = QP_UNITS.label('speed');
-  const metric = QP_UNITS.isMetric();
-  const fmtEcd = v => metric ? v.toFixed(0) : v.toFixed(2);          // axis ticks (display units)
-  const fmtSpd = v => metric ? (Math.round(toSpd(v) * 10) / 10) : v; // legend/table (display units)
+  const fmtEcd = v => v.toFixed(QP_UNITS.dp('mw'));                  // axis ticks (display units)
+  const fmtSpd = v => +QP_UNITS.fmt('speed', v);                      // legend/table (display units)
 
   // ── Input values — speed fields are display units → imperial (empty falls
   //    back to the imperial HTML defaults un-converted) ────────────────────────

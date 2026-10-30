@@ -31,17 +31,18 @@ function _ktHYZ(Pr, Tr) {
   return A * Pr / y;
 }
 
-// Temperature conversions (offset, so handled inline — not the factor-based units).
-const _KT_GEO = 1.822688;   // °F/100ft ↔ °C/100m scale
-function _ktTempToImp(v)  { return QP_UNITS.isMetric() ? (+v * 9 / 5 + 32) : +v; }   // display → °F
-function _ktTempToDisp(f) { return QP_UNITS.isMetric() ? ((f - 32) * 5 / 9) : f; }   // °F → display
-function _ktGeoToImp(v)   { return QP_UNITS.isMetric() ? (+v / _KT_GEO) : +v; }       // display → °F/100ft
-function _ktGeoToDisp(g)  { return QP_UNITS.isMetric() ? (g * _KT_GEO) : g; }
-function _ktUTemp()       { return QP_UNITS.isMetric() ? '°C' : '°F'; }
-function _ktUGeo()        { return QP_UNITS.isMetric() ? '°C/100m' : '°F/100ft'; }
-// convert a value between two explicit systems (for the unit toggle)
-function _ktConvTemp(v, from, to) { return from === to ? +v : (from === 'imperial' ? (+v - 32) * 5 / 9 : +v * 9 / 5 + 32); }
-function _ktConvGeo(v, from, to)  { return from === to ? +v : (from === 'imperial' ? +v * _KT_GEO : +v / _KT_GEO); }
+// Temperature helpers — thin names over the 'temp' / 'tgrad' quantities of
+// QP_UNITS (which carry the °F→°C offset); kept because thermal.js and
+// casing-triaxial.js call them.
+function _ktTempToImp(v)  { return QP_UNITS.fromDisplay('temp', v); }    // display → °F
+function _ktTempToDisp(f) { return QP_UNITS.toDisplay('temp', f); }      // °F → display
+function _ktGeoToImp(v)   { return QP_UNITS.fromDisplay('tgrad', v); }   // display → °F/100ft
+function _ktGeoToDisp(g)  { return QP_UNITS.toDisplay('tgrad', g); }
+function _ktUTemp()       { return QP_UNITS.label('temp'); }
+function _ktUGeo()        { return QP_UNITS.label('tgrad'); }
+// convert a value between two explicit systems (for the unit switch)
+function _ktConvTemp(v, from, to) { return QP_UNITS.convert('temp',  v, from, to); }
+function _ktConvGeo(v, from, to)  { return QP_UNITS.convert('tgrad', v, from, to); }
 
 // ── KT / PPFG unit-system wiring ───────────────────────────────────────────────
 function _ktUpdateLabels() {
@@ -58,7 +59,8 @@ function _ktUpdateLabels() {
   set('hdrPpfgFG',  `Min Frac Gradient (${QP_UNITS.label('mw')})`);
 }
 
-function _ktConvertFields(fromSys, toSys) {
+// The model-input fields only (not the PPFG table, which ppfgAddRow fills in display units)
+function _ktConvertInputs(fromSys, toSys) {
   const conv = (id, q) => { const el = document.getElementById(id); if (el && el.value !== '') el.value = +QP_UNITS.convert(q, +el.value, fromSys, toSys).toFixed(2); };
   conv('ktSafety', 'press');
   conv('ktInfluxGrad', 'pgrad');
@@ -66,6 +68,10 @@ function _ktConvertFields(fromSys, toSys) {
   if (st && st.value !== '') st.value = +_ktConvTemp(+st.value, fromSys, toSys).toFixed(1);
   const gg = document.getElementById('ktGeoGrad');
   if (gg && gg.value !== '') gg.value = +_ktConvGeo(+gg.value, fromSys, toSys).toFixed(3);
+}
+
+function _ktConvertFields(fromSys, toSys) {
+  _ktConvertInputs(fromSys, toSys);
   // PPFG table: TVD (depth), PP/FG (mw)
   const body = document.getElementById('ppfgBody');
   if (body) for (const tr of body.rows) {
@@ -265,7 +271,7 @@ function drawKickTolerance() {
   const maxTVD  = survey.length ? survey[survey.length - 1].tvd : 10000;
   const mw      = ((typeof fluidBase === 'function') ? fluidBase() : fluidGet()).mudWeight || 10;   // well default (chart line)
   const el      = document.getElementById('ktMWdisplay');
-  if (el) el.textContent = QP_UNITS.toDisplay('mw', mw).toFixed(QP_UNITS.isMetric() ? 0 : 1);
+  if (el) el.textContent = QP_UNITS.fmt('mw', mw);
   const uMWel = document.getElementById('ktMWunit');
   if (uMWel) uMWel.textContent = QP_UNITS.label('mw');
   const thEl = document.getElementById('ktThermalNote');
@@ -499,9 +505,9 @@ function _renderKTTable(results, inp) {
   if (!div) return;
 
   const dD = v => Math.round(QP_UNITS.toDisplay('depth', v)).toLocaleString();
-  const dM = v => QP_UNITS.toDisplay('mw', v).toFixed(QP_UNITS.isMetric() ? 0 : 2);
+  const dM = v => QP_UNITS.fmt('mw', v);
   const dP = v => Math.round(QP_UNITS.toDisplay('press', v)).toLocaleString();
-  const dV = v => v === Infinity ? '∞' : QP_UNITS.toDisplay('volume', v).toFixed(QP_UNITS.isMetric() ? 2 : 1);
+  const dV = v => v === Infinity ? '∞' : QP_UNITS.fmt('volume', v);
   const uD = QP_UNITS.label('depth'), uMW = QP_UNITS.label('mw'),
         uP = QP_UNITS.label('press'), uV = QP_UNITS.label('volume');
   const ktTxt = g => g.infinite ? '∞' : dV(g.kt);
@@ -602,13 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   _ktUpdateLabels();
-  // On a metric startup, convert the static HTML KT model-input defaults
+  // On a non-imperial startup, convert the static HTML KT model-input defaults
   // (PPFG fields are already display-correct via ppfgAddRow above).
-  if (QP_UNITS.isMetric()) {
-    const conv = (id, q) => { const el = document.getElementById(id); if (el && el.value !== '') el.value = +QP_UNITS.convert(q, +el.value, 'imperial', 'metric').toFixed(2); };
-    conv('ktSafety', 'press');
-    conv('ktInfluxGrad', 'pgrad');
-    const st = document.getElementById('ktSurfTemp'); if (st && st.value !== '') st.value = +_ktConvTemp(+st.value, 'imperial', 'metric').toFixed(1);
-    const gg = document.getElementById('ktGeoGrad');  if (gg && gg.value !== '') gg.value = +_ktConvGeo(+gg.value, 'imperial', 'metric').toFixed(3);
-  }
+  if (QP_UNITS.get() !== 'imperial') _ktConvertInputs('imperial', QP_UNITS.get());
 });

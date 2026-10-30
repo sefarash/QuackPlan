@@ -46,8 +46,8 @@ function drawHydSweep(h) {
   _lblReserve(opX - 6, opY - 6, 12, 12);
   _lblQueue(`${Math.round(toF(h.flowRate))} ${uF} / ${Math.round(toP(h.pumpPressure))} ${uP}`, opX, opY,
     { dx: 8, dy: -15, font: '10px sans-serif', bounds: g, dir: -1 });
-  const esdTxt = h.tempCorr ? `  (P/T-corrected, ESD ${toM(h.esdAtBit).toFixed(uM === 'ppg' ? 2 : 0)})` : '';
-  _lblQueue(`ECD at bit: ${toM(h.ecdAtBit).toFixed(uM === 'ppg' ? 2 : 0)} ${uM}${esdTxt}   HSI: ${h.hsi?.toFixed(2) ?? '—'}`,
+  const esdTxt = h.tempCorr ? `  (P/T-corrected, ESD ${QP_UNITS.fmt('mw', h.esdAtBit)})` : '';
+  _lblQueue(`ECD at bit: ${QP_UNITS.fmt('mw', h.ecdAtBit)} ${uM}${esdTxt}   HSI: ${h.hsi?.toFixed(2) ?? '—'}`,
     g.l + 2, g.t + 4, { pin: true, font: '11px sans-serif', bounds: g });
   _lblFlush(ctx);
 

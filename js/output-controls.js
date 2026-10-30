@@ -67,8 +67,9 @@ function _ocConvertPlainFields(fromSys, toSys) {
 
 // The range sliders and the min/max inputs that drive their range + a metric step.
 const _OC_SLIDERS = [
-  { slider: 'hydMWslider',   min: 'hydMWmin',   max: 'hydMWmax',   qty: 'mw',   stepImp: 0.5, stepMet: 5  },
-  { slider: 'hydFlowSlider', min: 'hydFlowMin', max: 'hydFlowMax', qty: 'flow', stepImp: 10,  stepMet: 25 },
+  // step per display unit (QP_UNITS.unit(qty))
+  { slider: 'hydMWslider',   min: 'hydMWmin',   max: 'hydMWmax',   qty: 'mw',   step: { ppg: 0.5, kgm3: 5, sg: 0.05 } },
+  { slider: 'hydFlowSlider', min: 'hydFlowMin', max: 'hydFlowMax', qty: 'flow', step: { gpm: 10, Lmin: 25 } },
 ];
 
 let _ocLoaded = false;
@@ -130,14 +131,13 @@ function _ocDisplayValue(id, vals) {
 // for the active system. Must run BEFORE the slider value is set, or the browser
 // clamps the value to the stale range.
 function _ocSyncSliderRanges() {
-  const metric = QP_UNITS.isMetric();
   _OC_SLIDERS.forEach(s => {
     const sl = document.getElementById(s.slider);
     if (!sl) return;
     const a = document.getElementById(s.min), b = document.getElementById(s.max);
     if (a) sl.min = a.value;
     if (b) sl.max = b.value;
-    sl.step = metric ? s.stepMet : s.stepImp;
+    sl.step = s.step[QP_UNITS.unit(s.qty)] || s.step[Object.keys(s.step)[0]];
   });
 }
 
@@ -198,12 +198,12 @@ function loadOutputControls(vals) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Sync labels/ranges to the current system on startup. If starting in metric
-  // with no scenario loaded yet, convert the static HTML default slider fields
-  // (scenario load, when it happens, sets absolute display values anyway).
-  if (!_ocLoaded && QP_UNITS.isMetric()) {
-    _ocConvertPlainFields('imperial', 'metric');
-    _ocRetuneSliders('imperial', 'metric');
+  // Sync labels/ranges to the current system on startup. If starting in a
+  // non-imperial system with no scenario loaded yet, convert the static HTML
+  // default fields (scenario load, when it happens, sets absolute display values anyway).
+  if (!_ocLoaded && QP_UNITS.get() !== 'imperial') {
+    _ocConvertPlainFields('imperial', QP_UNITS.get());
+    _ocRetuneSliders('imperial', QP_UNITS.get());
   } else {
     _ocSyncSliderRanges();
     _ocSyncSliderLabels();

@@ -78,7 +78,9 @@
     </div>
     <button class="hdr-btn" onclick="showNewProjectModal()">+ Project</button>
     <button class="hdr-btn primary" onclick="qpCompute()">⚡ Run</button>
-    <button class="hdr-btn" id="unitToggle" onclick="qpToggleUnits()" title="Toggle imperial / metric units">Imperial</button>
+    <select class="hdr-btn" id="unitSelect" onchange="qpSetUnits(this.value)" title="Unit system">
+      <option value="imperial">Imperial</option>
+    </select>
     <span id="authAccount" class="hdr-account" title="Signed-in account"></span>
     <button class="hdr-btn" id="tourBtn" onclick="QP_TOUR.start()" title="Guided tour with a sample well">? Tour</button>
     <button class="hdr-btn" onclick="qpLogout()" title="Sign out">Sign out</button>

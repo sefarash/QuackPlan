@@ -413,10 +413,9 @@ function drawCasingTriaxial() {
   // Display helpers: force (klbf→kN), stress (psi → kpsi | MPa), dogleg
   const _dF = v => Math.round(QP_UNITS.toDisplay('force', v)).toLocaleString();
   const _uF = QP_UNITS.label('force');
-  const _met = QP_UNITS.isMetric();
-  const _dStress  = psi => _met ? (psi * 0.00689476).toFixed(0) : (psi / 1000).toFixed(0);
-  const _dStress1 = psi => _met ? (psi * 0.00689476).toFixed(1) : (psi / 1000).toFixed(1);
-  const _uStress  = _met ? 'MPa' : 'kpsi';
+  const _dStress  = psi => QP_UNITS.fmt('stress', psi, 0);
+  const _dStress1 = psi => QP_UNITS.fmt('stress', psi, 1);
+  const _uStress  = QP_UNITS.label('stress');
   const jointStr = (jointYield_klbf != null && jointYield_klbf < bodyYield_klbf)
     ? `  ·  Joint Yield = ${_dF(jointYield_klbf)} ${_uF}`
     : '';

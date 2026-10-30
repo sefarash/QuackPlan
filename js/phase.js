@@ -220,9 +220,15 @@ function qpPhaseChanged(v) {
 document.addEventListener('DOMContentLoaded', qpPhaseRebuildSelector);
 
 // The selector labels and the "runs to" note carry depths in display units.
-if (typeof QP_UNITS !== 'undefined' && QP_UNITS.onChange) {
-  QP_UNITS.onChange(() => {
-    qpPhaseRebuildSelector();
-    if (typeof qpUpdateDataBanner === 'function') qpUpdateDataBanner();
-  });
-}
+// Registered at DOMContentLoaded so it runs AFTER the input panels' listeners
+// (registered at script parse — trajectory-input.js converts the schematic
+// fields): rebuilding first read the still-unconverted fields through the new
+// system, mislabelling every depth and dropping a selected section to 'auto'.
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof QP_UNITS !== 'undefined' && QP_UNITS.onChange) {
+    QP_UNITS.onChange(() => {
+      qpPhaseRebuildSelector();
+      if (typeof qpUpdateDataBanner === 'function') qpUpdateDataBanner();
+    });
+  }
+});

@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Convert the static HTML default fields to display units on a metric startup,
   // unless a scenario has already populated them (fluidLoadState sets absolute
   // display values, so either order is correct).
-  if (!_fluidLoaded && QP_UNITS.isMetric()) _fluidConvertFields('imperial', 'metric');
+  if (!_fluidLoaded && QP_UNITS.get() !== 'imperial') _fluidConvertFields('imperial', QP_UNITS.get());
   document.querySelectorAll('.fann-grid input').forEach(i => i.addEventListener('change', fluidChanged));
   _fluidModelChanged();
 });

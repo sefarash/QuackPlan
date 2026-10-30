@@ -55,7 +55,7 @@ function generateReport() {
 
   const well     = esc(document.getElementById('hdrWellName')?.textContent || 'Well');
   const scenario = esc(document.getElementById('hdrScenarioName')?.textContent || '—');
-  const sys      = QP_UNITS.isMetric() ? 'Metric (SI)' : 'Imperial (field)';
+  const sys      = QP_UNITS.name();
   const totDays  = esc(document.getElementById('actTotalDays')?.textContent || '—');
   const totCost  = esc(document.getElementById('actTotalCost')?.textContent || '—');
 
